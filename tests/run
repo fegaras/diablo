@@ -1,0 +1,7 @@
+#/bin/bash
+
+DIABLO="$(cd `dirname $0`/..; pwd -P)"
+
+jar cf test.jar -C classes .
+
+scala -cp ${DIABLO}/lib/diablo.jar:test.jar -J-Xmx4G -J-Xms4G -J-Xss128M Test $*
