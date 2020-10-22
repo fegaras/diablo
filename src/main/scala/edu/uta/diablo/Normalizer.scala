@@ -166,6 +166,9 @@ object Normalizer {
         => // lift all env vars except the group-by pattern vars
            val nenv = freeEnv(p,env).map{ case (v,x) => (v,Seq(List(x))) }
            GroupByQual(p,normalize(substE(u,env)))::normalize(head,r,nenv,Map())
+      case AssignQual(d,u)::r
+        => AssignQual(substE(d,env),substE(u,env))::normalize(head,r,env,opts)
+      case q::r => q::normalize(head,r,env,opts)
     }
 
   /** normalize an expression */
@@ -177,9 +180,13 @@ object Normalizer {
            normalize(if (isSimple(nu) || occurrences(v,nb) <= 1)
                         subst(Var(v),nu,nb)
                      else Let(p,nu,nb))
+      case Apply(Lambda(p,b),u)
+        => Let(p,u,b)
       case Let(VarPat(v),u,b)
         if isSimple(u) || occurrences(v,b) <= 1
         => normalize(subst(Var(v),u,b))
+      case Let(TuplePat(ps),Tuple(us),b)
+        => (ps zip us).foldLeft(b){ case (r,(p,u)) => Let(p,u,r) }
       case Comprehension(h,List())
         => Seq(List(normalize(h)))
       case Comprehension(h,Predicate(p)::qs)
@@ -196,6 +203,37 @@ object Normalizer {
                   else normalize(nc)
              case _ => Seq(Nil)
            }
+      case flatMap(Lambda(VarPat(v),Seq(List(Var(w)))),x)
+        if v == w
+        => normalize(x)
+      case flatMap(Lambda(VarPat(v),Let(p,Var(w),b)),x)
+        if v == w && occurrences(v,b) == 0
+        => normalize(flatMap(Lambda(p,b),x))
+      case flatMap(f,flatMap(g,x))
+        => val Lambda(p,b) = renameVars(g)
+           normalize(flatMap(Lambda(p,flatMap(f,b)),x))
+      case flatMap(Lambda(_,_),x@Seq(Nil))
+        => x
+      case flatMap(Lambda(p@VarPat(v),b),Seq(List(Var(w))))
+        => normalize(subst(Var(v),Var(w),b))
+      case flatMap(Lambda(p@VarPat(v),b),Seq(List(x)))
+        => normalize(if (occurrences(v,b) <= 1)
+                        subst(Var(v),x,b)
+                     else Let(p,x,b))
+      case flatMap(Lambda(TuplePat(ps),b),Seq(List(Tuple(es))))
+        => normalize((ps zip es).foldLeft(b){ case (r,(p,e)) => Let(p,e,r) })
+      case flatMap(Lambda(p,b),Seq(List(x)))
+        => normalize(Let(p,x,b))
+      case flatMap(f,IfE(c,e1,e2))
+        => normalize(IfE(c,flatMap(f,e1),flatMap(f,e2)))
+      case groupBy(x@Seq(List()))
+        => x
+      case groupBy(groupBy(x))
+        => val nv = newvar
+           val kv = newvar
+           normalize(flatMap(Lambda(TuplePat(List(VarPat(kv),VarPat(nv))),
+                                    Seq(List(Tuple(List(Var(kv),Seq(List(Var(nv)))))))),
+                             groupBy(x)))
       case reduce(m,Seq(List(x)))
         => normalize(x)
       case reduce(m,Seq(Nil))

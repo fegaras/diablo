@@ -62,20 +62,21 @@ class MyLexical extends StdLexical with MyTokens {
 }
 
 object Parser extends StandardTokenParsers {
+  import AST._
   var queryText: String = ""
 
   override val lexical = new MyLexical
 
   lexical.delimiters += ( "(" , ")" , "[", "]", "{", "}", "," , ":", ";", ".", "=>", "=", "->", "<-",
                           "||", "&&", "!", "==", "<=", ">=", "<", ">", "!=", "+", "-", "*", "/", "%",
-                          "#", "^", "|", "&", "+=", "*=", "&&=", "||=" )
+                          "#", "^", "|", "&", "+=", "*=", "&&=", "||=", ".." )
 
   lexical.reserved += ( "var", "for", "in", "do", "while", "if", "else", "true", "false", "def", "let",
-                        "return", "typemap", "to", "with", "array" )
+                        "return", "typemap", "to", "with", "group", "by" )
 
   /* groups of infix operator precedence, from low to high */
   val operator_precedence: List[Parser[String]]
-      = List( "||", "^", "&&"|"&", "<="|">="|"<"|">", "=="|"!=", "+"|"-", "*"|"/"|"%", ":" )
+      = List( "..", "||", "^", "&&"|"&", "<="|">="|"<"|">", "=="|"!=", "+"|"-", "*"|"/"|"%", ":" )
 
   /* all infix operators not listed in operator_precedence have the same highest precedence */  
   val infixOpr: Parser[String]
@@ -88,7 +89,8 @@ object Parser extends StandardTokenParsers {
   /* group infix operations into terms based on the operator precedence, from low to high */
   def terms ( level: Int ): Parser[(Expr,Expr)=>Expr]
       = precedence(level) ^^
-        { op => (x:Expr,y:Expr) => MethodCall(x,op,List(y)) }
+        { case ".." => (x:Expr,y:Expr) => Range(x,y,IntConst(1))
+          case op => (x:Expr,y:Expr) => MethodCall(x,op,List(y)) }
   def infix ( level: Int ): Parser[Expr]
       = if (level >= precedence.length) conses
         else infix(level+1) * terms(level)
@@ -141,12 +143,13 @@ object Parser extends StandardTokenParsers {
                           case (r,Project(_,a)) => Project(r,a)
                           case (r,Nth(_,n)) => Nth(r,n)
                           case (r,Index(_,s)) => Index(r,s)
+                          case (r,MethodCall(_,m,el)) => MethodCall(r,m,el)
                           case (r,_) => r } }
 
   def qual: Parser[Qualifier]
       = ( "group" ~ "by" ~ pat ~ opt( ":" ~ expr ) ^^
           { case _~_~p~Some(_~e) => GroupByQual(p,e)
-            case _~_~p~None => GroupByQual(p,AST.toExpr(p)) }
+            case _~_~p~None => GroupByQual(p,toExpr(p)) }
         | "let" ~ pat ~ "=" ~ expr ^^
           { case _~p~_~e => LetBinding(p,e) }
         | pat ~ ("<-" | "=") ~ expr ^^
@@ -162,7 +165,7 @@ object Parser extends StandardTokenParsers {
   def term: Parser[Expr]
       = ( compr
         | ident ~ "(" ~ repsep( expr, "," ) ~ ")" ~ opt( compr ) ^^
-          { case n~_~el~_~Some(c) => Call(n,List(Tuple(el),c))
+          { case n~_~el~_~Some(c) => Call(n,el:+c)
             case n~_~es~_~None => Call(n,es) }
         | ident ~ compr ^^
           { case n~c => Call(n,List(c)) }
@@ -177,7 +180,7 @@ object Parser extends StandardTokenParsers {
         | "true" ^^^ { BoolConst(true) }
         | "false" ^^^ { BoolConst(false) }
         | "{" ~> rep1sep( "case" ~ pat ~ opt( "if" ~> expr ) ~ "=>" ~ expr, sem ) <~ "}" ^^
-          { cs => { val nv = AST.newvar
+          { cs => { val nv = newvar
                     Lambda(VarPat(nv),
                            MatchE(Var(nv),
                                   cs.map{ case _~p~Some(c)~_~b => Case(p,c,b)
@@ -219,17 +222,32 @@ object Parser extends StandardTokenParsers {
         | failure("illegal start of pattern")
         )
 
+  def subst ( tp: Type, s: List[String] ): Type
+    = tp match {
+        case BasicType(n) if s.contains(n) => TypeParameter(n)
+        case _ => apply(tp,subst(_,s))
+      }
+
+  def subst ( e: Expr, s: List[String] ): Expr
+    = e match {
+        case VarDecl(v,at,b)
+          => VarDecl(v,subst(at,s),subst(b,s))
+        case _ => apply(e,subst(_,s))
+      }
+
   def stmt: Parser[Stmt]
       = ( "var" ~ ident ~ ":" ~ stype ~ opt( "=" ~ expr ) ^^
           { case _~v~_~t~None => VarDeclS(v,Some(t),None)
             case _~v~_~t~Some(_~e) => VarDeclS(v,Some(t),Some(e)) }
         | "var" ~ ident ~ "=" ~ expr ^^
           { case _~v~_~e => VarDeclS(v,None,Some(e)) }
-        | "typemap" ~ opt("[" ~ rep1sep(ident,",") ~ "]") ~ stype ~ "to" ~ stype ~ "with" ~ expr ~ "," ~ expr ^?
-          { case _~Some(_~s~_)~ft~_~tt~_~(h1@Lambda(_,_))~_~(h2@Lambda(_,_))
-              => TypeMapS(s,ft,tt,h1,h2)
-            case _~None~ft~_~tt~_~(h1@Lambda(_,_))~_~(h2@Lambda(_,_))
-              => TypeMapS(Nil,ft,tt,h1,h2) }
+        | "typemap" ~ ident ~ opt("[" ~ rep1sep(ident,",") ~ "]") ~ "=" ~ stype
+                    ~ "from" ~ stype ~ "to" ~ stype ~ "with" ~ expr ~ "," ~ expr ^?
+          { case _~v~Some(_~s~_)~_~at~_~ft~_~tt~_~(h1@Lambda(_,_))~_~(h2@Lambda(_,_))
+              => TypeMapS(v,s,subst(at,s),subst(ft,s),subst(tt,s),
+                          subst(h1,s).asInstanceOf[Lambda],subst(h2,s).asInstanceOf[Lambda])
+            case _~v~None~_~at~_~ft~_~tt~_~(h1@Lambda(_,_))~_~(h2@Lambda(_,_))
+              => TypeMapS(v,Nil,at,ft,tt,h1,h2) }
         | "{" ~ rep( stmt ~ ";" ) ~ "}" ^^
           { case _~ss~_ => if (ss.length==1) ss.head match { case s~_ => s }
                            else BlockS(ss.map{ case s~_ => s }) }
@@ -271,16 +289,14 @@ object Parser extends StandardTokenParsers {
           { case _~ts~_ => if (ts.length==1) ts.head else TupleType(ts) }
         | "<" ~ rep1sep( ident ~ ":" ~ stype, "," ) ~ ">" ^^
           { case _~cs~_ => RecordType(cs.map{ case n~_~t => (n,t)}.toMap) }
-        | "array" ~ "[" ~ int ~ "," ~ stype ~ "]" ^^
-          { case _~_~d~_~t~_ => ArrayType(d,t) }
+        | ident ~ "[" ~ int ~ "," ~ stype ~ "]" ^?
+          { case "array"~_~d~_~t~_ => ArrayType(d,t)
+            case "darray"~_~d~_~t~_ if d <= 9 => ParametricType("darray"+d,List(t)) }
         | ident ~ "[" ~ rep1sep( stype, "," ) ~ "]" ^^
           { case "list"~_~List(t)~_ => SeqType(t)
             case "vector"~_~List(t)~_ => ArrayType(1,t)
             case "matrix"~_~List(t)~_ => ArrayType(2,t)
             case n~_~ts~_ => ParametricType(n,ts) }
-        | ident ~ opt("*") ~ "[" ~ rep1sep( stype, "," ) ~ "]" ^^
-          { case n~Some(_)~_~ts~_ => ParametricType(n+"*",ts)
-            case n~None~_~ts~_ => ParametricType(n,ts) }
         | ident ^^ { s => BasicType(s) }
         )
 

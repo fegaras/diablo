@@ -19,7 +19,7 @@ object Translator {
   import AST._
   import Typechecker._
 
-  type Defs = List[(String,(List[String],Stmt))]
+  type Defs = Map[String,(List[String],Stmt)]
 
   def elem ( x: Expr ) = Seq(List(x))
 
@@ -44,9 +44,17 @@ object Translator {
              Comprehension(Nth(Var(v),n),
                            List(Generator(VarPat(v),translate(x,env,vars,fncs))))
         case Project(x,n)
-          => val v = newvar
-             Comprehension(Project(Var(v),n),
-                           List(Generator(VarPat(v),translate(x,env,vars,fncs))))
+          => n match {
+               case "length"
+                 => translate(MethodCall(x,n,null),env,vars,fncs)
+               case "rows" => translate(Nth(Nth(x,0),0),env,vars,fncs)
+               case "cols" => translate(Nth(Nth(x,0),1),env,vars,fncs)
+               case "dims" => translate(Nth(x,0),env,vars,fncs)
+               case _
+                 => val v = newvar
+                    Comprehension(Project(Var(v),n),
+                                  List(Generator(VarPat(v),translate(x,env,vars,fncs))))
+             }
         case Index(u,is)
           => val v = newvar
              val A = newvar
@@ -125,6 +133,14 @@ object Translator {
                                case (v,a)
                                  => Generator(VarPat(v),translate(a,env,vars,fncs))
                            })
+        case Range(f,l,s)
+          => val fv = newvar
+             val lv = newvar
+             val sv = newvar
+             Comprehension(Range(Var(fv),Var(lv),Var(sv)),
+                           List(Generator(VarPat(fv),translate(f,env,vars,fncs)),
+                                Generator(VarPat(lv),translate(l,env,vars,fncs)),
+                                Generator(VarPat(sv),translate(s,env,vars,fncs))))
         case Apply(Lambda(p,b),arg)
           => val v = newvar
              val w = newvar
@@ -141,6 +157,12 @@ object Translator {
              Comprehension(Var(w),
                            List(Generator(VarPat(v),translate(arg,env,vars,fncs)),
                                 Generator(VarPat(w),Apply(translate(f,env,vars,fncs),Var(v)))))
+        case Comprehension(h,qs)
+          => Seq(List(e))
+        case reduce(op,e)
+          => var w = newvar
+             Comprehension(reduce(op,Var(w)),
+                           List(Generator(VarPat(w),translate(e,env,vars,fncs))))
         case _ => elem(apply(e,translate(_,env,vars,fncs)))
       }
 
@@ -290,8 +312,8 @@ object Translator {
                   case _ => Nil
              }
              BlockS(ss.map(renameStmt(_,nenv)))
-        case VarDeclS(v,t,u)
-          => VarDeclS(env(v),t,u.map(substE(_,env)))
+        case VarDeclS(v,tp,u)
+          => VarDeclS(env(v),tp,u.map(substE(_,env)))
         case AssignS(d,u)
           => AssignS(substE(d,env),substE(u,env))
         case ForS(v,e1,e2,e3,b)
@@ -315,9 +337,9 @@ object Translator {
                      env: Environment, vars: List[String], fncs: Defs ): Expr
     = e match {
         case Call(f,List(u))
-          if contains(f,fncs)
-          => val (List(v),b) = find(f,fncs)
-             val FunctionType(dt,rtp) = find(f,env)
+          if fncs.contains(f)
+          => val (List(v),b) = fncs(f)
+             val FunctionType(dt,rtp) = env(f)
              val rv = newvar
              val decl = VarDeclS(v,Some(dt),Some(u))
              val c = translate(BlockS(List(VarDeclS(rv,Some(rtp),None),renameStmt(BlockS(List(decl,b)),Map()))),
@@ -325,9 +347,9 @@ object Translator {
              unfolded_function_bodies = unfolded_function_bodies ++ c
              Var(rv)
         case Call(f,es)
-          if contains(f,fncs)
-          => val (ps,b) = find(f,fncs)
-             val FunctionType(TupleType(ds),rtp) = find(f,env)
+          if env.contains(f)
+          => val (ps,b) = fncs(f)
+             val FunctionType(TupleType(ds),rtp) = env(f)
              val rv = newvar
              val decls = ((ps zip ds) zip es).map{ case ((v,tp),u) => VarDeclS(v,Some(tp),Some(u)) }.toList
              val c = translate(BlockS(List(VarDeclS(rv,Some(rtp),None),renameStmt(BlockS(decls:+b),Map()))),
@@ -359,10 +381,9 @@ object Translator {
                         ((vs zip is).map{ case (v,i) => Generator(VarPat(v),translate(i,env,vars,fncs)) }:+
                          GroupByQual(VarPat(k),tuple(vs.map(Var(_)))))
                calls:+Assign(Var(a),
-                             Call("increment",
-                                  List(Var(a),StringConst(op),
-                                       Comprehension(Tuple(List(Var(k),reduce(op,Var(v)))),
-                                                     quals++qs))))
+                             ((//Call("increment",List(Var(a),StringConst(op),
+                                       elem(Comprehension(Tuple(List(Var(k),reduce(op,Var(v)))),
+                                                     quals++qs)))))
           case (d@Var(a),MethodCall(x,op,List(e)))
             if d == x
             => val v = newvar
@@ -380,10 +401,9 @@ object Translator {
                val qs = Generator(VarPat(v),translate(ne,env,vars,fncs))::
                         (vs zip is).map{ case (v,i) => Generator(VarPat(v),translate(i,env,vars,fncs)) }
                calls:+Assign(Var(a),
-                             Call("update",
-                                  List(Var(a),
-                                       Comprehension(Tuple(List(tuple(vs.map(Var(_))),Var(v))),
-                                                     quals++qs))))
+                             ((//Call("update",List(Var(a),
+                                       elem(Comprehension(Tuple(List(tuple(vs.map(Var(_))),Var(v))),
+                                                     quals++qs)))))
           case (d,MethodCall(x,op,List(e)))
             if d == x
             => val v = newvar
@@ -397,6 +417,9 @@ object Translator {
                                                   GroupByQual(VarPat(k),Var(k)),
                                                   Generator(VarPat(w),destination(d,Var(k),vars)))),
                       env,vars,fncs)
+          case (Var(v),e)
+            => val (calls,ne) = unfoldCalls(e,quals,env,vars,fncs)
+               calls:+Assign(Var(v),translate(ne,env,vars,fncs))
           case (d,e)
             => val v = newvar
                val k = newvar
@@ -406,9 +429,6 @@ object Translator {
                                       quals++List(Generator(VarPat(v),translate(ne,env,vars,fncs)),
                                                   Generator(VarPat(k),key(d,env,vars,fncs)))),
                       env,vars,fncs)
-          case (Var(v),e)
-            => val (calls,ne) = unfoldCalls(e,quals,env,vars,fncs)
-               calls:+Assign(Var(v),translate(ne,env,vars,fncs))
     }
 
   def translate ( s: Stmt, quals: List[Qualifier], retVars: List[String],
@@ -420,27 +440,24 @@ object Translator {
             => val nv = newvar
                translate(b,
                          quals++List(Generator(VarPat(nv),
-                                               translate(Call("range",List(e1,e2,e3)),
-                                                         env,vars,fncs)),
+                                               translate(Range(e1,e2,e3),env,vars,fncs)),
                                      Generator(VarPat(v),Var(nv))),
-                         retVars,(v,intType)::env,vars,fncs)
+                         retVars,env + (v->intType),vars,fncs)
           case ForeachS(p,e,b)
             => typecheck(e,env) match {
-                  case ParametricType(f,List(tp))
-                    if List("vector","matrix").contains(f)
+                  case ArrayType(d,tp)
                     => val A = newvar
-                       val i = newvar
                        translate(b,
                                  quals++List(Generator(VarPat(A),
                                                        translate(e,env,vars,fncs)),
-                                             Generator(TuplePat(List(VarPat(i),p)),Var(A))),
+                                             Generator(TuplePat(List(StarPat(),p)),Var(A))),
                                  retVars,bindPattern(p,tp,env),vars,fncs)
-                  case ParametricType("map",List(t1,t2))
+                  case MapType(t1,t2)
                     => val A = newvar
                        translate(b,
                                  quals++List(Generator(VarPat(A),
                                                        translate(e,env,vars,fncs)),
-                                             Generator(p,Var(A))),
+                                             Generator(TuplePat(List(StarPat(),p)),Var(A))),
                                  retVars,bindPattern(p,TupleType(List(t1,t2)),env),vars,fncs)
                   case ParametricType(_,List(tp))
                     => val A = newvar
@@ -474,33 +491,40 @@ object Translator {
                    => throw new Error("A return statement can only appear inside a function body: "+e)
                }
           case ExprS(e)
-            => List(translate(e,env,vars,fncs))
+            => List(translate(Comprehension(e,quals),env,vars,fncs))
           case BlockS(ss)
             => val (m,_,_,_) = ss.foldLeft(( Nil:List[Expr], env, vars, fncs )) {
                     case ((ns,ls,vs,fs),VarDeclS(v,Some(t),None))
-                      => ( ns:+VarDecl(v,t,Seq(Nil)), (v,t)::ls, v::vs, fs )
+                      => ( ns:+VarDecl(v,t,Seq(Nil)), ls+(v->t), v::vs, fs )
                     case ((ns,ls,vs,fs),VarDeclS(v,Some(t),Some(e)))
                       => val es = translate(e,ls,vs,fs)
-                         ( ns:+VarDecl(v,t,es), (v,t)::ls, v::vs, fs )
+                         ( ns:+VarDecl(v,t,es), ls+(v->t), v::vs, fs )
                     case ((ns,ls,vs,fs),VarDeclS(v,None,Some(e)))
                       => val tp = typecheck(e,ls)
                          val es = translate(e,ls,vs,fs)
-                         ( ns:+VarDecl(v,tp,es), (v,tp)::ls, v::vs, fs )
+                         ( ns:+VarDecl(v,tp,es), ls+(v->tp), v::vs, fs )
                     case ((ns,ls,vs,fs),DefS(f,ps,tp,b))
                       => val ftp = FunctionType(TupleType(ps.values.toList),tp)
-                         val nfs = (f,(ps.toList.map(_._1),b))::fs
+                         val nfs = fs + (f -> (ps.toList.map(_._1),b))
                          val v = newvar
                          val df = Def(f,ps,tp,Block(translate(BlockS(List(VarDeclS(v,Some(tp),None),b)),
-                                                              quals,v::retVars,(f,ftp)::ls,vs,nfs)
+                                                              quals,v::retVars,ls+(f->ftp),vs,nfs)
                                                     :+Var(v)))
-                         ( ns:+df, (f,ftp)::ls, vs, nfs )
+                         ( ns:+df, ls+(f->ftp), vs, nfs )
                     case ((ns,ls,vs,fs),stmt)
                       => ( ns++translate(stmt,quals,retVars,ls,vs,fs), ls, vs, fs )
                     }
-               m
+               List(block(m))//if (quals.isEmpty) List(block(m)) else m
+          case tm@TypeMapS(v,ps,tp,from,to,Lambda(p1,u1),Lambda(p2,u2))
+            => if (!typeMatch(typecheck(u1,bindPattern(p1,from,env)),to))
+                 throw new Error("Wrong map function: "+Lambda(p1,u1))
+               if (!typeMatch(typecheck(u2,bindPattern(p2,to,env)),from))
+                 throw new Error("Wrong map function: "+Lambda(p2,u2))
+               typeMaps += ((v,tm))
+               Nil
           case _ => throw new Error("Illegal statement: "+s)
     }
 
   def translate ( s: Stmt ): Expr
-    = block(translate(s,Nil,Nil,Nil,Nil,Nil))
+    = block(translate(s,Nil,Nil,Map(),Nil,Map()))
 }

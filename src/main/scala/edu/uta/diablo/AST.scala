@@ -17,8 +17,9 @@ package edu.uta.diablo
 
 import scala.util.parsing.input.Positional
 
-sealed abstract class Type ( var tpe: Type = null )
+sealed abstract class Type
     case class AnyType () extends Type
+    case class TypeParameter ( name: String ) extends Type
     case class BasicType ( name: String ) extends Type
     case class TupleType ( components: List[Type] ) extends Type
     case class RecordType ( components: Map[String,Type] ) extends Type
@@ -27,6 +28,8 @@ sealed abstract class Type ( var tpe: Type = null )
     case class MapType ( key: Type, element: Type ) extends Type
     case class ParametricType ( name: String, components: List[Type] ) extends Type
     case class FunctionType ( domain: Type, target: Type ) extends Type
+    // storage type based on a storage mapping with type params and args
+    case class StorageType ( mapping: String, typeParams: List[Type], args: List[Expr] ) extends Type
 
 sealed abstract class Pattern
     case class TuplePat ( components: List[Pattern] ) extends Pattern
@@ -34,7 +37,7 @@ sealed abstract class Pattern
     case class StarPat () extends Pattern
 
 sealed abstract class Qualifier
-    case class Generator ( pattern: Pattern, domain: Expr ) extends Qualifier
+    case class Generator ( pattern: Pattern, var domain: Expr ) extends Qualifier
     case class LetBinding ( pattern: Pattern, domain: Expr ) extends Qualifier
     case class Predicate ( predicate: Expr ) extends Qualifier
     case class GroupByQual ( pattern: Pattern, key: Expr ) extends Qualifier
@@ -62,13 +65,18 @@ sealed abstract class Expr ( var tpe: Type = null ) extends Positional
     case class Record ( args: Map[String,Expr] ) extends Expr
     case class MatchE ( expr: Expr, cases: List[Case] ) extends Expr
     case class Seq ( args: List[Expr] ) extends Expr
+    case class Range ( first: Expr, last: Expr, step: Expr ) extends Expr
     case class Comprehension ( head: Expr, qualifiers: List[Qualifier] ) extends Expr
     case class Merge ( left: Expr, right: Expr ) extends Expr
     case class Block ( args: List[Expr] ) extends Expr
     case class While ( predicate: Expr, body: Expr ) extends Expr
     case class Assign ( destination: Expr, value: Expr ) extends Expr
-    case class VarDecl ( name: String, vtype: Type, value: Expr ) extends Expr
+    case class VarDecl ( name: String, atype: Type, value: Expr ) extends Expr
     case class Def ( name: String, params: Map[String,Type], rtype: Type, body: Expr ) extends Expr
+    // builder: storage of a value based on a storage mapping with type params and args
+    case class Store ( mapping: String, typeParams: List[Type], args: List[Expr], value: Expr ) extends Expr
+    // sparsifier: implicit lifting of the domain of a generator in a comprehension
+    case class Lift ( mapping: String, storage: Expr ) extends Expr
     case class StringConst ( value: String ) extends Expr {
          override def toString: String = "StringConst(\""+value+"\")"
     }
@@ -90,7 +98,10 @@ sealed abstract class Stmt extends Positional
     case class DefS ( name: String, params: Map[String,Type], rtype: Type, body: Stmt ) extends Stmt
     case class ReturnS ( value: Expr ) extends Stmt
     case class ExprS ( value: Expr ) extends Stmt
-    case class TypeMapS ( params: List[String], from: Type, to: Type, map: Lambda, inv: Lambda ) extends Stmt
+    // declare a new storage mapping as an isomorphism map <-> inv
+    case class TypeMapS ( typeName: String, typeParams: List[String],
+                          abstractType: Type, storageType: Type, liftedType: Type,
+                          map: Lambda, inv: Lambda ) extends Stmt
 
 
 object AST {
@@ -103,8 +114,29 @@ object AST {
   /** apply f to every pattern in p */
   def apply ( p: Pattern, f: Pattern => Pattern ): Pattern =
     p match {
-      case TuplePat(ps) => TuplePat(ps.map(f(_)))
+      case TuplePat(ps) => TuplePat(ps.map(f))
       case _ => p
+    }
+
+  def apply ( tp: Type, f: Type => Type ): Type =
+    tp match {
+      case TupleType(ts)
+        => TupleType(ts.map(f))
+      case RecordType(es)
+        => RecordType(es.map{ case (n,v) => (n,f(v)) })
+      case SeqType(t)
+        => SeqType(f(t))
+      case ArrayType(d,t)
+        => ArrayType(d,f(t))
+      case MapType(k,v)
+        => MapType(f(k),f(v))
+      case ParametricType(n,ts)
+        => ParametricType(n,ts.map(f))
+      case FunctionType(d,t)
+        => FunctionType(f(d),f(t))
+      case StorageType(m,ps,as)
+        => StorageType(m,ps.map(f),as)
+      case _ => tp
     }
 
   def apply ( q: Qualifier, f: Expr => Expr ): Qualifier =
@@ -145,11 +177,11 @@ object AST {
       case Let(p,v,b)
         => Let(p,f(v),f(b))
       case Call(n,es)
-        => Call(n,es.map(f(_)))
+        => Call(n,es.map(f))
       case MethodCall(o,m,null)
         => MethodCall(f(o),m,null)
       case MethodCall(o,m,es)
-        => MethodCall(f(o),m,es.map(f(_)))
+        => MethodCall(f(o),m,es.map(f))
       case Apply(h,a)
         => Apply(f(h),f(a))
       case IfE(p,x,y)
@@ -157,25 +189,31 @@ object AST {
       case MatchE(x,cs)
         => MatchE(f(x),cs.map{ case Case(p,c,b) => Case(p,f(c),f(b)) })
       case Tuple(es)
-        => Tuple(es.map(f(_)))
+        => Tuple(es.map(f))
       case Record(es)
         => Record(es.map{ case (n,v) => (n,f(v)) })
       case Comprehension(h,qs)
         => Comprehension(f(h),qs.map(apply(_,f)))
       case Seq(es)
-        => Seq(es.map(f(_)))
+        => Seq(es.map(f))
+      case Range(i,l,s)
+        => Range(f(i),f(l),f(s))
       case Merge(x,y)
         => Merge(f(x),f(y))
       case Block(es)
         => Block(es.map(f))
-      case VarDecl(v,t,u)
-        => VarDecl(v,t,f(u))
+      case VarDecl(v,at,u)
+        => VarDecl(v,at,f(u))
       case Def(n,ps,tp,b)
         => Def(n,ps,tp,f(b))
       case Assign(d,u)
         => Assign(f(d),f(u))
       case While(p,u)
-        => While(f(e),f(u))
+        => While(f(p),f(u))
+      case Store(m,ts,as,o)
+        => Store(m,ts,as.map(f),f(o))
+      case Lift(m,v)
+        => Lift(m,f(v))
       case _ => e
     }
 
@@ -183,7 +221,7 @@ object AST {
   def apply ( s: Stmt, f: Stmt => Stmt ): Stmt =
     s match {
       case BlockS(l)
-        => BlockS(l.map(f(_)))
+        => BlockS(l.map(f))
       case ForS(v,a,b,c,body)
         => ForS(v,a,b,c,f(body))
       case ForeachS(v,e,body)
@@ -201,7 +239,7 @@ object AST {
   def accumulatePat[T] ( p: Pattern, f: Pattern => T, acc: (T,T) => T, zero: T ): T =
     p match {
       case TuplePat(ps)
-        => ps.map(f(_)).fold(zero)(acc)
+        => ps.map(f).fold(zero)(acc)
       case _ => zero
     }
 
@@ -213,7 +251,7 @@ object AST {
       case Project(x,_)
         => f(x)
       case Index(b,s)
-        => s.map(f(_)).fold(f(b))(acc)
+        => s.map(f).fold(f(b))(acc)
       case MapAccess(b,i)
         => acc(f(b),f(i))
       case Lambda(_,b)
@@ -225,11 +263,11 @@ object AST {
       case reduce(_,x)
         => f(x)
       case Call(_,es)
-        => es.map(f(_)).fold(zero)(acc)
+        => es.map(f).fold(zero)(acc)
       case MethodCall(o,_,null)
         => f(o)
       case MethodCall(o,_,es)
-        => es.map(f(_)).fold(f(o))(acc)
+        => es.map(f).fold(f(o))(acc)
       case Apply(h,a)
         => acc(f(h),f(a))
       case Let(_,v,b)
@@ -239,20 +277,22 @@ object AST {
       case MatchE(x,cs)
         => cs.map{ case Case(p,c,b) => acc(f(c),f(b)) }.fold(f(x))(acc)
       case Tuple(es)
-        => es.map(f(_)).fold(zero)(acc)
+        => es.map(f).fold(zero)(acc)
       case Record(es)
         => es.map{ case (_,v) => f(v) }.fold(zero)(acc)
       case Seq(es)
-        => es.map(f(_)).fold(zero)(acc)
+        => es.map(f).fold(zero)(acc)
+      case Range(i,l,s)
+        => acc(acc(f(i),f(l)),f(s))
       case Comprehension(h,qs)
-        => acc(f(h),qs.map{
+        => qs.map{
               case Generator(_,u) => f(u)
               case LetBinding(_,u) => f(u)
               case Predicate(u) => f(u)
               case GroupByQual(_,k) => f(k)
               case AssignQual(d,u) => acc(f(d),f(u))
               case VarDef(_,u) => f(u)
-           }.reduce(acc))
+           }.fold(f(h))(acc)
       case Merge(x,y)
         => acc(f(x),f(y))
       case Block(es)
@@ -265,6 +305,10 @@ object AST {
         => acc(f(d),f(u))
       case While(p,u)
         => acc(f(p),f(u))
+      case Store(m,ts,as,o)
+        => as.map(f).fold(f(o))(acc)
+      case Lift(m,v)
+        => f(v)
       case _ => zero
     }
 

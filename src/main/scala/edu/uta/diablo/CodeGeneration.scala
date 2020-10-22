@@ -15,14 +15,13 @@
  */
 package edu.uta.diablo
 
-import scala.reflect.macros.whitebox.Context
-import scala.reflect.macros.TypecheckException
+import scala.reflect.macros.{TypecheckException, whitebox}
 import scala.language.experimental.macros
 import java.io._
 
 
 abstract class CodeGeneration {
-  val c: Context
+  val c: whitebox.Context
   import c.universe.{Expr=>_,Block=>_,Apply=>_,Assign=>_,Return=>_,_}
   import AST._
   import edu.uta.diablo.{Type=>DType}
@@ -70,8 +69,22 @@ abstract class CodeGeneration {
     tp match {
       case tq"(..$cs)" if cs.length > 1
         => TupleType(cs.map(Tree2Type))
+      case tq"Array[$t]"
+        => Tree2Type(t) match {
+              case ArrayType(d,tp)
+                => ArrayType(d+1,tp)
+              case tp => ArrayType(1,tp)
+           }
+      case tq"Map[$kt,$vt]"
+        => MapType(Tree2Type(kt),Tree2Type(vt))
+      case tq"List[$et]"
+        => SeqType(Tree2Type(et))
       case tq"$n[..$cs]" if cs.nonEmpty
         => ParametricType(n.toString,cs.map(Tree2Type))
+      case tq"Any"
+        => AnyType()
+      case tq"Nothing"
+        => AnyType()
       case _
         => BasicType(tp.toString)
     }
@@ -88,10 +101,15 @@ abstract class CodeGeneration {
             case _ => tq""
            }
 
-  def Type2Tree ( tp: DType ): c.Tree =
-    tp match {
+  def Type2Tree ( tp: DType ): c.Tree
+    = tp match {
+      case StorageType(_,_,_)
+        => Type2Tree(Typechecker.unfold_storage_type(tp))
       case TupleType(cs) if cs.nonEmpty
         => val tcs = cs.map(Type2Tree)
+           tq"(..$tcs)"
+      case RecordType(cs) if cs.nonEmpty
+        => val tcs = cs.map(_._2).map(Type2Tree).toList
            tq"(..$tcs)"
       case ParametricType(n,cs) if cs.nonEmpty
         => val tcs = cs.map(Type2Tree)
@@ -101,7 +119,7 @@ abstract class CodeGeneration {
         => val tn = get_type_name(n)
            tq"$tn"
       case ArrayType(d,t)
-        => (0 to d).foldLeft(Type2Tree(t)) { case (r,_) => tq"Array[$r]" }
+        => (0 until d).foldLeft(Type2Tree(t)) { case (r,_) => tq"Array[$r]" }
       case MapType(k,v)
         => val kc = Type2Tree(k)
            val vc = Type2Tree(v)
@@ -130,8 +148,7 @@ abstract class CodeGeneration {
                                     q"($nv:$tp) => $nv match { case $p => $r }" }
     val te = try c.Expr[Any](c.typecheck(q"{ import edu.uta.diablo._; $fc }")).actualType
              catch { case ex: TypecheckException
-                       => //println("@@@ "+code+" "+env+" "+fc)
-                          return Right(ex)
+                       => return Right(ex)
                    }
     Left(returned_type(type2tree(te)))
   }
@@ -212,8 +229,14 @@ abstract class CodeGeneration {
     val ec = codeGen(e,env)
     typedCodeOpt(ec,env) match {
       case Some(v) => (v,ec)
-      case _ => c.abort(c.universe.NoPosition,
-                        s"Expression $ec is not a collection (line $line)")
+      case _
+        => getOptionalType(ec,env) match {
+              case Right(ex)
+                => throw ex
+              case Left(tp)
+                => c.abort(c.universe.NoPosition,
+                           s"Expression $ec is not a collection (found type $tp)")
+           }
     }
   }
 
@@ -256,6 +279,8 @@ abstract class CodeGeneration {
     = tp match {
         case tq"Array[$atp]"
           => element_type(atp)
+        case tq"$c[$atp]"
+          => atp
         case _ => tp
       }
 
@@ -271,8 +296,6 @@ abstract class CodeGeneration {
     val xc = codeGen(x,env)
     val ic = codeGen(i,env)
     (getOptionalType(xc,env),ic,getOptionalType(ic,env)) match {
-      case (Left(tq"edu.uta.diablo.Matrix"),q"($i,$j)",_)
-        => q"$xc($i,$j)"
       case (Left(tq"Array[$t]"),q"(..$is)",_)
         => is.foldLeft[c.Tree](xc) { case (r,n) => q"$r($n)" }
       case (Left(tq"Array[$t]"),_,Left(tq"(..$its)"))
@@ -332,21 +355,29 @@ abstract class CodeGeneration {
            isc.foldLeft(uc){ case (r,i) => q"$r($i)" }
       case Tuple(es)
         => codeList(es,cs => q"(..$cs)",env)
+      case Record(es)
+        => codeList(es.map(_._2).toList,cs => q"(..$cs)",env)
       case Call("map",Nil)
         => q"scala.collection.mutable.Map[Any,Any]()"
       case Call("array",d)
         => val dc = d.map(codeGen(_,env))
            q"Array.ofDim[Any](..$dc)"
-      case Call("matrix",List(n,m))
-        => val nc = codeGen(n,env)
-           val mc = codeGen(m,env)
-           q"Matrix($nc,$mc)"
       case Call("tile",Nil)
         => val ts = tileSize*tileSize
            q"Array.ofDim[Any]($ts)"
       case Call(n,es)
         => val fm = TermName(method_name(n))
            codeList(es,cs => q"$fm(..$cs)",env)
+      case Project(x,a)
+        if x.tpe != null
+        => x.tpe match {
+              case RecordType(cs)
+                if cs.contains(a)
+                => codeGen(Nth(x,cs.keys.toList.indexOf(a)+1),env)
+              case _ => codeGen(MethodCall(x,a,null),env)
+           }
+      case Project(x,a)
+        => codeGen(MethodCall(x,a,null),env)
       case MethodCall(Var("_"),m,null)
         => val nv = TermName(c.freshName("x"))
            val fm = TermName(method_name(m))
@@ -424,11 +455,30 @@ abstract class CodeGeneration {
       case Seq(s)
         => val sc = s.map(codeGen(_,env))
            q"List(..$sc)"
+      case Range(i,MethodCall(l,"-",List(IntConst(1))),IntConst(1))
+        => val ic = codeGen(i,env)
+           val lc = codeGen(l,env)
+           q"$ic.until($lc)"
+      case Range(i,l,IntConst(1))
+        => val ic = codeGen(i,env)
+           val lc = codeGen(l,env)
+           q"$ic.to($lc)"
+      case Range(i,l,s)
+        => val ic = codeGen(i,env)
+           val lc = codeGen(l,env)
+           val sc = codeGen(s,env)
+           q"$ic.to($lc,$sc)"
       case IfE(p,x,y)
         => val pc = codeGen(p,env)
            val xc = codeGen(x,env)
            val yc = codeGen(y,env)
            q"if ($pc) $xc else $yc"
+      case Let(p,u,b)
+        => val pc = code(p)
+           val uc = codeGen(u,env)
+           val tc = getType(uc,env)
+           val bc = codeGen(b,add(p,tc,env))
+           q"{ val $pc: $tc = $uc; $bc }"
       case MatchE(x,List(Case(VarPat(v),BoolConst(true),b)))
         if occurrences(v,b) == 1
         => codeGen(subst(v,x,b),env)
@@ -478,13 +528,40 @@ abstract class CodeGeneration {
            val bc = codeGen(b,add(p,tpt,env))
            q"{ case $pc => $bc }"
       case Block(s)
-        => val sc = s.map{ case Seq(List(u)) => codeGen(u,env); case u => codeGen(u,env) }
+        => val nenv = s.foldLeft(env){ case (r,VarDecl(v,tp,_))
+                                         => val vc = TermName(v)
+                                            val tc = Type2Tree(tp)
+                                            (pq"$vc",tc)::r
+                                       case (r,Def(f,ps,tp,b))
+                                         => val fc = TermName(f)
+                                            val pt = TupleType(ps.map(_._2).toList)
+                                            val tc = Type2Tree(FunctionType(pt,tp))
+                                            (pq"$fc",tc)::r
+                                       case (r,_) => r }
+           def toStmt ( e: Expr ): Stmt
+             = e match {
+                 case Seq(List(u)) => ExprS(u)
+                 case IfE(p,u,Seq(Nil)) => IfS(p,toStmt(u),BlockS(Nil))
+                 case flatMap(Lambda(p,u),b)
+                   => ForeachS(p,b,toStmt(u))
+                 case MethodCall(u,"toList",null)
+                   => toStmt(u)
+                 case _ => ExprS(e)
+               }
+           val sc = s.map {
+                       case Seq(List(u))
+                         => codeGen(u,nenv)
+                       case flatMap(Lambda(p,u),b)
+                         => codeGen(ForeachS(p,b,toStmt(u)),nenv)
+                       case MethodCall(flatMap(Lambda(p,u),b),"toList",null)
+                         => codeGen(ForeachS(p,b,toStmt(u)),nenv)
+                       case MethodCall(MethodCall(flatMap(Lambda(p,u),b),"toList",null),"toList",null)
+                         => codeGen(ForeachS(p,b,toStmt(u)),nenv)
+                       case u
+                         => codeGen(u,nenv)
+                    }
            q"{ ..$sc }"
-      case Assign(d,Seq(u::_))
-        => val dc = codeGen(d,env)
-           val uc = codeGen(u,env)
-           q"$dc = $uc"
-      case VarDecl(v,tp,Seq(Nil))
+       case VarDecl(v,tp,Seq(Nil))
         => val vc = TermName(v)
            val tc = Type2Tree(tp)
            val init = tp match {
@@ -492,13 +569,31 @@ abstract class CodeGeneration {
                          case BasicType("Double") => q"0.0"
                          case _ => q"null"
                       }
-           //q"var $vc:$tc = $init"
-           q"var $vc:$tc = _"
+           q"var $vc:$tc = $init"
+     case VarDecl(v,tp,Seq(List(Call("map",Nil))))
+        => val vc = TermName(v)
+           val tq"Map[$kt,$vt]" = Type2Tree(tp)
+           q"var $vc = collection.mutable.Map[$kt,$vt]()"
+      case VarDecl(v,tp,Seq(List(Call("array",d))))
+        => val vc = TermName(v)
+           val tc = element_type(Type2Tree(tp))
+           val dc = d.map(codeGen(_,env))
+           q"var $vc = Array.ofDim[$tc](..$dc)"
+      case VarDecl(v,tp,Seq(List(Call("tile",Nil))))
+        => val vc = TermName(v)
+           val tc = element_type(Type2Tree(tp))
+           val ts = tileSize*tileSize
+           q"var $vc = Array.ofDim[$tc]($ts)"
       case VarDecl(v,tp,Seq(u::_))
         => val vc = TermName(v)
            val uc = codeGen(u,env)
            val tc = Type2Tree(tp)
            q"var $vc:$tc = $uc"
+      case VarDecl(v,tp,u)
+        => val vc = TermName(v)
+           val uc = codeGen(u,env)
+           val tc = Type2Tree(tp)
+           q"var $vc:$tc = $uc.head"
       case Def(f,ps,tp,b)
         => val fc = TermName(f)
            val bc = codeGen(b,ps.map {
@@ -512,6 +607,18 @@ abstract class CodeGeneration {
                                   val tc = Type2Tree(tp)
                                   q"val $vc: $tc" }
            q"def $fc (..$psc): $tc = $bc"
+      case Assign(d,Seq(u::_))
+        => val dc = codeGen(d,env)
+           val uc = codeGen(u,env)
+           q"$dc = $uc"
+      case Assign(d,u)
+        => val dc = codeGen(d,env)
+           val uc = codeGen(u,env)
+           q"$dc = $uc.head"
+      case While(p,b)
+        => val pc = codeGen(p,env)
+           val bc = codeGen(b,env)
+           q"while($pc.head) $bc"
       case IntConst(n)
         => q"$n"
       case LongConst(n)
@@ -619,5 +726,6 @@ abstract class CodeGeneration {
            q"return $uc"
       case ExprS(u)
         => codeGen(u,env)
+      case _ => q"()"
     }
 }

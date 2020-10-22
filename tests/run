@@ -2,6 +2,12 @@
 
 DIABLO="$(cd `dirname $0`/..; pwd -P)"
 
+if [ -z ${SPARK_HOME} ]; then
+   SPARK_HOME=~/spark-3.0.0-bin-hadoop2.7
+fi
+
+export HADOOP_CONF_DIR=
+
 jar cf test.jar -C classes .
 
-scala -cp ${DIABLO}/lib/diablo.jar:test.jar -J-Xmx4G -J-Xms4G -J-Xss128M Test $*
+${SPARK_HOME}/bin/spark-submit --jars ${DIABLO}/lib/diablo.jar --class $1 --driver-memory 4g --executor-memory 1G --master local[*] test.jar $2 $3 $4 $5 $6 $7

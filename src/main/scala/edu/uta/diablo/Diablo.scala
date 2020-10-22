@@ -30,48 +30,8 @@ package object diablo {
   var parallel = true
   var tileSize = 1000
 
-  def array[T: ClassTag] ( length: Int ) ( values: List[(Int,T)] ): Array[T] = {
-    val a = Array.ofDim[T](length)
-    for { (i,v) <- values }
-        if (i>=0 && i<length)
-           a(i) = v
-    a
-  }
-
-  def array[T: ClassTag] ( rows: Int, cols: Int ) ( values: List[((Int,Int),T)] ): Array[Array[T]] = {
-    val a = Array.ofDim[T](rows,cols)
-    for { ((i,j),v) <- values }
-        if (i>=0 && i<rows && j>=0 && j<cols)
-           a(i)(j) = v
-    a
-  }
-
-  def map[K,V] ( s: List[(K,V)] ): mutable.Map[K,V] = {
-    val m = mutable.HashMap[K,V]()
-    for { (k,v) <- s }
-        m += (k -> v)
-    m
-  }
-
-  def array[T] ( a: Array[T] ) ( values: List[(Int,T)] ): Array[T] = {
-    for { (i,v) <- values }
-        if (i>=0 && i<a.length)
-           a(i) = v
-    a
-  }
-
-  def array[T] ( a: Array[Array[T]] ) ( values: List[((Int,Int),T)] ): Array[Array[T]] = {
-    for { ((i,j),v) <- values }
-        if (i>=0 && i<a.length && j>=0 && j<a(i).length)
-           a(i)(j) = v
-    a
-  }
-
-  def map[K,V] ( m: mutable.Map[K,V] ) ( s: List[(K,V)] ): mutable.Map[K,V] = {
-    for { (k,v) <- s }
-        m += (k -> v)
-    m
-  }
+  // Contains the natural transformations for type abstractions
+  var typeMaps = mutable.Map[String,TypeMapS]()
 
   def range ( n1: Long, n2: Long, n3: Long ): List[Long]
     = n1.to(n2,n3).toList
@@ -79,31 +39,10 @@ package object diablo {
   def inRange ( i: Long, n1: Long, n2: Long, n3: Long ): Boolean
     = i>=n1 && i<= n2 && (i-n1)%n3 == 0
 
-  def translate_query ( q: Expr ): Expr = {
-    val c = ComprehensionTranslator.translate(q)
-    if (trace) println("Translated comprehension:\n"+Pretty.print(c.toString))
-    val n = Normalizer.normalizeAll(c)
-    if (trace) println("Normalized comprehension:\n"+Pretty.print(n.toString))
-    val o = Normalizer.normalizeAll(Optimizer.optimizeAll(n))
-    if (trace) println("Optimized comprehension:\n"+Pretty.print(o.toString))
-/*
-    val e = Normalizer.normalizeAll(translate(o))
-    if (trace) println("Final Translated term:\n"+Pretty.print(e.toString))
-    val p = if (parallel) Translator.parallelize(e) else e
-    if (trace && parallel) println("Parallelized term:\n"+Pretty.print(p.toString))
-*/
-    o
-  }
-/*
-  var typecheck_var: String => Option[Type] = _
-  var typecheck_expr: Expr => Option[Type] = _
-  var typecheck_method: (Type,String,List[Type]) => Option[Type] = _
-  var typecheck_call: (String,List[Type]) => Option[Type] = _
-*/
   def q_impl ( c: Context ) ( query: c.Expr[String] ): c.Expr[Any] = {
     import c.universe.{Expr=>_,Type=>_,_}
     val context: c.type = c
-    val cg = new { val c: context.type = context } with CodeGeneration//Lifting
+    val cg = new { val c: context.type = context } with CodeGeneration
     val Literal(Constant(s:String)) = query.tree
     // hooks to the Scala compiler
     Typechecker.typecheck_var
@@ -114,26 +53,26 @@ package object diablo {
        = ( f: String, args: List[Type] ) => cg.typecheck_call(f,args)
     val env: cg.Environment = Nil
     cg.var_decls = collection.mutable.Map[String,c.Tree]()
+    Lifting.initialize()
+    Typechecker.useStorageTypes = false
     val q = parse(s)
+    def opt ( e: Expr): Expr = Optimizer.optimizeAll(Normalizer.normalizeAll(e))
     if (trace) println("Imperative program:\n"+Pretty.print(q.toString))
     Typechecker.typecheck(q)
     val sq = Translator.translate(q)
     if (trace) println("Comprehension:\n"+Pretty.print(sq.toString))
-    Typechecker.typecheck(sq)
-    val n = Normalizer.normalizeAll(sq)
+    val n = opt(sq)
     if (trace) println("Normalized comprehension:\n"+Pretty.print(n.toString))
-    Typechecker.typecheck(n)
-/*
-    //val lq = cg.lift(q,env)
-    //if (trace) println("Lifted term:\n"+Pretty.print(lq.toString))
-    val e = translate_query(sq)
-*/
-    val ec = cg.codeGen(n,env)
-    if (trace) println("Scala code:\n"+showCode(ec))
-    val tp = cg.getType(ec,env)
-    if (trace) println("Scala type: "+showCode(tp))
+    val le = opt(Lifting.lift(n))
+    if (trace) println("Lifted comprehension:\n"+Pretty.print(le.toString))
+    val to = opt(ComprehensionTranslator.translate(le))
+    val pc = if (parallel) ComprehensionTranslator.parallelize(to) else to
+    if (trace) println("Compiled comprehension:\n"+Pretty.print(pc.toString))
+    val ec = q"${cg.codeGen(pc,env)}.head"
+    if (trace) println("Scala code:\n"+ec)
+    val tc = cg.getType(ec,env)
+    if (trace) println("Scala type: "+tc)
     context.Expr[Any](ec)
-    //context.Expr[Any](q"()")
   }
 
   /** translate an array comprehension to Scala code */
@@ -166,16 +105,4 @@ package object diablo {
 
   /** set compilation parameters */
   def param ( x:Boolean, b: Boolean ): Unit = macro param_impl
-}
-
-object Test {
-  //import array.Pretty
-  import edu.uta.diablo.Pretty
-
-  def main ( args: Array[String] ) {
-    val e = parse(args(0))
-    println(Pretty.print(e.toString))
-    val te = translate(e)
-    println(print(te.toString))
-  }
 }

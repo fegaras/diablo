@@ -1,5 +1,5 @@
 /*
- * Copyright © 2019 University of Texas at Arlington
+ * Copyright © 2020 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,55 +18,127 @@ package edu.uta.diablo
 object Typechecker {
     import AST._
 
-    // binds variable names to types (contains duplicate names)
-    type Environment = List[(String,Type)]
+    // binds variable names to types
+    type Environment = Map[String,Type]
 
-    val intType = BasicType("Int")
-    val longType = BasicType("Long")
-    val boolType = BasicType("Boolean")
-    val doubleType = BasicType("Double")
-    val stringType = BasicType("String")
+    val intType: Type = BasicType("Int")
+    val longType: Type = BasicType("Long")
+    val boolType: Type = BasicType("Boolean")
+    val doubleType: Type = BasicType("Double")
+    val stringType: Type = BasicType("String")
 
     // hooks to the Scala compiler; set at v_impl in Diablo.scala
     var typecheck_call: ( String, List[Type] ) => Option[Type] = _
     var typecheck_method: ( Type, String, List[Type] ) => Option[Type] = _
-    var typecheck_var: ( String ) => Option[Type] = _
+    var typecheck_var: String => Option[Type] = _
 
-    val collection_names = List("array","map","List",
-                                ComprehensionTranslator.arrayClassName,
-                                ComprehensionTranslator.datasetClassPath)
+    val rddClass = "org.apache.spark.rdd.RDD"
 
-    def find[T] ( name: String, env: List[(String,T)] ): T
-      = env.find{ case (n,_) => n == name }.head._2
+    val collection_names = List("array","map","List",rddClass)
 
-    def contains[T] ( name: String, env: List[(String,T)] ): Boolean
-      = env.exists{ case (n,_) => n == name }
+    var useStorageTypes: Boolean = false
+
+    def tuple ( s: List[Expr] ): Expr
+      = s match { case List(x) => x; case _ => Tuple(s) }
 
     def tuple ( s: List[Type] ): Type
       = s match { case List(x) => x; case _ => TupleType(s) }
 
+    def tuple ( s: List[Pattern] ): Pattern
+      = s match { case List(x) => x; case _ => TuplePat(s) }
+
     def isCollection ( f: String ): Boolean
       = collection_names.contains(f)
 
+  type Env = Option[Environment]
+
+  def substType ( tp: Type, env: Env ): Type
+    = env match {
+        case Some(m)
+          => def f ( t: Type ): Type
+              = t match {
+                  case TypeParameter(n)
+                    if m.contains(n)
+                    => m(n)
+                  case _ => apply(t,f)
+                }
+             f(tp)
+        case _ => tp
+      }
+
+  def substType ( e: Expr, env: Env ): Expr
+    = e match {
+        case VarDecl(v,at,u)
+          => VarDecl(v,substType(at,env),u)
+        case Store(f,tps,args,v)
+          => Store(f,tps.map(substType(_,env)),
+                   args,substType(v,env))
+        case _ => apply(e,substType(_,env))
+      }
+
+  def merge ( x: Env, y: Env ): Env
+    = (x,y) match {
+        case (Some(m1),Some(m2))
+          => Some(m1++m2)
+        case _ => None
+      }
+
+  def unfold_storage_type ( tp: Type ): Type
+    = tp match {
+        case StorageType(f,tps,_)
+          => val TypeMapS(_,ps,_,st,_,_,_) = typeMaps(f)
+             substType(st,Some((ps zip tps).toMap))
+        case _ => tp
+      }
+
+  def tmatch ( t1: Type, t2: Type ): Env
+    = if (t1 == t2) Some(Map())
+      else (unfold_storage_type(t1),unfold_storage_type(t2)) match {
+         case (AnyType(),_)
+           => Some(Map())
+         case (_,AnyType())
+           => Some(Map())
+         case (TypeParameter(n),tp)
+           => Some(Map(n->tp))
+         case (tp,TypeParameter(n))
+           => Some(Map(n->tp))
+         case (TupleType(ts1),TupleType(ts2))
+           if ts1.length == ts2.length
+           => (ts1 zip ts2).map{ case (x,y) => tmatch(x,y) }.reduce[Env](merge(_,_))
+         case (RecordType(rs1),RecordType(rs2))
+           if rs1.keys == rs2.keys
+           => ((rs1.values) zip (rs2.values)).map{ case (x,y) => tmatch(x,y) }.reduce[Env](merge(_,_))
+         case (SeqType(st1),SeqType(st2))
+           => tmatch(st1,st2)
+         case (ArrayType(d1,et1),ArrayType(d2,et2))
+           if d1 == d2
+           => tmatch(et1,et2)
+         case (MapType(tk1,tv1),MapType(tk2,tv2))
+           => merge(tmatch(tk1,tk2),tmatch(tv1,tv2))
+         case (ParametricType(n1,ts1),ParametricType(n2,ts2))
+           if n1 == n2 && ts1.length == ts2.length
+           => (ts1 zip ts2).map{ case (x,y) => tmatch(x,y) }.reduce[Env](merge(_,_))
+         case _ => None
+      }
+
     def typeMatch ( t1: Type, t2: Type ): Boolean
-      = ((t1 == AnyType() || t2 == AnyType())
-         || t1 == t2)
+      = tmatch(t1,t2).nonEmpty
 
     def bindPattern ( pat: Pattern, tp: Type, env: Environment ): Environment
-      = (pat,tp) match {
+      = (pat,unfold_storage_type(tp)) match {
           case (TuplePat(cs),TupleType(ts))
             => if (cs.length != ts.length)
                  throw new Error("Pattern "+pat+" does not match the type "+tp)
                else cs.zip(ts).foldRight(env){ case ((p,t),r) => bindPattern(p,t,r) }
           case (VarPat(v),t)
-            => (v,t)::env
+            => env + (v -> t)
           case (StarPat(),_)
             => env
           case _ => throw new Error("Pattern "+pat+" does not match the type "+tp)
       }
 
   def elemType ( tp: Type ): Type
-    = tp match {
+    = unfold_storage_type(tp) match {
           case ArrayType(_,t)
             => t
           case MapType(_,t)
@@ -79,17 +151,36 @@ object Typechecker {
           case t => throw new Error("Type "+tp+" is not a collection (found "+t+")")
       }
 
+    def import_type ( tp: Type ): Type
+      = tp match {
+          case TupleType(List(BasicType("Int"),BasicType("Int"),
+                              ParametricType(rdd,List(TupleType(List(TupleType(List(BasicType("Int"),BasicType("Int"))),
+                                                                     ArrayType(1,etp)))))))
+            if rdd == rddClass
+            => if (useStorageTypes)
+                 StorageType("tiled",List(etp),List(IntConst(-1),IntConst(-1)))
+               else SeqType(TupleType(List(TupleType(List(BasicType("Int"),BasicType("Int"))),etp)))
+          case ParametricType(rdd,List(etp))
+            if rdd == rddClass
+            => if (useStorageTypes)
+                 StorageType("rdd",List(etp),Nil)
+               else SeqType(etp)
+          case _ => tp
+      }
+
     def typecheck ( e: Expr, env: Environment ): Type
-      = try { val tpe = e match {
+      = if (e.tpe != null && !e.isInstanceOf[Var])
+           e.tpe   // the cached type of e
+        else try { val tpe = e match {
           case Var("null")
             => AnyType()
           case Var(v)
-            => if (contains(v,env))
-                  find(v,env)
-               else typecheck_var(v). // call the Scala typechecker to find var v
-                          getOrElse(throw new Error("Undefined variable: "+v))
+            => if (env.contains(v))
+                 env(v)
+               else import_type(typecheck_var(v). // call the Scala typechecker to find var v
+                            getOrElse(throw new Error("Undefined variable: "+v)))
           case Nth(u,n)
-            => typecheck(u,env) match {
+            => unfold_storage_type(typecheck(u,env)) match {
                   case TupleType(cs)
                     => if (n<=0 || n>cs.length)
                           throw new Error("Tuple does not contain a "+n+" element")
@@ -97,20 +188,20 @@ object Typechecker {
                   case t => throw new Error("Tuple projection "+e+" must be over a tuple (found "+t+")")
                }
           case Project(u,a)
-            => typecheck(u,env) match {
+            => unfold_storage_type(typecheck(u,env)) match {
                   case RecordType(cs)
                     => if (cs.contains(a))
                          cs(a)
                        else throw new Error("Unknown record attribute: "+a)
                   case ArrayType(d,_)
                     if a == "dims"
-                    => TupleType((1 to d).map(i => longType).toList)
+                    => TupleType((1 to d).map(i => intType).toList)
                   case ArrayType(1,_)
                     if a == "length"
-                    => longType
+                    => intType
                   case ArrayType(2,_)
                     if a == "rows" || a == "cols"
-                    => longType
+                    => intType
                   case _ => typecheck(MethodCall(u,a,null),env)
                }
           case Index(u,is)
@@ -118,12 +209,18 @@ object Typechecker {
                for { itp <- itps }
                   if ( itp != longType && itp != intType )
                     throw new Error("Matrix indexing "+e+" must use an integer row index: "+itp)
-               typecheck(u,env) match {
+               unfold_storage_type(typecheck(u,env)) match {
                   case ArrayType(d,t)
                     if is.length == d
                     => t
                   case ArrayType(d,t)
                     => throw new Error("Array indexing "+e+" needs "+d+" indices (found "+is.length+" )")
+                  case SeqType(TupleType(List(BasicType("Int"),t)))
+                    if is.length == 1
+                    => t
+                  case SeqType(TupleType(List(TupleType(ts),t)))
+                    if ts.forall(_ == intType) && ts.length == is.length
+                    => t
                   case t => throw new Error("Array indexing "+e+" must be over an array (found "+t+")")
                }
           case Let(p,u,b)
@@ -135,7 +232,7 @@ object Typechecker {
                       => val nenv = bindPattern(p,tp,env)
                          if (typecheck(c,nenv) != boolType)
                            throw new Error("Predicate "+c+" in "+e+" must be boolean")
-                         val btp = typecheck(b,env)
+                         val btp = typecheck(b,nenv)
                          if (!typeMatch(r,btp))
                            throw new Error("Incompatible results in "+e)
                          btp
@@ -150,9 +247,9 @@ object Typechecker {
           case Comprehension(h,qs)
             => val nenv = qs.foldLeft((env,Nil:List[String])) {
                     case ((r,s),q@Generator(p,u))
-                      => (typecheck(u,r) match {
+                      => (unfold_storage_type(typecheck(u,r)) match {
                             case ArrayType(d,t)
-                              => bindPattern(p,tuple(List(tuple((1 to d).map(i => longType).toList),t)),r)
+                              => bindPattern(p,tuple(List(tuple((1 to d).map(i => intType).toList),t)),r)
                             case MapType(k,v)
                               => bindPattern(p,TupleType(List(k,v)),r)
                             case SeqType(t)
@@ -173,7 +270,7 @@ object Typechecker {
                       => val nvs = patvars(p)
                          val ktp = typecheck(k,r)
                          // lift all pattern variables to bags
-                         ( bindPattern(p,ktp,s.diff(nvs).map{ v => (v,SeqType(find(v,r))) }.toList ++ r),
+                         ( bindPattern(p,ktp,r++s.diff(nvs).map{ v => (v,SeqType(r(v))) }.toMap),
                            nvs ++ s )
                     case ((r,s),AssignQual(d,u))
                       => typecheck(d,r)
@@ -184,10 +281,32 @@ object Typechecker {
                          ( bindPattern(VarPat(n),tp,r), n::s )
               }._1
               SeqType(typecheck(h,nenv))
+          case Store(f,tps,args,_)
+            => StorageType(f,tps,args)
+          case Lift(f,ne)
+            => typecheck(Lifting.lift(f,ne),env)
           case Call(f,args)
-            if contains(f,env)
+            if typeMaps.contains(f)
+            => val TypeMapS(_,ps,at,st,lt,map,inv) = typeMaps(f)
+               inv match {
+                 case Lambda(TuplePat(ps),_)
+                   => if (ps.length != args.length)
+                        throw new Error("Wrong type transformation (wrong number of Int args)")
+                      if (args.init.exists(a => typecheck(a,env) != intType))
+                        throw new Error("Wrong type transformation (expected Int args)")
+                 case _ => ;
+               }
+               val tp = typecheck(args.last,env)
+               val ev = tmatch(lt,tp)
+               if (ev.isEmpty)
+                 throw new Error("Wrong type transformation: "+e+"\n(expected: "+lt+", found: "+tp+")")
+               if (useStorageTypes)
+                 substType(st,ev)
+               else substType(at,ev)
+          case Call(f,args)
+            if env.contains(f)
             => val tp = typecheck(Tuple(args),env)
-               find(f,env) match {
+               env(f) match {
                   case FunctionType(dt,rt)
                     => if (typeMatch(dt,tp)) rt
                        else throw new Error("Function "+f+" on "+dt+" cannot be applied to "+args+" of type "+tp);
@@ -195,16 +314,25 @@ object Typechecker {
                }
           case Call(f,args)
             => // call the Scala typechecker to find function f
-               typecheck_call(f,args.map(typecheck(_,env))).
-                          getOrElse(throw new Error("Wrong function call: "+e))
+               val tas = args.map(typecheck(_,env))
+               typecheck_call(f,tas)
+                 .getOrElse(throw new Error("Wrong function call: "+e+" for type "+tas))
+          case MethodCall(u,"reduceByKey",List(Lambda(TuplePat(List(p1,p2)),b)))
+            => val tu = typecheck(u,env)
+               val TupleType(List(_,tp)) = elemType(tu)
+               typecheck_method(tu,"reduceByKey",List(FunctionType(TupleType(List(tp,tp)),tp)))
+                 .getOrElse(throw new Error("Wrong method call: "+e+" for type "+tu))
           case MethodCall(u,m,null)
             => // call the Scala typechecker to find method m
-               typecheck_method(typecheck(u,env),m,null).
-                          getOrElse(throw new Error("Wrong method call: "+e))
+               val tu = typecheck(u,env)
+               typecheck_method(tu,m,null)
+                 .getOrElse(throw new Error("Wrong method call: "+e+" for type "+tu))
           case MethodCall(u,m,args)
             => // call the Scala typechecker to find method m
-               typecheck_method(typecheck(u,env),m,args.map(typecheck(_,env))).
-                          getOrElse(throw new Error("Wrong method call: "+e))
+               val tu = typecheck(u,env)
+               val tas = args.map(typecheck(_,env))
+               typecheck_method(tu,m,tas)
+                 .getOrElse(throw new Error("Wrong method call: "+e+" for type "+tu+"."+tas))
           case IfE(p,a,b)
             => if (typecheck(p,env) != boolType)
                  throw new Error("The if-expression condition "+p+" must be a boolean")
@@ -233,7 +361,7 @@ object Typechecker {
                    throw new Error("Incompatible types in Merge: "+e+" (found "+xtp+" and "+ytp+")")
                xtp
           case flatMap(Lambda(p,b),u)
-            => val nenv = typecheck(u,env) match {
+            => val nenv = unfold_storage_type(typecheck(u,env)) match {
                             case ArrayType(d,t)
                               => bindPattern(p,tuple(List(tuple((1 to d).map(i => longType).toList),t)),env)
                             case MapType(k,v)
@@ -247,7 +375,7 @@ object Typechecker {
                          }
                typecheck(b,nenv)
           case groupBy(u)
-            => typecheck(u,env) match {
+            => unfold_storage_type(typecheck(u,env)) match {
                  case ArrayType(d,t)
                    => ArrayType(d,SeqType(t))
                  case MapType(k,t)
@@ -260,33 +388,54 @@ object Typechecker {
                  case t => throw new Error("Expected a collection of pairs in "+e+" (found "+t+")")
                }
           case reduce(m,u)
-            => if (!contains(m,env))
-                 throw new Error("The monoid "+m+" in reduction "+e+" is undefined")
-               else find(m,env) match {
-                 case FunctionType(TupleType(List(t1,t2)),t3)
-                   if t1 == t2 && t1 == t3
-                   => elemType(typecheck(u,env))
-                 case _ => throw new Error("The monoid "+m+" in reduction "+e+" is ill-formed")
-               }
+            => if (env.contains(m))
+                 env(m) match {
+                    case FunctionType(TupleType(List(t1,t2)),t3)
+                      if t1 == t2 && t1 == t3
+                      => elemType(typecheck(u,env))
+                    case _ => throw new Error("The monoid "+m+" in reduction "+e+" is ill-formed")
+                 } else {
+                    val tp = elemType(typecheck(u,env))
+                    if (!typeMatch(typecheck_method(tp,m,List(tp))
+                            .getOrElse(throw new Error("Wrong monoid in "+e)),tp))
+                      throw new Error("Wrong monoid in "+e)
+                    tp
+                 }
           case Block(es)
             => es.foldLeft((AnyType():Type,env)) {
-                  case ((_,r),VarDecl(v,tp,u))
-                    => if (!typeMatch(elemType(typecheck(u,env)),tp))   // u is lifted to a collection
-                         throw new Error("Incompatible values in assignment: "+e)
-                       (tp,(v,tp)::r)
+                  case ((_,r),x@VarDecl(v,at,u))
+                    => val tp = elemType(typecheck(u,r))  // type of u is concrete
+                       if (!typeMatch(tp,at))
+                         throw new Error("Incompatible value in variable declaration: "
+                                         +x+"\n(expected "+at+" found "+tp+")")
+                       if (false && useStorageTypes)
+                         (tp,r + (v->tp))
+                       else (at,r + (v->at))
                   case ((_,r),Def(f,ps,tp,b))
-                    => typecheck(b,ps.toList++r)
-                       (tp,(f,FunctionType(TupleType(ps.values.toList),tp))::r)
+                    => typecheck(b,r++ps.toMap)
+                       (tp,r + (f -> FunctionType(TupleType(ps.values.toList),tp)))
                   case ((_,r),e)
                     => (typecheck(e,r),r)
                }._1
-          case VarDecl(_,t,u)
-            => t
+          case VarDecl(_,at,u)
+            => at
           case Assign(d,u)
-            => val ut = typecheck(u,env)
-               if (!typeMatch(typecheck(d,env),elemType(ut)))   // u is lifted to a collection
-                 throw new Error("Incompatible values in assignment: "+e)
-               ut
+            => val ut = elemType(typecheck(u,env))    // u is lifted to a collection
+               val dt = typecheck(d,env)
+               if (!typeMatch(dt,ut))
+                 throw new Error("Incompatible values in assignment: "+e+"\nAssign( "+dt+" , "+ut+" )")
+               else ut
+          case Range(a,b,c)
+            => val at = typecheck(a,env)
+               val bt = typecheck(b,env)
+               val ct = typecheck(c,env)
+               if (at != longType && at != intType)
+                  throw new Error("Range "+e+" must use an integer or long initial value: "+a)
+               else if (bt != longType && bt != intType)
+                  throw new Error("Range "+e+" must use an integer or long final value: "+b)
+               else if (ct != longType && ct != intType)
+                  throw new Error("Range "+e+" must use an integer or long step: "+c)
+               SeqType(at)
           case StringConst(_) => stringType
           case IntConst(_) => intType
           case LongConst(_) => longType
@@ -296,30 +445,40 @@ object Typechecker {
         }
         e.tpe = tpe
         tpe
-      } catch { case m: Error => throw new Error(m.getMessage+"\nFound in: "+e) }
+      } catch { case m: Error => throw new Error(m.getMessage+"\nFound in: "+e+"\nwith env: "+env) }
 
     def typecheck ( s: Stmt, return_types: List[Type], env: Environment ): Environment
       = try { s match {
           case VarDeclS(v,Some(t),Some(u))
-            => if (!typeMatch(typecheck(u,env),t))
-                 throw new Error("Incompatible value in: "+s)
-               (v,t)::env
+            => val tp = typecheck(u,env)
+               if (!typeMatch(tp,t))
+                 throw new Error("Incompatible value in: "+s+" (expected "+t+", found "+tp+")")
+               env + (v->t)
           case VarDeclS(v,Some(t),None)
-            => (v,t)::env
+            => env + (v->t)
           case VarDeclS(v,None,Some(u))
             => val t = typecheck(u,env)
-               (v,t)::env
+               env + (v->t)
           case DefS(f,ps,tp,b)
-            => typecheck(b,tp::return_types,ps.toList++env)
-               (f,FunctionType(TupleType(ps.values.toList),tp))::env
+            => typecheck(b,tp::return_types,env++ps.toMap)
+               env + (f -> FunctionType(TupleType(ps.values.toList),tp))
           case BlockS(cs)
             => cs.foldLeft(env){ case (r,c) => typecheck(c,return_types,r) }
-          case AssignS(d,v)
+          case AssignS(d,u)
             => val dt = typecheck(d,env)
-               val vt = typecheck(v,env)
-               if (!typeMatch(dt,vt))
-                  throw new Error("Incompatible values in assignment: "+s+" ("+dt+","+vt+")")
-               else env
+               val ut = typecheck(u,env)
+               (dt,ut) match {
+                 case (ArrayType(1,edt),SeqType(TupleType(List(BasicType("Int"),eut))))
+                   if typeMatch(edt,eut)
+                   => env
+                 case (ArrayType(d,edt),SeqType(TupleType(List(TupleType(is),eut))))
+                   if is.length == d && !is.exists(_ != BasicType("Int")) && typeMatch(edt,eut)
+                   => env
+                 case _
+                   => if (!typeMatch(dt,ut))
+                        throw new Error("Incompatible values in assignment: "+s+" ("+dt+","+ut+")")
+                      else env
+               }
           case IfS(p,x,y)
             => if (typecheck(p,env) != boolType)
                   throw new Error("The if-statement condition "+p+" must be a boolean")
@@ -336,7 +495,7 @@ object Typechecker {
                   throw new Error("For loop "+s+" must use an integer or long final value: "+b)
                else if (ct != longType && ct != intType)
                   throw new Error("For loop "+s+" must use an integer or long step: "+c)
-               else typecheck(u,return_types,(v,intType)::env)
+               else typecheck(u,return_types,env + (v->intType))
           case ForeachS(p,c,b)
             => typecheck(c,env) match {
                   case ArrayType(d,t)
@@ -365,10 +524,13 @@ object Typechecker {
           case ExprS(u)
             => typecheck(u,env)
                env
+          case TypeMapS(f,tpd,at,st,lt,map,inv)
+            => Lifting.typeMap(f,tpd,at,st,lt,map,inv)
+               env
           case _ => throw new Error("Illegal statement: "+s)
     } } catch { case m: Error => throw new Error(m.getMessage+"\nFound in: "+s) }
 
-    val localEnv: Environment = List()
+    val localEnv: Environment = Map()
 
     def typecheck ( s: Stmt ) { typecheck(s,Nil,localEnv) }
     def typecheck ( e: Expr ) { typecheck(e,localEnv) }

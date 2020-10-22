@@ -1,7 +1,18 @@
 #/bin/bash
 
-DIABLO="$(cd `dirname $0`/..; pwd -P)"
+ARRAY_HOME="$(cd `dirname $0`/..; pwd -P)"
 
-rm -rf classes
+if [ -z ${SPARK_HOME} ]; then
+   SPARK_HOME=~/spark-3.0.0-bin-hadoop2.7
+fi
+
+JARS=.
+for I in ${SPARK_HOME}/jars/*.jar; do
+    JARS=${JARS}:$I
+done
+for I in ${SPARK_HOME}/lib/*.jar; do
+    JARS=${JARS}:$I
+done
+
 mkdir -p classes
-scalac -d classes -cp ${DIABLO}/lib/diablo.jar $*
+scalac -d classes -cp classes:${JARS}:${ARRAY_HOME}/lib/diablo.jar $*

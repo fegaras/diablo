@@ -34,17 +34,60 @@ object Optimizer {
         case _ => None
       }
 
-  /* matches ...,i<-_.until(_),...,j<-_.until(_),...,i==j,... */
+  def isArray ( e: Expr ): Boolean
+    = e match {
+        case Lift("vector",_) => true
+        case Lift("matrix",_) => true
+        case Lift("tile",_) => true
+        case Lift("tiled",_) => true
+        case _ => false
+      }
+
+  val inverses = Map( "+"->"-", "*"->"/", "-"->"+", "/"->"*" )
+
+  /* for dst=e(src), find g such that src=g(dst) */
+  def inverse ( e: Expr, src: String, dst: Expr ): Option[Expr]
+    = e match {
+        case Var(v)
+          if v==src
+          => Some(dst)
+        case MethodCall(u,op,List(c))
+          if (inverses.contains(op) && constantKey(c))
+          => inverse(u,src,MethodCall(dst,inverses(op),List(c)))
+        case MethodCall(c,op,List(u))
+          if (inverses.contains(op) && constantKey(c))
+          => inverse(u,src,MethodCall(dst,inverses(op),List(c)))
+        case _ => None
+      }
+
+  /* matches ...,i<-range(...),...,p<-e,...,v==i,... where p contains v */
   def findRangeGen ( qs: List[Qualifier] ): Option[List[Qualifier]]
-    = matchQ(qs,{ case Generator(VarPat(_),MethodCall(_,"until",_)) => true; case _ => false },
-                { case (ig@Generator(VarPat(i),MethodCall(_,"until",_)))::r
-                    => matchQ(r,{ case Generator(VarPat(_),MethodCall(_,"until",_)) => true; case _ => false },
-                                { case (jg@Generator(VarPat(j),MethodCall(_,"until",_)))::s
-                                    => matchQ(s,{ case Predicate(MethodCall(Var(v),"==",List(Var(w))))
-                                                    => (v==i && w==j) || (v==j && w==i)
+    = matchQ(qs,{ case Generator(_,Range(_,_,_)) => true; case _ => false },
+                { case (ig@Generator(VarPat(index),Range(_,_,_)))::r
+                    => matchQ(r,{ case Generator(_,x) => isArray(x); case _ => false },
+                                { case (g@Generator(TuplePat(List(p,_)),_))::s
+                                    => matchQ(s,{ case Predicate(MethodCall(Var(v),"==",List(ie)))
+                                                    => patvars(p).contains(v) &&
+                                                       inverse(ie,index,Var(v)).nonEmpty
                                                   case _ => false },
                                               { case c::_
-                                                  => Some(List(ig,jg,c))
+                                                  => Some(List(ig,g,c))
+                                                case _ => None })
+                                  case _ => None })
+                  case _ => None })
+
+  /* matches ...,p<-e,...,i<-range(...),...,v==i,... where p contains v */
+  def findRangeGen2 ( qs: List[Qualifier] ): Option[List[Qualifier]]
+    = matchQ(qs,{ case Generator(_,x) => isArray(x); case _ => false },
+                { case (g@Generator(TuplePat(List(p,_)),_))::s
+                    => matchQ(s,{ case Generator(_,Range(_,_,_)) => true; case _ => false },
+                                { case (ig@Generator(VarPat(index),Range(_,_,_)))::r
+                                    => matchQ(s,{ case Predicate(MethodCall(Var(v),"==",List(ie)))
+                                                    => patvars(p).contains(v) &&
+                                                       inverse(ie,index,Var(v)).nonEmpty
+                                                  case _ => false },
+                                              { case c::_
+                                                  => Some(List(ig,g,c))
                                                 case _ => None })
                                   case _ => None })
                   case _ => None })
@@ -66,7 +109,7 @@ object Optimizer {
   /* matches ...,(i1,x1)<-e,...,(i2,x2)<-e,...,i1=i2,...
    * or      ...,((i1,j1),x1)<-e,...,((i2,j2),x2)<-e,...,i1=i2,...,j1=j2,...   */
   def findEqGen ( qs: List[Qualifier] ): Option[List[Qualifier]]
-    = matchQ(qs,{ case Generator(_,x) => true; case _ => false },
+    = matchQ(qs,{ case Generator(_,x) if isArray(x) => true; case _ => false },
                 { case (g1@Generator(TuplePat(List(VarPat(i1),_)),x))::r
                     => matchQ(r,{ case Generator(_,y) if x==y => true; case _ => false },
                                 { case (g2@Generator(TuplePat(List(VarPat(i2),_)),y))::s
@@ -83,9 +126,10 @@ object Optimizer {
                   case _ => None })
 
   def findBoundRange ( qs: List[Qualifier] ): Option[List[Qualifier]]
-    = matchQ(qs,{ case Generator(VarPat(_),MethodCall(_,"until",_)) => true; case _ => false },
-                { case (g1@Generator(VarPat(v),MethodCall(_,"until",_)))::s
-                    => matchQ(s,{ case Predicate(MethodCall(Var(v1),"==",List(e))) => v==v1; case _ => false },
+    = matchQ(qs,{ case Generator(VarPat(_),Range(_,_,_)) => true; case _ => false },
+                { case (g1@Generator(VarPat(v),Range(_,_,_)))::s
+                    => matchQ(s,{ case Predicate(MethodCall(Var(v1),"==",List(e)))
+                                    => v==v1; case _ => false },
                                 { case g2::_ => Some(List(g1,g2))
                                   case _ => None })
                   case _ => None })
@@ -113,10 +157,12 @@ object Optimizer {
 
   /* true if the group-by key is unique, then the groups are singletons */
   def uniqueKey ( key: Expr, qs: List[Qualifier] ): Boolean = {
-     val is = qs.takeWhile(!_.isInstanceOf[GroupByQual])
-                .flatMap {
-                  case Generator(VarPat(i),MethodCall(_,"until",_))
+     val is = qs.takeWhile(!_.isInstanceOf[GroupByQual]).flatMap {
+                  case Generator(VarPat(i),Range(_,_,_))
                     => List(i)
+                  case Generator(TuplePat(List(pi,pv)),e)
+                    if isArray(e)
+                    => patvars(pi)
                   case Generator(_,_)
                     => return false
                   case _ => Nil
@@ -125,12 +171,13 @@ object Optimizer {
        = k match {
             case Tuple(ts) => ts.flatMap(comps)
             case Var(i) => List(i)
+            case Project(u,_) => comps(u)
             case Nth(u,_) => comps(u)
             case MethodCall(u,op,List(c))
-              if List("+","-","*").contains(op) && constantKey(c)
+              if (List("+","-","*").contains(op) && constantKey(c))
               => comps(u)
             case MethodCall(c,op,List(u))
-              if List("+","-","*").contains(op) && constantKey(c)
+              if (List("+","-","*").contains(op) && constantKey(c))
               => comps(u)
             case _ => List("%") // will fail to match
          }
@@ -162,20 +209,38 @@ object Optimizer {
         if { QLcache = findRangeGen(qs); QLcache.nonEmpty }
         => // eliminate a range generator
            QLcache match {
-             case Some(List( ig@Generator(VarPat(i),MethodCall(n1,"until",List(n2))),
-                             jg@Generator(VarPat(j),MethodCall(n3,"until",List(n4))), c ))
-                => val mx = max(n1,n3)
-                   val mn = min(n2,n4)
-                   val nqs = if (freevars(n4,freevars(e)) == Nil)
-                               replace(c,Predicate(BoolConst(true)),
-                                     replace(jg,LetBinding(VarPat(j),Var(i)),
-                                             replace(ig,Generator(VarPat(i),MethodCall(mx,"until",List(mn))),
-                                                     qs)))
-                             else replace(c,Predicate(MethodCall(Var(i),"<",List(n4))),
-                                     replace(jg,LetBinding(VarPat(j),Var(i)),
-                                             replace(ig,Generator(VarPat(i),MethodCall(mx,"until",List(n2))),
-                                                     qs)))
-                   optimize(Normalizer.normalize(Comprehension(h,nqs)))
+             case Some(List( ig@Generator(VarPat(i),ir@Range(n1,n2,n3)),
+                             g@Generator(p,u),
+                             c@Predicate(MethodCall(Var(v),"==",List(ie))) ))
+                => val m1 = subst(i,n1,ie)
+                   val m2 = subst(i,n2,ie)
+                   val m13 = subst(i,MethodCall(n1,"+",List(n3)),ie)
+                   val m3 = if (n3 == IntConst(1)) n3
+                              else MethodCall(MethodCall(m13,"-",List(m1)),"/",List(n3))
+                   val gs = List(Generator(p,u),
+                                 LetBinding(VarPat(i),inverse(ie,i,Var(v)).get))++
+                              (if (ir==u) Nil else List(Predicate(Call("inRange",List(Var(v),m1,m2,m3)))))
+                   val nqs = qs.diff(List(g,c)).flatMap( x => if (x==ig) gs else List(x))
+                   optimize(Comprehension(h,nqs))
+             case _ => apply(e,optimize)
+           }
+      case Comprehension(h,qs)
+        if { QLcache = findRangeGen2(qs); QLcache.nonEmpty }
+        => // eliminate a range generator (first the array generator, then the range generator)
+           QLcache match {
+             case Some(List( ig@Generator(VarPat(i),ir@Range(n1,n2,n3)),
+                             g@Generator(p,u),
+                             c@Predicate(MethodCall(Var(v),"==",List(ie))) ))
+                => val m1 = subst(i,n1,ie)
+                   val m2 = subst(i,n2,ie)
+                   val m13 = subst(i,MethodCall(n1,"+",List(n3)),ie)
+                   val m3 = if (n3 == IntConst(1)) n3
+                              else MethodCall(MethodCall(m13,"-",List(m1)),"/",List(n3))
+                   val gs = List(Generator(p,u),
+                                 LetBinding(VarPat(i),inverse(ie,i,Var(v)).get))++
+                              (if (ir==u) Nil else List(Predicate(Call("inRange",List(Var(v),m1,m2,m3)))))
+                   val nqs = qs.diff(List(ig,c)).flatMap( x => if (x==g) gs else List(x))
+                   optimize(Comprehension(h,nqs))
              case _ => apply(e,optimize)
            }
       case Comprehension(h,qs)
@@ -242,14 +307,38 @@ object Optimizer {
                                   normalizeAll(Comprehension(h,(r:+x)++bs))
                              case _ => apply(e,optimize)
                            }
-                }
+                   }
            }
       case _ => apply(e,optimize)
     }
 
+  def movePredicates ( qs: List[Qualifier] ): List[Qualifier]
+    = qs match {
+        case (p@Predicate(_))::r
+          => movePredicates(r):+p
+        case q::r
+          => q::movePredicates(r)
+        case Nil => Nil
+      }
+
+  def movePredicates ( e: Expr ): Expr
+    = e match {
+        case Comprehension(h,qs)
+          => qs.span{ case GroupByQual(_,_) => false
+                      case AssignQual(_,_) => false
+                      case _ => true } match {
+               case (r,q::s)
+                 => val Comprehension(_,ss) = movePredicates(Comprehension(h,s))
+                    Comprehension(movePredicates(h),
+                                  movePredicates(r)++(q+:ss))
+               case _ => Comprehension(movePredicates(h),movePredicates(qs))
+             }
+        case _ => apply(e,movePredicates)
+      }
+
   def optimizeAll ( e: Expr ): Expr = {
     var olde = e
-    var ne = e
+    var ne = olde//movePredicates(olde)
     do { olde = ne
          ne = normalizeAll(optimize(ne))
        } while (olde != ne)
