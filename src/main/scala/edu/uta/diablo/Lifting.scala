@@ -15,7 +15,6 @@
  */
 package edu.uta.diablo
 
-
 object Lifting {
   import AST._
   import Typechecker._

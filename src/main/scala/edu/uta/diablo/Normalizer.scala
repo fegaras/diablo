@@ -185,8 +185,8 @@ object Normalizer {
       case Let(VarPat(v),u,b)
         if isSimple(u) || occurrences(v,b) <= 1
         => normalize(subst(Var(v),u,b))
-      case Let(TuplePat(ps),Tuple(us),b)
-        => (ps zip us).foldLeft(b){ case (r,(p,u)) => Let(p,u,r) }
+//      case Let(TuplePat(ps),Tuple(us),b)
+//        => (ps zip us).foldLeft(b){ case (r,(p,u)) => Let(p,u,r) }
       case Comprehension(h,List())
         => Seq(List(normalize(h)))
       case Comprehension(h,Predicate(p)::qs)

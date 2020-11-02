@@ -17,7 +17,7 @@ package edu.uta.diablo
 
 object Optimizer {
   import AST._
-  import Normalizer._
+  import Normalizer.{normalizeAll,comprVars}
 
   /* general span for comprehensions; if a qualifier matches, split there and continue with cont */
   def matchQ ( qs: List[Qualifier], filter: Qualifier => Boolean,

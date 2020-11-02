@@ -8,8 +8,8 @@ object Test {
     val conf = new SparkConf().setAppName("Test")
     val spark_context = new SparkContext(conf)
 
-    parami(tileSize,1024) // each tile has size N*N
-    val N = 1024
+    parami(tileSize,10) // each tile has size N*N
+    val N = 10
 
     type Tiled = (Int,Int,RDD[((Int,Int),Array[Double])])
 
@@ -22,7 +22,9 @@ object Test {
            if (ii*N+i < n && jj*N+j < m)
              println("%d,%d,%.1f".format(ii*N+i,jj*N+j,a(i*N+j)))
     }
-/*
+
+    //param(groupByJoin,false)
+
     q("""
       {
         var L: list[(Int,Double)] = [ (k,(+/i)/i.length.toDouble) | i <- 0..99, group by k: i%10 ];
@@ -53,11 +55,16 @@ object Test {
       {
         var M: matrix[Double] = tiled(100,100)[ ((i,j),i*100.0+j) | i <- 0..99, j <- 0..99 ];
         var N = M;
+        var Q = M;
         M = [ (k,+/w) | i <- 0..99, j <- 0..99, let w = 1.0, group by k: (i,j) ];
         M = [ ((i,j),+/v) | ((i,k),m) <- M, ((kk,j),n) <- N, kk == k, let v = m*n, group by (i,j) ];
         M = [ (k,+/v) | ((i,k),m) <- M, ((kk,j),n) <- N, kk == k, let v = m*n, group by k:(i,j) ];
+        M = [ ((i,j),+/v) | ((jj,l),q) <- Q, ((kk,j),n) <- N, ((i,k),m) <- M, kk == k, jj == j, let v = m*n*q, group by (i,j) ];
+        // doesn't give groupByJoin:
+        M = [ ((i,j),+/v) | ((i,k),m) <- M, ((kk,j),n) <- N, ((jj,l),q) <- Q, kk == k, jj == j, let v = m*n*q, group by (i,j) ];
         M = [ ((j,i),m) | ((i,j),m) <- M ];
-        M = [ ((i,j),m*n) | ((i,j),m) <- M, ((ii,jj),n) <- N, ii == i, jj == j ];
+        M = [ ((i,j),m+n) | ((i,j),m) <- M, ((ii,jj),n) <- N, ii == i, jj == j ];
+        M = [ ((i,l),m+n*q) | ((i,k),m) <- M, ((kk,j),n) <- N, ((jj,l),q) <- Q, kk == k, jj == j ];
         M = [ ((j%10,i),m) | ((i,j),m) <- M, ((ii,jj),n) <- N, ii == i, jj == j ];
         var V = vector(100)[ (i,+/m) | ((i,j),m) <- M, group by i ];
         var X = matrix(100,100) [ ((j,i),m+1) | ((i,j),m) <- M ];
@@ -85,6 +92,7 @@ object Test {
       };
       0
     """)
+
     val X = q("""
           var n = 100;
           var M = tiled(n,n)[ ((i,j),random()) | i <- 0..n-1, j <- 0..n-1 ];
@@ -99,7 +107,7 @@ object Test {
               };
           R;
         """)
-*/
+
     q("""
       var n = 100; var m = n; var l = 10;
       var R = tiled(n,m)[ ((i,j),random()) | i <- 0..n-1, j <- 0..m-1 ];
@@ -136,5 +144,6 @@ object Test {
       };
       (P,Q);
     """)
+
   }
 }

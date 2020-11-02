@@ -49,7 +49,7 @@ class MyLexical extends StdLexical with MyTokens {
 
   /* floating point numbers */
   def doubleLit: Parser[Token]
-      = regex("""[0-9]*[\.][0-9]+([eE][+-]?[0-9]+)?[FfDd]?""".r) ^^ { DoubleLit }
+      = regex("""[0-9]*[.][0-9]+([eE][+-]?[0-9]+)?[FfDd]?""".r) ^^ { DoubleLit }
 
   /* character literal */
   def charLit: Parser[Token]
@@ -57,7 +57,7 @@ class MyLexical extends StdLexical with MyTokens {
 
   /* an infix operator can be any sequence of special chars, except delimiters, etc */ 
   def infixOpr: Parser[Token]
-      = regex("""[^\s\w\$\(\)\[\]\{\}\'\"\`\.\;\,\\/]+""".r) ^^
+      = regex("""[^\s\w$()\[\]{}'"`.;,\\/]+""".r) ^^
         { s => if (delimiters.contains(s)) Keyword(s) else InfixOpr(s) }
 }
 

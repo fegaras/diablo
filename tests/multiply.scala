@@ -1,6 +1,8 @@
 import edu.uta.diablo._
 import org.apache.spark._
 import org.apache.spark.rdd._
+import org.apache.spark.sql._
+import org.apache.spark.sql.functions._
 import org.apache.spark.mllib.linalg.distributed._
 import org.apache.spark.mllib.linalg._
 import org.apache.log4j._
@@ -49,7 +51,7 @@ object Multiply extends Serializable {
     val MM = randomIJVMatrix(n,m)
     val NN = randomIJVMatrix(n,m)
 
-    def testMultiplyIJV(): Double = {
+    def testMultiplyIJV (): Double = {
       // matrix multiplication of IJV matrices using Diablo array comprehensions
       val t = System.currentTimeMillis()
       try {
@@ -89,7 +91,7 @@ object Multiply extends Serializable {
                         m.rowsPerBlock,m.colsPerBlock)
 
     // matrix multiplication of tiled matrices in MLlib.linalg
-    def testMultiplyMLlib(): Double = {
+    def testMultiplyMLlib (): Double = {
       val t = System.currentTimeMillis()
       try {
         val C = A.multiply(B)
@@ -99,7 +101,7 @@ object Multiply extends Serializable {
     }
 
     // matrix multiplication of tiled matrices using Diablo array comprehensions
-    def testMultiplyDiabloDAC(): Double = {
+    def testMultiplyDiabloDAC (): Double = {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
@@ -111,7 +113,7 @@ object Multiply extends Serializable {
     }
 
     // matrix multiplication of tiled matrices using Diablo array comprehensions - no in-tile parallelism
-    def testMultiplyDiabloDACs(): Double = {
+    def testMultiplyDiabloDACs (): Double = {
       param(parallel,false)
       val t = System.currentTimeMillis()
       try {
@@ -125,7 +127,7 @@ object Multiply extends Serializable {
     }
 
     // matrix multiplication of tiled matrices using Diablo array comprehensions - no groupBy-join
-    def testMultiplyDiabloDACn(): Double = {
+    def testMultiplyDiabloDACn (): Double = {
       param(groupByJoin,false)
       val t = System.currentTimeMillis()
       try {
@@ -139,7 +141,7 @@ object Multiply extends Serializable {
     }
 
     // matrix multiplication of tiled matrices using loops
-    def testMultiplyDiabloLoop(): Double = {
+    def testMultiplyDiabloLoop (): Double = {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
@@ -156,38 +158,32 @@ object Multiply extends Serializable {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    def mult ( x: Array[Double], y: Array[Double] ): Array[Double] = {
-       val V = Array.ofDim[Double](N*N)
-       for { i <- (0 until N).par }
-           for { j <- 0 until N }
-               for { k <- 0 until N }
-                   V(i*N+j) += x(i*N+k)*y(k*N+j)
-       V
-    }
-
-    def add ( x: Array[Double], y: Array[Double] ): Array[Double] = {
-       val V = Array.ofDim[Double](N*N)
-       for { i <- (0 until N).par
-             j <- 0 until N }
-           V(i*N+j) = x(i*N+j)+y(i*N+j)
-       V
-    }
-
-    // matrix multiplication of IJV matrices - hand-written
-    def testMultiplyCodeIJV (): Double = {
+    // matrix multiplication of tiled matrices - hand-written
+    def testMultiplyCode (): Double = {
       val t: Long = System.currentTimeMillis()
       try {
         val C = (n,m,AA._3.map{ case ((i,k),a) => (k,(i,a)) }
                        .join( BB._3.map{ case ((kk,j),b) => (kk,(j,b)) } )
-                       .map{ case (_,((i,a),(j,b))) => ((i,j),mult(a,b)) }
-                       .reduceByKey(add))
+                       .map{ case (_,((i,a),(j,b)))
+                               => val V = Array.ofDim[Double](N*N)
+                                  for { i <- (0 until N).par
+                                        k <- 0 until N
+                                        j <- 0 until N }
+                                     V(i*N+j) += a(i*N+k)*b(k*N+j)
+                                  ((i,j),V) }
+                       .reduceByKey{ case (x,y)
+                                       => val V = Array.ofDim[Double](N*N)
+                                          for { i <- (0 until N).par
+                                                j <- 0 until N }
+                                             V(i*N+j) = x(i*N+j)+y(i*N+j)
+                                          V })
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
 
     // matrix multiplication of tiled matrices using groupBy-join - hand-written
-    def testMultiplyCode (): Double = {
+    def testMultiplyCodeGBJ (): Double = {
       val t = System.currentTimeMillis()
       try {
         val C = (n,m,AA._3.flatMap{ case ((i,k),a) => (0 until n/N).map(j => ((i,j),(k,a))) }
@@ -245,11 +241,12 @@ object Multiply extends Serializable {
     //test("DIABLO IJV Multiply",testMultiplyIJV)
     test("MLlib Multiply",testMultiplyMLlib)
     test("DIABLO groupByJoin Multiply",testMultiplyDiabloDAC)
-    test("DIABLO groupByJoin Multiply sequential",testMultiplyDiabloDACs)
+    //test("DIABLO groupByJoin Multiply sequential",testMultiplyDiabloDACs)
     test("DIABLO groupBy Multiply",testMultiplyDiabloDACn)
     test("DIABLO loop Multiply",testMultiplyDiabloLoop)
-    test("Hand-written groupByJoin Multiply",testMultiplyCode)
-    
+    test("Hand-written groupByJoin Multiply",testMultiplyCodeGBJ)
+    test("Hand-written groupBy Multiply",testMultiplyCode)
+
 /*
     if (!gbj) {
       test("MLlib Multiply",testMultiplyMLlib)

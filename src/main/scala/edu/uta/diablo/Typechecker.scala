@@ -15,6 +15,7 @@
  */
 package edu.uta.diablo
 
+
 object Typechecker {
     import AST._
 
@@ -104,10 +105,10 @@ object Typechecker {
            => Some(Map(n->tp))
          case (TupleType(ts1),TupleType(ts2))
            if ts1.length == ts2.length
-           => (ts1 zip ts2).map{ case (x,y) => tmatch(x,y) }.reduce[Env](merge(_,_))
+           => (ts1 zip ts2).map{ case (x,y) => tmatch(x,y) }.reduce[Env](merge)
          case (RecordType(rs1),RecordType(rs2))
            if rs1.keys == rs2.keys
-           => ((rs1.values) zip (rs2.values)).map{ case (x,y) => tmatch(x,y) }.reduce[Env](merge(_,_))
+           => ((rs1.values) zip (rs2.values)).map{ case (x,y) => tmatch(x,y) }.reduce[Env](merge)
          case (SeqType(st1),SeqType(st2))
            => tmatch(st1,st2)
          case (ArrayType(d1,et1),ArrayType(d2,et2))
@@ -117,7 +118,7 @@ object Typechecker {
            => merge(tmatch(tk1,tk2),tmatch(tv1,tv2))
          case (ParametricType(n1,ts1),ParametricType(n2,ts2))
            if n1 == n2 && ts1.length == ts2.length
-           => (ts1 zip ts2).map{ case (x,y) => tmatch(x,y) }.reduce[Env](merge(_,_))
+           => (ts1 zip ts2).map{ case (x,y) => tmatch(x,y) }.reduce[Env](merge)
          case _ => None
       }
 
@@ -408,9 +409,7 @@ object Typechecker {
                        if (!typeMatch(tp,at))
                          throw new Error("Incompatible value in variable declaration: "
                                          +x+"\n(expected "+at+" found "+tp+")")
-                       if (false && useStorageTypes)
-                         (tp,r + (v->tp))
-                       else (at,r + (v->at))
+                       (at,r + (v->at))
                   case ((_,r),Def(f,ps,tp,b))
                     => typecheck(b,r++ps.toMap)
                        (tp,r + (f -> FunctionType(TupleType(ps.values.toList),tp)))

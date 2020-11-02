@@ -5,7 +5,7 @@
 #SBATCH --partition=compute
 #SBATCH --nodes=4
 #SBATCH --export=ALL
-#SBATCH --time=600    # time limit in minutes
+#SBATCH --time=60    # time limit in minutes
 
 nodes=$SLURM_NNODES
 echo "Number of nodes = " $nodes
@@ -49,7 +49,7 @@ done
 rm -rf classes
 mkdir -p classes
 
-scala_files="add.scala multiply.scala factorization.scala"
+scala_files="add.scala multiply.scala"
 for f in $scala_files; do
     echo compiling $f ...
     $SCALA_HOME/bin/scalac -d classes -cp classes:${JARS}:${DIABLO_HOME}/lib/diablo.jar $f
@@ -58,25 +58,16 @@ done
 jar cf test.jar -C classes .
 
 scale=100        # scale of datasets
-ns=5             # number of datasets per experiment
-repeat=4         # number of repetitions of each experiment
+ns=1             # number of datasets per experiment
+repeat=1         # number of repetitions of each experiment
 
 for ((i=1; i<=$ns; i++)); do   # for each different dataset
 
-   j=$(echo "scale=3;sqrt($i/$ns)*400*$scale" | bc); n=${j%.*}
-      $SPARK_HOME/bin/spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Add --master $MASTER $SPARK_OPTIONS test.jar $repeat $n
+  # j=$(echo "scale=3;sqrt($i/$ns)*400*$scale" | bc); n=${j%.*}
+  #    $SPARK_HOME/bin/spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Add --master $MASTER $SPARK_OPTIONS test.jar $repeat $n
 
    j=$(echo "scale=3;sqrt($i/$ns)*80*$scale" | bc); n=${j%.*}
       $SPARK_HOME/bin/spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master $MASTER $SPARK_OPTIONS test.jar $repeat $n 0
-
-   j=$(echo "scale=3;sqrt($i/$ns)*200*$scale" | bc); n=${j%.*}
-      $SPARK_HOME/bin/spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master $MASTER $SPARK_OPTIONS test.jar $repeat $n 1
-
-   j=$(echo "scale=3;sqrt($i/$ns)*200*$scale" | bc); n=${j%.*}
-      $SPARK_HOME/bin/spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Factorization --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $n 1000 0
-
-   j=$(echo "scale=3;sqrt($i/$ns)*200*$scale" | bc); n=${j%.*}
-      $SPARK_HOME/bin/spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Factorization --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $n 1000 1
 
 done
 

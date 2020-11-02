@@ -2,14 +2,11 @@
 
 A compiler from array-based loops to distributed data parallel programs.
 Arrays are stored as distributed collections of square tiles.
-It works on Apache Spark and Scala's Parallel colections.
+It works on Apache Spark and Scala's Parallel collections.
 
 ### Installation on Spark
 
-To compile DIABLO on Spark:
-```bash
-mvn install
-```
+DIABLO depends on Scala 2.12 and Spark 3.0. To compile DIABLO, use ``sbt package`` or ``mvn install``.
 To test  on Spark:
 ```bash
 export SPARK_HOME= ... path to Spark home ...

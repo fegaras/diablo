@@ -15,13 +15,15 @@
  */
 package edu.uta.diablo
 
+import scala.annotation.tailrec
+
 object Translator {
   import AST._
   import Typechecker._
 
   type Defs = Map[String,(List[String],Stmt)]
 
-  def elem ( x: Expr ) = Seq(List(x))
+  def elem ( x: Expr ): Expr = Seq(List(x))
 
   def tuple ( s: List[Expr] ): Expr
     = s match { case List(x) => x; case _ => Tuple(s) }
@@ -34,9 +36,6 @@ object Translator {
 
   def translate ( e: Expr, env: Environment, vars: List[String], fncs: Defs ): Expr
     = e match {
-        case Var(n)
-          if false && vars.contains(n)
-          => Var(n)
         case Var(n)
           => elem(Var(n))
         case Nth(x,n)
@@ -63,7 +62,7 @@ object Translator {
              Comprehension(Var(v),
                            (Generator(VarPat(A),translate(u,env,vars,fncs))::
                             (is zip vs).map{ case (i,iv) => Generator(VarPat(iv),translate(i,env,vars,fncs)) })++
-                           (Generator(TuplePat(List(tuple(vS.map(VarPat(_))),VarPat(v))),Var(A))::
+                           (Generator(TuplePat(List(tuple(vS.map(VarPat)),VarPat(v))),Var(A))::
                             (vS zip vs).map{ case (v,w) => Predicate(MethodCall(Var(v),"==",List(Var(w)))) }))
         case Let(p,u,b)
           => val v = newvar
@@ -177,7 +176,7 @@ object Translator {
         case Index(u,is)
           => val k = newvar
              val vs = is.map(x => newvar)
-             Comprehension(Tuple(List(Var(k),tuple(vs.map(Var(_))))),
+             Comprehension(Tuple(List(Var(k),tuple(vs.map(Var)))),
                            Generator(VarPat(k),key(u,env,vars,fncs))::
                            (is zip vs).map{ case (i,v) => Generator(VarPat(v),translate(i,env,vars,fncs)) })
         case _ => throw new Error("Illegal destination: "+d)
@@ -185,9 +184,6 @@ object Translator {
 
   def destination ( d: Expr, k: Expr, vars: List[String] ): Expr
     = d match {
-        case Var(n)
-          if false && vars.contains(n)
-          => Var(n)
         case Var(n)
           => elem(Var(n))
         case Project(u,a)
@@ -205,9 +201,9 @@ object Translator {
              val vs = is.map(x => newvar)
              val vS = is.map(x => newvar)
              Comprehension(Var(v),
-                           List(LetBinding(TuplePat(List(VarPat(ku),tuple(vs.map(VarPat(_))))),k),
+                           List(LetBinding(TuplePat(List(VarPat(ku),tuple(vs.map(VarPat)))),k),
                                 Generator(VarPat(A),destination(u,Var(ku),vars)),
-                                Generator(TuplePat(List(TuplePat(vS.map(VarPat(_))),VarPat(v))),Var(A)))++
+                                Generator(TuplePat(List(TuplePat(vS.map(VarPat)),VarPat(v))),Var(A)))++
                            (vS zip vs).map{ case (v,w) => Predicate(MethodCall(Var(v),"==",List(Var(w)))) })
         case _ => throw new Error("Illegal destination: "+d)
       }
@@ -217,11 +213,9 @@ object Translator {
                               case _ => true },
                           _&&_,true)
 
-  def update ( dest: Expr, value: Expr, env: Environment, vars: List[String], fncs: Defs ): List[Expr]
+  @tailrec
+  def update (dest: Expr, value: Expr, env: Environment, vars: List[String], fncs: Defs ): List[Expr]
     = dest match {
-        case Var(n)
-          if false && !vars.contains(n)
-          => throw new Error("Local variable "+n+" cannot be updated "+value)
         case Var(n)
           => val nv = newvar
              val k = newvar
@@ -275,9 +269,9 @@ object Translator {
              val k = newvar
              val v = newvar
              val vs = is.map(x => newvar)
-             val ce = Comprehension(Tuple(List(tuple(vs.map(Var(_))),Var(v))),
+             val ce = Comprehension(Tuple(List(tuple(vs.map(Var)),Var(v))),
                                     List(Generator(TuplePat(List(TuplePat(List(VarPat(k),
-                                                                               tuple(vs.map(VarPat(_))))),
+                                                                               tuple(vs.map(VarPat)))),
                                                                  VarPat(v))),
                                                    value)))
              update(u,Comprehension(Tuple(List(Var(k),Merge(Var(A),ce))),
@@ -291,10 +285,10 @@ object Translator {
              val vs = is.map(x => newvar)
              update(u,Comprehension(Tuple(List(Var(k),Merge(Var(A),Var(s)))),
                                     List(Generator(TuplePat(List(TuplePat(List(VarPat(k),
-                                                                               tuple(vs.map(VarPat(_))))),
+                                                                               tuple(vs.map(VarPat)))),
                                                                  VarPat(v))),
                                                    value),
-                                         LetBinding(VarPat(s),Tuple(List(tuple(vs.map(Var(_))),Var(v)))),
+                                         LetBinding(VarPat(s),Tuple(List(tuple(vs.map(Var)),Var(v)))),
                                          GroupByQual(VarPat(k),Var(k)),
                                          Generator(VarPat(A),destination(u,Var(k),vars)))),
                     env,vars,fncs)
@@ -379,7 +373,7 @@ object Translator {
                val (calls,ne) = unfoldCalls(e,quals,env,vars,fncs)
                val qs = Generator(VarPat(v),translate(ne,env,vars,fncs))::
                         ((vs zip is).map{ case (v,i) => Generator(VarPat(v),translate(i,env,vars,fncs)) }:+
-                         GroupByQual(VarPat(k),tuple(vs.map(Var(_)))))
+                         GroupByQual(VarPat(k),tuple(vs.map(Var))))
                calls:+Assign(Var(a),
                              ((//Call("increment",List(Var(a),StringConst(op),
                                        elem(Comprehension(Tuple(List(Var(k),reduce(op,Var(v)))),
@@ -402,7 +396,7 @@ object Translator {
                         (vs zip is).map{ case (v,i) => Generator(VarPat(v),translate(i,env,vars,fncs)) }
                calls:+Assign(Var(a),
                              ((//Call("update",List(Var(a),
-                                       elem(Comprehension(Tuple(List(tuple(vs.map(Var(_))),Var(v))),
+                                       elem(Comprehension(Tuple(List(tuple(vs.map(Var)),Var(v))),
                                                      quals++qs)))))
           case (d,MethodCall(x,op,List(e)))
             if d == x
@@ -514,7 +508,7 @@ object Translator {
                     case ((ns,ls,vs,fs),stmt)
                       => ( ns++translate(stmt,quals,retVars,ls,vs,fs), ls, vs, fs )
                     }
-               List(block(m))//if (quals.isEmpty) List(block(m)) else m
+               List(block(m))
           case tm@TypeMapS(v,ps,tp,from,to,Lambda(p1,u1),Lambda(p2,u2))
             => if (!typeMatch(typecheck(u1,bindPattern(p1,from,env)),to))
                  throw new Error("Wrong map function: "+Lambda(p1,u1))

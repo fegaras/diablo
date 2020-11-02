@@ -340,7 +340,7 @@ abstract class CodeGeneration {
            }
       case groupBy(x)
         => val xc = codeGen(x,env)
-           q"$xc.groupBy(_._1).mapValues( _.map(_._2))"
+           q"$xc.groupBy(_._1).mapValues( _.map(_._2)).toList"
       case reduce(m,x)
         => val xc = codeGen(x,env)
            val fnc = TermName(method_name(m))
@@ -365,6 +365,12 @@ abstract class CodeGeneration {
       case Call("tile",Nil)
         => val ts = tileSize*tileSize
            q"Array.ofDim[Any]($ts)"
+      case Call("inRange",List(i,n1,n2,n3))
+        => val ic = codeGen(i,env)
+           val nc1 = codeGen(n1,env)
+           val nc2 = codeGen(n2,env)
+           val nc3 = codeGen(n3,env)
+           q"$ic >= $nc1 && $ic <= $nc2 && ($ic-$nc1) % $nc3 == 0"
       case Call(n,es)
         => val fm = TermName(method_name(n))
            codeList(es,cs => q"$fm(..$cs)",env)
@@ -534,7 +540,7 @@ abstract class CodeGeneration {
                                             (pq"$vc",tc)::r
                                        case (r,Def(f,ps,tp,b))
                                          => val fc = TermName(f)
-                                            val pt = TupleType(ps.map(_._2).toList)
+                                            val pt = TupleType(ps.values.toList)
                                             val tc = Type2Tree(FunctionType(pt,tp))
                                             (pq"$fc",tc)::r
                                        case (r,_) => r }
@@ -658,7 +664,15 @@ abstract class CodeGeneration {
            val nc = codeGen(n,env)
            val mc = codeGen(m,env)
            val kc = codeGen(m,env)
-           q"{ var $nv = $nc; while($nv < $mc){ $bc; $nv += $kc } }"
+           q"{ var $nv = $nc; while($nv <= $mc){ $bc; $nv += $kc } }"
+      case ForeachS(p@VarPat(v),Range(n,m,k),b)
+        // a while-loop is more efficient than a foreach
+        => val nv = TermName(v)
+           val bc = codeGen(b,add(p,tq"Int",env))
+           val nc = codeGen(n,env)
+           val mc = codeGen(m,env)
+           val kc = codeGen(k,env)
+           q"{ var $nv = $nc; while($nv <= $mc){ $bc; $nv += $kc } }"
       case ForeachS(p@VarPat(v),x,b)
         => val (tp,xc) = typedCode(x,env)
            val nv = TermName(v)

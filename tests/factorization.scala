@@ -114,6 +114,34 @@ object Factorization extends Serializable {
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
+    def testFactorizationDiabloLoop(): Double = {
+      val t = System.currentTimeMillis()
+      var E = RR
+      var P = PPinit
+      var Q = QQinit
+      try {
+
+       val (P,Q) = q("""
+          var a = 0.002;
+          var b = 0.02;
+
+          for i = 0, n-1 do
+             for j = 0, m-1 do {
+                pq[i,j] = 0.0;
+                for k = 0, d-1 do
+                    pq[i,j] += P[i,k]*Q[k,j];
+                E[i,j] = R[i,j]-pq[i,j];
+                for k = 0, d-1 do {
+                    P[i,k] += a*(2*E[i,j]*Q[k,j]-b*P[i,k]);
+                    Q[k,j] += a*(2*E[i,j]*P[i,k]-b*Q[k,j]);
+                };
+             };
+          (P,Q);
+          """)
+        val x = P._3.count+Q._3.count
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
 
     def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()

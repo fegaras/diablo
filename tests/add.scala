@@ -108,6 +108,22 @@ object Add {
       (System.currentTimeMillis()-t)/1000.0
     }
 
+    def testAddCode (): Double = {
+      val t = System.currentTimeMillis()
+      try {
+        val C = (n,m,AA._3.join(BB._3)
+                       .mapValues{ case (a,b)
+                                     => val c = Array.ofDim[Double](N*N)
+                                        for { i <- (0 until N).par
+                                              j <- 0 until N
+                                            } c(i*N+j) = a(i*N+j)+b(i*N+j)
+                                        c
+                                 })
+        validate(C)
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
     def validate ( M: (Int,Int,RDD[((Int,Int),Array[Double])]) ) {
       if (!validate_output)
         M._3.count()
@@ -146,6 +162,7 @@ object Add {
     test("MLlib Add",testAddMLlib)
     test("DIABLO Add",testAddDiabloDAC)
     test("DIABLO loop Add",testAddDiabloDACloop)
+    test("Hand-written Add",testAddCode)
 
     spark_context.stop()
   }

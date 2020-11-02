@@ -19,13 +19,13 @@ import scala.util.parsing.combinator.RegexParsers
 import scala.util.Try
 
 
-sealed abstract class Tree
-    case class Node ( name: String, children: List[Tree] ) extends Tree
-    case class TupleNode ( children: List[Tree] ) extends Tree
-    case class MapNode ( binds: List[(Tree,Tree)] ) extends Tree
-    case class LeafS ( value: String ) extends Tree
-    case class LeafL ( value: Long ) extends Tree
-    case class LeafD ( value: Double ) extends Tree
+sealed abstract class PPTree
+    case class PPNode ( name: String, children: List[PPTree] ) extends PPTree
+    case class TupleNode ( children: List[PPTree] ) extends PPTree
+    case class MapNode ( binds: List[(PPTree,PPTree)] ) extends PPTree
+    case class LeafS ( value: String ) extends PPTree
+    case class LeafL ( value: Long ) extends PPTree
+    case class LeafD ( value: Double ) extends PPTree
 
 
 /** Pretty printer for case classes */
@@ -38,12 +38,12 @@ object Pretty extends RegexParsers {
   val value: Parser[String] = """[^,\)]+""".r
   val string: Parser[String] = """"[^"]*"""".r
 
-  def tree: Parser[Tree]
+  def tree: Parser[PPTree]
       = ( "Map" ~ "(" ~ repsep( ident ~ "->" ~ tree, "," ) ~ ")"
             ^^ { case _~_~as~_ => MapNode(as.map{ case v~_~a => (LeafS(v),a) }) }
-          | ident ~ "(" ~ repsep( tree, "," ) ~ ")" ^^ { case f~_~as~_ => Node(f,as) }
+          | ident ~ "(" ~ repsep( tree, "," ) ~ ")" ^^ { case f~_~as~_ => PPNode(f,as) }
           | "(" ~ repsep( tree, "," ) ~ ")" ^^ { case _~as~_ => TupleNode(as) }
-          | "None" ^^ { _ => Node("None",List()) }
+          | "None" ^^ { _ => PPNode("None",List()) }
           | string ^^ { LeafS(_) }
           | value ^^ { v => Try(v.toInt).toOption match {
                                             case Some(i) => LeafL(i)
@@ -55,9 +55,9 @@ object Pretty extends RegexParsers {
                      }
         )
 
-  def size ( e: Tree ): Int = {
+  def size ( e: PPTree ): Int = {
     e match {
-      case Node(f,as)
+      case PPNode(f,as)
         => as.map(size(_)+1).sum + f.length + 2
       case TupleNode(as)
         => as.map(size(_)+1).sum + 4
@@ -73,11 +73,11 @@ object Pretty extends RegexParsers {
   }
 
   /** pretty-print trees */
-  def pretty ( e: Tree, position: Int ): String = {
+  def pretty ( e: PPTree, position: Int ): String = {
     e match {
-      case Node(f,l) if position+size(e) <= screen_size
+      case PPNode(f,l) if position+size(e) <= screen_size
         => l.map(pretty(_,position)).mkString(f+"(", ", ", ")")
-      case Node(f,l)
+      case PPNode(f,l)
         => l.map(pretty(_,position+f.length+1))
             .mkString(f+"(", ",\n"+prefix+" "*(position+f.length+1), ")")
       case TupleNode(l)

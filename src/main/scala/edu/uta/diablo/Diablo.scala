@@ -31,7 +31,7 @@ package object diablo {
   var tileSize = 1000
 
   // Contains the natural transformations for type abstractions
-  var typeMaps = mutable.Map[String,TypeMapS]()
+  var typeMaps: mutable.Map[String,TypeMapS] = mutable.Map[String,TypeMapS]()
 
   def range ( n1: Long, n2: Long, n3: Long ): List[Long]
     = n1.to(n2,n3).toList
@@ -69,7 +69,7 @@ package object diablo {
     val pc = if (parallel) ComprehensionTranslator.parallelize(to) else to
     if (trace) println("Compiled comprehension:\n"+Pretty.print(pc.toString))
     val ec = q"${cg.codeGen(pc,env)}.head"
-    if (trace) println("Scala code:\n"+ec)
+    if (trace) println("Scala code:\n"+showCode(ec))
     val tc = cg.getType(ec,env)
     if (trace) println("Scala type: "+tc)
     context.Expr[Any](ec)

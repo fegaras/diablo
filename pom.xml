@@ -23,17 +23,38 @@
   <packaging>jar</packaging>
   <version>0.1</version>
   <name>Array Comprehensions</name>
-  <description>Translation of Array Comprehensions</description>
+  <description>DIABLO: a Data-Intensive Array-Based Loop Optimizer</description>
 
   <properties>
     <scala.version>2.12.3</scala.version>
+    <spark.version>3.0.0</spark.version>
   </properties>
 
   <dependencies>
     <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scala-compiler</artifactId>
+      <version>${scala.version}</version>
+    </dependency>
+    <dependency>
       <groupId>org.scala-lang.modules</groupId>
       <artifactId>scala-parser-combinators_2.12</artifactId>
       <version>1.1.2</version>
+    </dependency>
+    <dependency>
+    	<groupId>org.apache.spark</groupId>
+    	<artifactId>spark-core_2.12</artifactId>
+    	<version>${spark.version}</version>
+    </dependency>
+    <dependency>
+    	<groupId>org.apache.spark</groupId>
+    	<artifactId>spark-sql_2.12</artifactId>
+    	<version>${spark.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.spark</groupId>
+      <artifactId>spark-streaming_2.12</artifactId>
+      <version>${spark.version}</version>
     </dependency>
   </dependencies>
 
@@ -50,8 +71,8 @@
           <artifactId>maven-compiler-plugin</artifactId>
           <version>3.8.1</version>
           <configuration>
-            <source>1.7</source>
-            <target>1.7</target>
+            <source>1.8</source>
+            <target>1.8</target>
           </configuration>
         </plugin>
       </plugins>
@@ -102,11 +123,6 @@
             <configuration>
               <finalName>${project.artifactId}</finalName>
               <outputDirectory>lib</outputDirectory>
-              <transformers>
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <mainClass>edu.uta.diablo</mainClass>
-                </transformer>
-              </transformers>
               <artifactSet>
               <includes>
               	<include>edu.uta:*</include>
