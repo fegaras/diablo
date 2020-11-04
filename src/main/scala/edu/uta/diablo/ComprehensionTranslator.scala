@@ -136,6 +136,7 @@ object ComprehensionTranslator {
                                               .intersect(comprVars(r)).distinct
                    val rt = findReducedTerms(yieldReductions(Comprehension(h,s),usedVars),
                                              usedVars)
+                   assert(rt.length > 0,"Expected aggregations in a group-by comprehension")
                    val reducedTerms = rt.filter{ case (_,reduce(_,_)) => true; case _ => false }
                                         .map(x => (newvar,x._2))
                    val reducedVars = reducedTerms.map(_._1)
@@ -879,6 +880,7 @@ object ComprehensionTranslator {
                 => val groupByVars = patvars(p)
                    val usedVars = freevars(result,groupByVars).intersect(comprVars(qs)).distinct
                    val rt = findReducedTerms(yieldReductions(result,usedVars),usedVars)
+                   assert(rt.length > 0,"Expected aggregations in a group-by comprehension")
                    val reducedTerms = rt.filter{ case (_,reduce(_,_)) => true; case _ => false }
                                         .map(x => (newvar,x._2))
                    val reducedVars = reducedTerms.map(_._1)

@@ -209,6 +209,9 @@ object Normalizer {
       case flatMap(Lambda(VarPat(v),Let(p,Var(w),b)),x)
         if v == w && occurrences(v,b) == 0
         => normalize(flatMap(Lambda(p,b),x))
+      case flatMap(Lambda(TuplePat(List(k,VarPat(v))),Let(p,Var(w),b)),x)
+        if v == w && occurrences(v,b) == 0
+        => normalize(flatMap(Lambda(TuplePat(List(k,p)),b),x))
       case flatMap(f,flatMap(g,x))
         => val Lambda(p,b) = renameVars(g)
            normalize(flatMap(Lambda(p,flatMap(f,b)),x))

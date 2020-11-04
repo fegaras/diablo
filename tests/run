@@ -10,4 +10,4 @@ export HADOOP_CONF_DIR=
 
 jar cf test.jar -C classes .
 
-${SPARK_HOME}/bin/spark-submit --jars ${DIABLO}/lib/diablo.jar --class $1 --driver-memory 4g --executor-memory 8G --master local[*] test.jar $2 $3 $4 $5 $6 $7
+${SPARK_HOME}/bin/spark-submit --jars ${DIABLO}/lib/diablo.jar --class $1 --driver-memory 4g --executor-memory 8G --master local[2] test.jar $2 $3 $4 $5 $6 $7
