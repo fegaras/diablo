@@ -22,6 +22,8 @@ object Lifting {
 
   val N: Expr = IntConst(tileSize)
 
+  val arrayBuffer = "scala.collection.mutable.ArrayBuffer"
+
   /* check and construct a new type mapping */
   def typeMap ( typeName: String, typeParams: List[String],
                 abstractType: Type, storageType: Type, liftedType: Type,
@@ -80,43 +82,7 @@ object Lifting {
                                                               Var("L")),
                                                     Predicate(MethodCall(Var("i"),"<",List(Var("d")))))),
                                  Var(a)))) })
-    typeMap("mmatrix",List("T"),
-             ArrayType(2,TypeParameter("T")),
-             RecordType(Map( "rows" -> intType,
-                             "cols" -> intType,
-                             "content" -> ArrayType(1,TypeParameter("T")))),
-             SeqType(TupleType(List(TupleType(List(intType,intType)),
-                                    TypeParameter("T")))),
-             Lambda(VarPat("A"),
-                    Comprehension(Tuple(List(Tuple(List(Var("i"),Var("j"))),
-                                    Index(Project(Var("A"),"content"),
-                                          List(MethodCall(MethodCall(Var("i"),
-                                                                     "*",List(Project(Var("A"),"rows"))),
-                                                          "+",List(Var("j"))))))),
-                                  List(Generator(VarPat("i"),
-                                                 Range(IntConst(0),
-                                                       MethodCall(Project(Var("A"),"rows"),
-                                                                  "-",List(IntConst(1))),
-                                                       IntConst(1))),
-                                       Generator(VarPat("j"),
-                                                 Range(IntConst(0),
-                                                       MethodCall(Project(Var("A"),"cols"),
-                                                                  "-",List(IntConst(1))),
-                                                       IntConst(1)))))),
-             { val a = newvar
-               Lambda(TuplePat(List(VarPat("n"),VarPat("m"),VarPat("L"))),
-                      Block(List(VarDecl(a,ArrayType(1,TypeParameter("T")),
-                                         Seq(List(Call("array",List(MethodCall(Var("n"),"*",List(Var("m")))))))),
-                                 Comprehension(Assign(Index(Var(a),
-                                                            List(MethodCall(MethodCall(Var("i"),"*",List(Var("n"))),
-                                                                            "+",List(Var("j"))))),
-                                                      Seq(List(Var("v")))),
-                                               List(Generator(TuplePat(List(TuplePat(List(VarPat("i"),VarPat("j"))),
-                                                                            VarPat("v"))),
-                                                              Var("L")),
-                                                    Predicate(MethodCall(Var("i"),"<",List(Var("n")))),
-                                                    Predicate(MethodCall(Var("j"),"<",List(Var("m")))))),
-                                 Record(Map( "rows" -> Var("n"), "cols" -> Var("m"), "content" -> Var(a)))))) })
+    // a matrix in a sparse format
     typeMap("matrix",List("T"),
              ArrayType(2,TypeParameter("T")),
              TupleType(List(intType,intType,ArrayType(1,TypeParameter("T")))),
@@ -151,6 +117,7 @@ object Lifting {
                                                     Predicate(MethodCall(Var("i"),"<",List(Var("n")))),
                                                     Predicate(MethodCall(Var("j"),"<",List(Var("m")))))),
                                  Tuple(List(Var("n"),Var("m"),Var(a)))))) })
+      // a square tile of size tileSize*tileSize
       typeMap("tile",List("T"),
                ArrayType(2,TypeParameter("T")),
                ArrayType(1,TypeParameter("T")),
@@ -178,6 +145,53 @@ object Lifting {
                                                                        VarPat("v"))),
                                                          Var("L")))),
                                    Var(a)))) })
+      // a matrix in a compressed sparse column (CSC) format
+      typeMap("CSC",List("T"),
+               ArrayType(2,TypeParameter("T")),
+               TupleType(List(intType,                              // numCols
+                              intType,                              // colPtrs
+                              ArrayType(1,intType),                 // colPtrs
+                              ArrayType(1,intType),                 // rowIndices
+                              ArrayType(1,TypeParameter("T")))),    // values
+               SeqType(TupleType(List(TupleType(List(intType,intType)),
+                                      TypeParameter("T")))),
+               Lambda(VarPat("A"),
+                      Comprehension(Tuple(List(Tuple(List(Index(Nth(Var("A"),4),
+                                                                List(Var("col"))),
+                                                          Var("j"))),
+                                               Index(Nth(Var("A"),5),
+                                                     List(Var("col"))))),
+                                    List(Generator(VarPat("j"),
+                                                   Range(IntConst(0),
+                                                         MethodCall(Nth(Var("A"),2),"-",List(IntConst(1))),
+                                                         IntConst(1))),
+                                         Generator(VarPat("col"),
+                                                   Range(Index(Nth(Var("A"),3),List(Var("j"))),
+                                                         Index(Nth(Var("A"),3),List(MethodCall(Var("j"),"+",
+                                                                                               List(IntConst(1))))),
+                                                         IntConst(1)))))),
+              Lambda(TuplePat(List(VarPat("n"),VarPat("m"),VarPat("L"))),
+                     Block(List(VarDecl("cols",ParametricType(arrayBuffer,List(intType)),Seq(Nil)),
+                                VarDecl("rows",ParametricType(arrayBuffer,List(intType)),Seq(Nil)),
+                                VarDecl("values",ParametricType(arrayBuffer,List(TypeParameter("T"))),Seq(Nil)),
+                                Comprehension(
+                                    Block(List(MethodCall(Var("rows"),"+=",List(Var("i"))),
+                                               MethodCall(Var("values"),"+=",List(Var("v"))))),
+                                    List(Generator(VarPat("j"),
+                                             Range(IntConst(0),
+                                                   MethodCall(Var("m"),"-",List(IntConst(1))),
+                                                   IntConst(1))),
+                                         Predicate(Block(List(MethodCall(Var("cols"),"+=",List(Var("j"))),
+                                                              BoolConst(true)))),
+                                         Generator(TuplePat(List(TuplePat(List(VarPat("i"),VarPat("jj"))),
+                                                                 VarPat("v"))),
+                                                   Var("L")),
+                                         Predicate(MethodCall(Var("jj"),"==",List(Var("j")))),
+                                         Predicate(MethodCall(Var("v"),"!=",List(DoubleConst(0.0)))))),
+                                Tuple(List(Var("n"),Var("m"),
+                                           MethodCall(Var("cols"),"toArray",null),
+                                           MethodCall(Var("rows"),"toArray",null),
+                                           MethodCall(Var("values"),"toArray",null)))))))
     typeMap("rdd",List("T"),
              SeqType(TypeParameter("T")),
              ParametricType(rddClass,List(TypeParameter("T"))),
@@ -296,6 +310,8 @@ object Lifting {
                   case ((r,s),VarDecl(v,at,u@Seq(List(Call("array",_)))))
                     => (r + (v->at),
                         s:+VarDecl(v,at,u))
+                  case ((r,s),x@VarDecl(v,at,Seq(Nil)))
+                    => (r + (v->at), s:+x)
                   case ((r,s),VarDecl(v,at,u))
                     => val nu = lift_expr(u,r)
                        val tp = elemType(typecheck(nu,r))

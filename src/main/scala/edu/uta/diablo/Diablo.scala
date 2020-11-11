@@ -24,7 +24,6 @@ import diablo.Translator.translate
 import scala.collection.mutable
 
 package object diablo {
-
   var trace = true
   var groupByJoin = true
   var parallel = true

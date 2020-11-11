@@ -129,6 +129,8 @@ abstract class CodeGeneration {
            tq"List[$tc]"
       case BasicType(n)
         => get_type_name(n)
+      case TypeParameter(_)
+        => tq"Double"
       case _ => tq""
     }
 

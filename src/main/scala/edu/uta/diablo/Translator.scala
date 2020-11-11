@@ -43,17 +43,9 @@ object Translator {
              Comprehension(Nth(Var(v),n),
                            List(Generator(VarPat(v),translate(x,env,vars,fncs))))
         case Project(x,n)
-          => n match {
-               case "length"
-                 => translate(MethodCall(x,n,null),env,vars,fncs)
-               case "rows" => translate(Nth(Nth(x,0),0),env,vars,fncs)
-               case "cols" => translate(Nth(Nth(x,0),1),env,vars,fncs)
-               case "dims" => translate(Nth(x,0),env,vars,fncs)
-               case _
-                 => val v = newvar
-                    Comprehension(Project(Var(v),n),
-                                  List(Generator(VarPat(v),translate(x,env,vars,fncs))))
-             }
+          => val v = newvar
+             Comprehension(Project(Var(v),n),
+                           List(Generator(VarPat(v),translate(x,env,vars,fncs))))
         case Index(u,is)
           => val v = newvar
              val A = newvar

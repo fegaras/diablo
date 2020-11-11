@@ -26,7 +26,7 @@
   <description>DIABLO: a Data-Intensive Array-Based Loop Optimizer</description>
 
   <properties>
-    <scala.version>2.12.3</scala.version>
+    <scala.version>2.12.12</scala.version>
     <spark.version>3.0.0</spark.version>
   </properties>
 
@@ -109,6 +109,13 @@
             </goals>
           </execution>
         </executions>
+        <configuration>
+          <jvmArgs>
+            <jvmArg>-Xss20m</jvmArg>
+            <jvmArg>-Xms256m</jvmArg>
+            <jvmArg>-Xmx1024m</jvmArg>
+          </jvmArgs>
+        </configuration>
       </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>

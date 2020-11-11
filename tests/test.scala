@@ -52,6 +52,7 @@ object Test {
         R = [ (i,x+y) | (i,x) <- S, (j,y) <- R, i == j, x>3 ];
         R = [ (i,x+y) | (i,x) <- S, (j,y) <- R, x>2, x+y<4 ];
       };
+
       {
         var M: matrix[Double] = tiled(100,100)[ ((i,j),i*100.0+j) | i <- 0..99, j <- 0..99 ];
         var N = M;
@@ -99,10 +100,10 @@ object Test {
           var N = tiled(n,n)[ ((i,j),random()) | i <- 0..n-1, j <- 0..n-1 ];
           var R = M;
 
-          for i = 0, n-1 do
-              for j = 0, n-1 do {
+          for i = 0, M.rows-1 do
+              for j = 0, N.cols-1 do {
                    R[i,j] = 0.0;
-                   for k = 0, n-1 do
+                   for k = 0, M.cols-1 do
                        R[i,j] += M[i,k]*N[k,j];
               };
           R;
@@ -144,6 +145,5 @@ object Test {
       };
       (P,Q);
     """)
-
   }
 }
