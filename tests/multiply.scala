@@ -3,10 +3,14 @@ import org.apache.spark._
 import org.apache.spark.rdd._
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.expressions.Aggregator
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.mllib.linalg.distributed._
 import org.apache.spark.mllib.linalg._
+//import com.github.fommil.netlib.NativeSystemBLAS
 import org.apache.log4j._
 import org.apache.hadoop.fs._
+import scala.collection.Seq
 import scala.util.Random
 import Math._
 
@@ -27,7 +31,6 @@ object Multiply extends Serializable {
     val repeats = args(0).toInt
     val n = args(1).toInt   // each matrix has n*n elements
     val m = n
-    val gbj = args(2) == "1"  // groupByJoin only
     parami(tileSize,1000) // each tile has size N*N
     val N = 1000
     val validate_output = false
@@ -36,7 +39,7 @@ object Multiply extends Serializable {
     val spark_context = new SparkContext(conf)
     conf.set("spark.logConf","false")
     conf.set("spark.eventLog.enabled","false")
-    LogManager.getRootLogger().setLevel(Level.ERROR)
+    LogManager.getRootLogger().setLevel(Level.WARN)
 
     def randomIJVMatrix ( n: Int, m: Int ): RDD[((Int,Int),Double)] = {
       val max = 10
@@ -48,11 +51,10 @@ object Multiply extends Serializable {
         .cache()
     }
 
-    val MM = randomIJVMatrix(n,m)
-    val NN = randomIJVMatrix(n,m)
-
     def testMultiplyIJV (): Double = {
       // matrix multiplication of IJV matrices using Diablo array comprehensions
+      val MM = randomIJVMatrix(n,m)
+      val NN = randomIJVMatrix(m,n)
       val t = System.currentTimeMillis()
       try {
         val C = q("""
@@ -62,7 +64,7 @@ object Multiply extends Serializable {
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
- 
+
     def randomTile (): DenseMatrix = {
       val max = 10
       val rand = new Random()
@@ -85,6 +87,23 @@ object Multiply extends Serializable {
     val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),a.transpose.toArray) })
     val BB = (n,m,Bm.map{ case ((i,j),a) => ((i,j),a.transpose.toArray) })
     var CC = AA
+
+    def validate ( M: (Int,Int,RDD[((Int,Int),Array[Double])]) ) {
+      if (!validate_output)
+        M._3.count()
+      else {
+        val C = A.multiply(B).toLocalMatrix()
+        val CC = M._3.collect
+        println("Validating ...")
+        for { ((ii,jj),a) <- CC
+              i <- 0 until N
+              j <- 0 until N }
+           if (ii*N+i < M._1 && jj*N+j < M._2
+               && Math.abs(a(i*N+j)-C(ii*N+i,jj*N+j)) > 0.01)
+             println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f"
+                     .format(ii,jj,i,j,a(i*N+j),C(ii*N+i,jj*N+j)))
+      }
+    }
 
     def map ( m: BlockMatrix, f: Double => Double ): BlockMatrix
       = new BlockMatrix(m.blocks.map{ case (i,a) => (i,new DenseMatrix(N,N,a.toArray.map(f))) },
@@ -166,18 +185,78 @@ object Multiply extends Serializable {
                        .join( BB._3.map{ case ((kk,j),b) => (kk,(j,b)) } )
                        .map{ case (_,((i,a),(j,b)))
                                => val V = Array.ofDim[Double](N*N)
-                                  for { i <- (0 until N).par
-                                        k <- 0 until N
-                                        j <- 0 until N }
-                                     V(i*N+j) += a(i*N+k)*b(k*N+j)
-                                  ((i,j),V) }
+                                  for { i <- (0 until N).par } {
+                                     var k = 0
+                                     while (k<N) {
+                                       var j = 0
+                                       while (j<N) {
+                                         V(i*N+j) += a(i*N+k)*b(k*N+j)
+                                         j += 1
+                                       }
+                                       k += 1
+                                     }
+                                  }
+                                  ((i,j),V)
+                           }
+                       .reduceByKey{ case (x,y)
+                                       => val V = Array.ofDim[Double](N*N)
+                                          for { i <- (0 until N).par } {
+                                             var j = 0
+                                             while (j<N) {
+                                               V(i*N+j) = x(i*N+j)+y(i*N+j)
+                                               j += 1
+                                             }
+                                          }
+                                          V
+                                   })
+        validate(C)
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix multiplication of tiled MLlib matrices - hand-written
+    def testMultiplyMLlibCode (): Double = {
+      val t: Long = System.currentTimeMillis()
+      try {
+        val C = (n,m,Am.map{ case ((i,k),a) => (k,(i,a)) }
+                       .join( Bm.map{ case ((kk,j),b) => (kk,(j,b)) } )
+                       .map{ case (_,((i,a),(j,b)))
+                               => ((i,j),a.multiply(b.asInstanceOf[DenseMatrix])) }
                        .reduceByKey{ case (x,y)
                                        => val V = Array.ofDim[Double](N*N)
                                           for { i <- (0 until N).par
                                                 j <- 0 until N }
-                                             V(i*N+j) = x(i*N+j)+y(i*N+j)
-                                          V })
-        validate(C)
+                                             V(i*N+j) = x(i,j)+y(i,j)
+                                          new DenseMatrix(N,N,V) })
+        C._3.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix multiplication of tiled Breeze matrices - hand-written
+    def testMultiplyBreezeCode (): Double = {
+      import breeze.linalg._
+      def randomTile (): DenseMatrix[Double] = {
+        val max = 10
+        val rand = new Random()
+        new DenseMatrix(N,N,Array.tabulate(N*N){ i => rand.nextDouble()*max })
+      }
+      def randomMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),DenseMatrix[Double])] = {
+        val l = Random.shuffle((0 until (rows+N-1)/N).toList)
+        val r = Random.shuffle((0 until (cols+N-1)/N).toList)
+        spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
+          .map{ case (i,j) => ((i,j),randomTile()) }
+      }
+      val Am = randomMatrix(n,m).cache()
+      val Bm = randomMatrix(n,m).cache()
+      val t: Long = System.currentTimeMillis()
+      try {
+        val C = (n,m,Am.map{ case ((i,k),a) => (k,(i,a)) }
+                       .join( Bm.map{ case ((kk,j),b) => (kk,(j,b)) } )
+                       .map{ case (_,((i,a),(j,b)))
+                               => ((i,j),a*b) }
+                       .reduceByKey{ case (x,y) => x+y })
+        C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -192,32 +271,100 @@ object Multiply extends Serializable {
                                      => val c = Array.ofDim[Double](N*N)
                                         for { (k1,a) <- as
                                               (k2,b) <- bs if k2 == k1
-                                              i <- (0 until N).par
-                                              k <- 0 until N
-                                              j <- 0 until N
-                                            } c(i*N+j) += a(i*N+k)*b(k*N+j)
-                                   c
-                                 })
+                                              i <- (0 until N).par } {
+                                           var k = 0
+                                           while (k<N) {
+                                             var j = 0
+                                             while (j<N) {
+                                               c(i*N+j) += a(i*N+k)*b(k*N+j)
+                                               j += 1
+                                             }
+                                             k += 1
+                                           }
+                                        }
+                                        c
+                                    })
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    def validate ( M: (Int,Int,RDD[((Int,Int),Array[Double])]) ) {
-      if (!validate_output)
-        M._3.count()
-      else {
-        val C = A.multiply(B).toLocalMatrix()
-        val MM = M._3.collect
-        for { ((ii,jj),a) <- MM;
-              i <- 0 until N;
-              j <- 0 until N }
-           if (ii*N+i < M._1 && jj*N+j < M._2
-               && Math.abs(a(i*N+j)-C(ii*N+i,jj*N+j)) > 0.01)
-             println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f"
-                     .format(ii,jj,i,j,a(i*N+j),C(ii*N+i,jj*N+j)))
+    val spark = SparkSession.builder().config(conf).getOrCreate()
+    import spark.implicits._
+
+    val ADF = Am.map{ case ((i,j),v) => (i,j,v) }.toDF("I", "J", "TILE")
+    val BDF = Bm.map{ case ((i,j),v) => (i,j,v) }.toDF("I", "J", "TILE")
+
+    ADF.createOrReplaceTempView("A")
+    BDF.createOrReplaceTempView("B")
+
+    def mult_tiles ( a: DenseMatrix, b: DenseMatrix ): DenseMatrix
+      = a.multiply(b.asInstanceOf[DenseMatrix])
+    spark.udf.register("mult_tiles", udf(mult_tiles(_,_)))
+
+    val sum_tiles =  new Aggregator[DenseMatrix,DenseMatrix,DenseMatrix] {
+      def zero: DenseMatrix = new DenseMatrix(N,N,Array.ofDim[Double](N*N))
+      def merge ( b1: DenseMatrix, b2: DenseMatrix ): DenseMatrix = {
+        val c = b1.values
+        for { i <- (0 until N).par
+              j <- 0 until N
+            } c(i*N+j) += b2(i,j)
+        new DenseMatrix(N,N,c)
       }
+      def reduce ( buf: DenseMatrix, a: DenseMatrix ): DenseMatrix = {
+        val c = buf.values
+        for { i <- (0 until N).par
+              j <- 0 until N
+            } c(i*N+j) += a(i,j)
+        new DenseMatrix(N,N,c)
+      }
+      def finish ( buf: DenseMatrix ): DenseMatrix = buf
+      def bufferEncoder: Encoder[DenseMatrix] = ExpressionEncoder()
+      def outputEncoder: Encoder[DenseMatrix] = ExpressionEncoder()
     }
+    spark.udf.register("sum_tiles", udaf(sum_tiles))
+
+    def testMultiplySQL (): Double = {
+      var t = System.currentTimeMillis()
+      try {
+        val C = spark.sql(""" SELECT A.I, B.J, sum_tiles(mult_tiles(A.TILE,B.TILE)) AS TILE
+                              FROM A JOIN B ON A.J = B.I
+                              GROUP BY A.I, B.J
+                          """)
+        //println(C.queryExecution)
+        val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
+        result.blocks.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    def tile_sum ( a: Seq[DenseMatrix] ): DenseMatrix = {
+      val s = Array.ofDim[Double](N*N)
+      for { x <- a
+            i <- (0 until N).par
+            j <- 0 until N }
+        s(i*N+j) += x(i,j)
+      new DenseMatrix(N,N,s)
+    }
+    spark.udf.register("tile_sum", udf(tile_sum(_)))
+
+    def testMultiplySQL2 (): Double = {
+      var t = System.currentTimeMillis()
+      try {
+        val C = spark.sql(""" SELECT A.I, B.J, tile_sum(collect_list(mult_tiles(A.TILE,B.TILE))) AS TILE
+                              FROM A JOIN B ON A.J = B.I
+                              GROUP BY A.I, B.J
+                          """)
+        //println(C.queryExecution)
+        val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
+        result.blocks.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    println("@@@@ IJV matrix size: %.2f GB".format(sizeof(((1,1),0.0D)).toDouble*n*m/(1024.0*1024.0*1024.0)))
+    val tile_size = sizeof(((1,1),randomTile())).toDouble
+    println("@@@@ tile matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
 
     def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()
@@ -234,7 +381,7 @@ object Multiply extends Serializable {
         }
       }
       if (i > 0) s = s/i
-      print("*** %s cores=%d n=%d N=%d %.2f GB ".format(name,cores,n,N,(8.0*n.toDouble*n)/(1024.0*1024.0*1024.0)))
+      print("*** %s cores=%d n=%d N=%d ".format(name,cores,n,N))
       println("tries=%d %.3f secs".format(i,s))
     }
 
@@ -246,14 +393,11 @@ object Multiply extends Serializable {
     test("DIABLO loop Multiply",testMultiplyDiabloLoop)
     test("Hand-written groupByJoin Multiply",testMultiplyCodeGBJ)
     test("Hand-written groupBy Multiply",testMultiplyCode)
+    test("Hand-written groupBy MLlib Multiply",testMultiplyMLlibCode)
+    test("Hand-written groupBy Breeze Multiply",testMultiplyBreezeCode)
+    test("SQL Multiply UDAF",testMultiplySQL)
+    test("SQL Multiply UDF",testMultiplySQL2)
 
-/*
-    if (!gbj) {
-      test("MLlib Multiply",testMultiplyMLlib)
-      test("DIABLO groupBy Multiply",testMultiplyDiabloDACn)
-    }
-    test("DIABLO groupByJoin Multiply",testMultiplyDiabloDAC)
-*/
     spark_context.stop()
   }
 }

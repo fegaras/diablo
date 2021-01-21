@@ -1,10 +1,13 @@
 import edu.uta.diablo._
 import org.apache.spark._
 import org.apache.spark.rdd._
+import org.apache.spark.sql._
+import org.apache.spark.sql.functions._
 import org.apache.spark.mllib.linalg.distributed._
 import org.apache.spark.mllib.linalg._
 import org.apache.log4j._
 import org.apache.hadoop.fs._
+import scala.collection.Seq
 import scala.util.Random
 import Math._
 
@@ -32,7 +35,7 @@ object Add {
     val spark_context = new SparkContext(conf)
     conf.set("spark.logConf","false")
     conf.set("spark.eventLog.enabled","false")
-    LogManager.getRootLogger().setLevel(Level.ERROR)
+    LogManager.getRootLogger().setLevel(Level.WARN)
 
     def randomTile (): DenseMatrix = {
       val max = 10
@@ -56,6 +59,23 @@ object Add {
     val AA = (n,n,Am.map{ case ((i,j),a) => ((i,j),a.transpose.toArray) })
     val BB = (n,n,Bm.map{ case ((i,j),a) => ((i,j),a.transpose.toArray) })
     var CC = AA
+
+    def validate ( M: (Int,Int,RDD[((Int,Int),Array[Double])]) ) {
+      if (!validate_output)
+        M._3.count()
+      else {
+        val C = A.add(B).toLocalMatrix()
+        val CC = M._3.collect
+        println("Validating ...")
+        for { ((ii,jj),a) <- CC
+              i <- 0 until N
+              j <- 0 until N }
+           if (ii*N+i < M._1 && jj*N+j < M._2
+               && Math.abs(a(i*N+j)-C(ii*N+i,jj*N+j)) > 0.01)
+             println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f"
+                     .format(ii,jj,i,j,a(i*N+j),C(ii*N+i,jj*N+j)))
+      }
+    }
 
     // matrix addition of tiled matrices in MLlib.linalg
     def testAddMLlib: Double = {
@@ -124,21 +144,40 @@ object Add {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    def validate ( M: (Int,Int,RDD[((Int,Int),Array[Double])]) ) {
-      if (!validate_output)
-        M._3.count()
-      else {
-        val C = A.add(B).toLocalMatrix()
-        val MM = M._3.collect
-        for { ((ii,jj),a) <- MM;
-              i <- 0 until N;
-              j <- 0 until N }
-           if (ii*N+i < M._1 && jj*N+j < M._2
-               && Math.abs(a(i*N+j)-C(ii*N+i,jj*N+j)) > 0.01)
-             println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f"
-                     .format(ii,jj,i,j,a(i*N+j),C(ii*N+i,jj*N+j)))
-      }
+    val spark = SparkSession.builder().config(conf).getOrCreate()
+    import spark.implicits._
+
+    val ADF = Am.map{ case ((i,j),v) => (i,j,v) }.toDF("I", "J", "TILE")
+    val BDF = Bm.map{ case ((i,j),v) => (i,j,v) }.toDF("I", "J", "TILE")
+
+    ADF.createOrReplaceTempView("A")
+    BDF.createOrReplaceTempView("B")
+
+    def add_tiles ( a: DenseMatrix, b: DenseMatrix ): DenseMatrix = {
+      val c = Array.ofDim[Double](N*N)
+      for { i <- (0 until N).par
+            j <- 0 until N
+          } c(i*N+j) = a(i,j)+b(i,j)
+      new DenseMatrix(N,N,c)
     }
+    spark.udf.register("add_tiles", udf(add_tiles(_,_)))
+
+    def testAddSQL (): Double = {
+      var t = System.currentTimeMillis()
+      try {
+        val C = spark.sql(""" SELECT A.I, A.J, add_tiles(A.TILE,B.TILE) AS TILE
+                              FROM A JOIN B ON A.I = B.I AND A.J = B.J
+                          """)
+        //println(C.queryExecution)
+        val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
+        result.blocks.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    println("@@@@ IJV matrix size: %.2f GB".format(sizeof(((1,1),0.0D)).toDouble*n*m/(1024.0*1024.0*1024.0)))
+    val tile_size = sizeof(((1,1),randomTile())).toDouble
+    println("@@@@ tile matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
 
     def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()
@@ -155,7 +194,7 @@ object Add {
         }
       }
       if (i > 0) s = s/i
-      print("*** %s cores=%d n=%d N=%d %.2f GB ".format(name,cores,n,N,(8.0*n.toDouble*n)/(1024.0*1024.0*1024.0)))
+      print("*** %s cores=%d n=%d N=%d ".format(name,cores,n,N))
       println("tries=%d %.3f secs".format(i,s))
     }
 
@@ -163,6 +202,7 @@ object Add {
     test("DIABLO Add",testAddDiabloDAC)
     test("DIABLO loop Add",testAddDiabloDACloop)
     test("Hand-written Add",testAddCode)
+    test("SQL Add",testAddSQL)
 
     spark_context.stop()
   }
