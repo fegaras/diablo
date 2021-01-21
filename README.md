@@ -48,7 +48,7 @@ val X = q("""
       var R = tiled(n,m)[ ((i,j),random()) | i <- 0..n-1, j <- 0..m-1 ];
       var P = tiled(n,l)[ ((i,j),random()) | i <- 0..n-1, j <- 0..l-1 ];
       var Q = tiled(l,m)[ ((i,j),random()) | i <- 0..l-1, j <- 0..m-1 ];
-      var pq = R
+      var pq = R;
       var E = R;
 
       var a: Double = 0.002;
