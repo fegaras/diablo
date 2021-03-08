@@ -7,6 +7,6 @@ libraryDependencies ++= Seq("org.scala-lang.modules" %% "scala-parser-combinator
                             "org.scala-lang" % "scala-reflect" % scalaVersion.value,
                             "org.apache.spark" %% "spark-core" % "3.0.0",
                             "org.apache.spark" %% "spark-sql" % "3.0.0",
-                            "org.apache.spark" %% "spark-streaming" % "3.0.0"
+                            "org.apache.spark" %% "spark-streaming" % "3.0.0",
                            )
 artifactName := { (sv: ScalaVersion, m: ModuleID, a: Artifact) => "../../lib/diablo.jar" }

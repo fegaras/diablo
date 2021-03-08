@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 University of Texas at Arlington
+ * Copyright © 2020-2021 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -206,7 +206,7 @@ object Translator {
                           _&&_,true)
 
   @tailrec
-  def update (dest: Expr, value: Expr, env: Environment, vars: List[String], fncs: Defs ): List[Expr]
+  def update ( dest: Expr, value: Expr, env: Environment, vars: List[String], fncs: Defs ): List[Expr]
     = dest match {
         case Var(n)
           => val nv = newvar
@@ -501,13 +501,8 @@ object Translator {
                       => ( ns++translate(stmt,quals,retVars,ls,vs,fs), ls, vs, fs )
                     }
                List(block(m))
-          case tm@TypeMapS(v,ps,tp,from,to,Lambda(p1,u1),Lambda(p2,u2))
-            => if (!typeMatch(typecheck(u1,bindPattern(p1,from,env)),to))
-                 throw new Error("Wrong map function: "+Lambda(p1,u1))
-               if (!typeMatch(typecheck(u2,bindPattern(p2,to,env)),from))
-                 throw new Error("Wrong map function: "+Lambda(p2,u2))
-               typeMaps += ((v,tm))
-               Nil
+          case TypeMapS(v,tps,ps,tp,from,to,map,inv)
+            => Nil
           case _ => throw new Error("Illegal statement: "+s)
     }
 

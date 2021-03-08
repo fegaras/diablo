@@ -27,12 +27,12 @@ object Add {
     val repeats = args(0).toInt
     val n = args(1).toInt   // each matrix has n*n elements
     val m = n
-    parami(tileSize,1000) // each tile has size N*N
+    parami(blockSize,1000000)
     val N = 1000
     val validate_output = false
 
-    val conf = new SparkConf().setAppName("tiles")
-    val spark_context = new SparkContext(conf)
+    val conf = new SparkConf().setAppName("add")
+    spark_context = new SparkContext(conf)
     conf.set("spark.logConf","false")
     conf.set("spark.eventLog.enabled","false")
     LogManager.getRootLogger().setLevel(Level.WARN)
@@ -56,18 +56,20 @@ object Add {
     val A = new BlockMatrix(Am,N,N)
     val B = new BlockMatrix(Bm,N,N)
 
-    val AA = (n,n,Am.map{ case ((i,j),a) => ((i,j),a.transpose.toArray) })
-    val BB = (n,n,Bm.map{ case ((i,j),a) => ((i,j),a.transpose.toArray) })
+    type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
+
+    val AA = (n,n,Am.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
+    val BB = (n,n,Bm.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
     var CC = AA
 
-    def validate ( M: (Int,Int,RDD[((Int,Int),Array[Double])]) ) {
+    def validate ( M: tiled_matrix ) = {
       if (!validate_output)
         M._3.count()
       else {
         val C = A.add(B).toLocalMatrix()
         val CC = M._3.collect
         println("Validating ...")
-        for { ((ii,jj),a) <- CC
+        for { ((ii,jj),(_,_,a)) <- CC
               i <- 0 until N
               j <- 0 until N }
            if (ii*N+i < M._1 && jj*N+j < M._2
@@ -92,7 +94,7 @@ object Add {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tiled(n,m)[ ((i,j),m+n) | ((i,j),m) <- AA, ((ii,jj),n) <- BB, ii == i, jj == j ];
+                  tensor*(n,m)[ ((i,j),m+n) | ((i,j),m) <- AA, ((ii,jj),n) <- BB, ii == i, jj == j ];
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -120,7 +122,7 @@ object Add {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tiled(n,m)[ ((i,j),m+n) | ((i,j),m) <- AA, ((ii,jj),n) <- BB, ii == i, jj == j ]
+                  tensor*(n,m)[ ((i,j),m+n) | ((i,j),m) <- AA, ((ii,jj),n) <- BB, ii == i, jj == j ]
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -132,12 +134,12 @@ object Add {
       val t = System.currentTimeMillis()
       try {
         val C = (n,m,AA._3.join(BB._3)
-                       .mapValues{ case (a,b)
+                       .mapValues{ case ((_,_,a),(_,_,b))
                                      => val c = Array.ofDim[Double](N*N)
                                         for { i <- (0 until N).par
                                               j <- 0 until N
                                             } c(i*N+j) = a(i*N+j)+b(i*N+j)
-                                        c
+                                        (N,N,c)
                                  })
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }

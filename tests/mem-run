@@ -1,0 +1,5 @@
+#/bin/bash
+
+DIABLO="$(cd `dirname $0`/..; pwd -P)"
+
+scala -classpath classes:${DIABLO}/lib/diablo.jar -J-Xmx4g Test $*

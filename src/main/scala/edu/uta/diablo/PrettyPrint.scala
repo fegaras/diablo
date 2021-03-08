@@ -97,18 +97,10 @@ object Pretty extends RegexParsers {
   }
 
  /** pretty-print the printout of a case class object */
-  def print ( s: String ): String = {
-    parseAll(tree,s) match {
+  def print ( x: Any ): String = {
+    parseAll(tree,x.toString) match {
       case Success(t,_) => pretty(t,0)
-      case e => println("Pretty.print error: "+e); s
-    }
-  }
-
-  def print ( s: String, prfx: String ): String = {
-    prefix = prfx
-    parseAll(tree,s) match {
-      case Success(t,_) => prefix+pretty(t,0)
-      case _ => s
+      case e => throw new java.lang.Error("Pretty.print error: "+e)
     }
   }
 }

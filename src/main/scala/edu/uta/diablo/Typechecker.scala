@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 University of Texas at Arlington
+ * Copyright © 2020-2021 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,9 @@
  */
 package edu.uta.diablo
 
-
 object Typechecker {
     import AST._
+    import Lifting.{typeMap,getTypeMap}
 
     // binds variable names to types
     type Environment = Map[String,Type]
@@ -87,7 +87,7 @@ object Typechecker {
   def unfold_storage_type ( tp: Type ): Type
     = tp match {
         case StorageType(f,tps,_)
-          => val TypeMapS(_,ps,_,st,_,_,_) = typeMaps(f)
+          => val Some(TypeMapS(_,ps,_,_,st,_,_,_)) = getTypeMap(f)
              substType(st,Some((ps zip tps).toMap))
         case _ => tp
       }
@@ -152,15 +152,23 @@ object Typechecker {
           case t => throw new Error("Type "+tp+" is not a collection (found "+t+")")
       }
 
-    def import_type ( tp: Type ): Type
+    def import_type ( tp: Type, vname: String ): Type
       = tp match {
-          case TupleType(List(BasicType("Int"),BasicType("Int"),
-                              ParametricType(rdd,List(TupleType(List(TupleType(List(BasicType("Int"),BasicType("Int"))),
-                                                                     ArrayType(1,etp)))))))
-            if rdd == rddClass
+          case TupleType(is:+ParametricType(rdd,List(TupleType(List(TupleType(ks),
+                                                    TupleType(js:+ArrayType(1,etp)))))))
+            // imported block tensor variable
+            if rdd == rddClass && is.length == js.length && is.length == ks.length
+               && (is++ks++js).forall(_ == intType)
             => if (useStorageTypes)
-                 StorageType("tiled",List(etp),List(IntConst(-1),IntConst(-1)))
-               else SeqType(TupleType(List(TupleType(List(BasicType("Int"),BasicType("Int"))),etp)))
+                 StorageType("block_tensor_"+is.length+"_0",List(etp),
+                             (1 to is.length).map(i => Nth(Var(vname),i)).toList)
+               else ArrayType(is.length,etp)
+          case TupleType(is:+ArrayType(1,etp))     // imported tensor variable
+            if is.forall(_ == intType)
+            => if (useStorageTypes)
+                 StorageType("tensor_"+is.length+"_0",List(etp),
+                             (1 to is.length).map(i => Nth(Var(vname),i)).toList)
+               else ArrayType(is.length,etp)
           case ParametricType(rdd,List(etp))
             if rdd == rddClass
             => if (useStorageTypes)
@@ -169,8 +177,11 @@ object Typechecker {
           case _ => tp
       }
 
+    val tpat = """tensor_(\d+)_(\d+)""".r
+    val btpat = """block_tensor_(\d+)_(\d+)""".r
+
     def typecheck ( e: Expr, env: Environment ): Type
-      = if (e.tpe != null && !e.isInstanceOf[Var])
+      = if (e.tpe != null)// && !e.isInstanceOf[Var])
            e.tpe   // the cached type of e
         else try { val tpe = e match {
           case Var("null")
@@ -179,12 +190,12 @@ object Typechecker {
             => if (env.contains(v))
                  env(v)
                else import_type(typecheck_var(v). // call the Scala typechecker to find var v
-                            getOrElse(throw new Error("Undefined variable: "+v)))
+                            getOrElse(throw new Error("Undefined variable: "+v)),v)
           case Nth(u,n)
             => unfold_storage_type(typecheck(u,env)) match {
                   case TupleType(cs)
                     => if (n<=0 || n>cs.length)
-                          throw new Error("Tuple does not contain a "+n+" element")
+                          throw new Error("Tuple "+u+" does not contain a "+n+" element")
                        cs(n-1)
                   case t => throw new Error("Tuple projection "+e+" must be over a tuple (found "+t+")")
                }
@@ -282,25 +293,72 @@ object Typechecker {
                          ( bindPattern(VarPat(n),tp,r), n::s )
               }._1
               SeqType(typecheck(h,nenv))
-          case Store(f,tps,args,_)
-            => StorageType(f,tps,args)
           case Lift(f,ne)
-            => typecheck(Lifting.lift(f,ne),env)
-          case Call(f,args)
-            if typeMaps.contains(f)
-            => val TypeMapS(_,ps,at,st,lt,map,inv) = typeMaps(f)
-               inv match {
-                 case Lambda(TuplePat(ps),_)
-                   => if (ps.length != args.length)
-                        throw new Error("Wrong type transformation (wrong number of Int args)")
-                      if (args.init.exists(a => typecheck(a,env) != intType))
-                        throw new Error("Wrong type transformation (expected Int args)")
+            => val Some(TypeMapS(_,_,_,at,st,_,_,_)) = getTypeMap(f)
+               val ev = tmatch(st,typecheck(ne,env))
+               substType(at,ev)
+               //typecheck(Lifting.lift(f,ne),env)
+          case x@Store(f,tps,args,u)
+            => tps match {
+                 case List(BasicType("Boolean"))
+                   => f match {
+                        case tpat(dn,sn) if sn.toInt > 0
+                          => // change tensor_*_* to bool_tensor_*_*
+                             x.mapping = "bool_"+f                         // destructive
+                        case btpat(dn,sn) if sn.toInt > 0
+                          => // change block_tensor_*_* to block_bool_tensor_*_*
+                             x.mapping = s"block_bool_tensor_${dn}_$sn"    // destructive
+                        case _ => ;
+                      }
                  case _ => ;
                }
-               val tp = typecheck(args.last,env)
-               val ev = tmatch(lt,tp)
+               getTypeMap(x.mapping)
+               args.map(typecheck(_,env))
+               typecheck(u,env)
+               StorageType(x.mapping,tps,args)
+          case x@Call(f,args@(_:+l))
+            if (f match { case tpat(_,_) => true; case btpat(_,_) => true; case _ => false })
+            => typecheck(l,env) match {
+                  case SeqType(TupleType(List(_, BasicType("Boolean"))))
+                    => f match {
+                        case tpat(dn,sn) if sn.toInt > 0
+                          => // change tensor_*_* to bool_tensor_*_*
+                             x.name = "bool_"+f                         // destructive
+                        case btpat(dn,sn) if sn.toInt > 0
+                          => // change block_tensor_*_* to block_bool_tensor_*_*
+                             x.name = s"block_bool_tensor_${dn}_$sn"    // destructive
+                        case _ => ;
+                      }
+                  case _ => ;
+               }
+               val Some(TypeMapS(_,tps,ps,at,st,lt,view,store)) = getTypeMap(x.name)
+               val ev = tmatch(tuple(ps.values.toList:+lt),tuple(args.map(typecheck(_,env))))
                if (ev.isEmpty)
-                 throw new Error("Wrong type transformation: "+e+"\n(expected: "+lt+", found: "+tp+")")
+                 throw new Error("Wrong type storage: "+x+"\n(expected: "
+                                 +tuple(ps.values.toList:+lt)+", found: "
+                                 +tuple(args.map(typecheck(_,env)))+")")
+               if (useStorageTypes)
+                 substType(st,ev)
+               else substType(at,ev)
+          case Call(f,args)
+            if getTypeMap(f).isDefined
+            => val Some(TypeMapS(_,tps,ps,at,st,lt,view,store)) = getTypeMap(f)
+               val ev = tmatch(tuple(ps.values.toList:+lt),tuple(args.map(typecheck(_,env))))
+               if (ev.isEmpty)
+                 throw new Error("Wrong type storage: "+e+"\n(expected: "
+                                 +tuple(ps.values.toList:+lt)+", found: "
+                                 +tuple(args.map(typecheck(_,env)))+")")
+               if (useStorageTypes)
+                 substType(st,ev)
+               else substType(at,ev)
+          case Call(f,args)
+            if getTypeMap(f).isDefined
+            => val Some(TypeMapS(_,tps,ps,at,st,lt,view,store)) = getTypeMap(f)
+               val ev = tmatch(tuple(ps.values.toList:+lt),tuple(args.map(typecheck(_,env))))
+               if (ev.isEmpty)
+                 throw new Error("Wrong type storage: "+e+"\n(expected: "
+                                 +tuple(ps.values.toList:+lt)+", found: "
+                                 +tuple(args.map(typecheck(_,env)))+")")
                if (useStorageTypes)
                  substType(st,ev)
                else substType(at,ev)
@@ -310,7 +368,8 @@ object Typechecker {
                env(f) match {
                   case FunctionType(dt,rt)
                     => if (typeMatch(dt,tp)) rt
-                       else throw new Error("Function "+f+" on "+dt+" cannot be applied to "+args+" of type "+tp);
+                       else throw new Error("Function "+f+" on "+dt
+                                  +" cannot be applied to "+args+" of type "+tp);
                   case _ => throw new Error(f+" is not a function: "+e)
                }
           case Call(f,args)
@@ -417,7 +476,11 @@ object Typechecker {
                     => (typecheck(e,r),r)
                }._1
           case VarDecl(_,at,u)
-            => at
+            => val tp = elemType(typecheck(u,env))  // type of u is concrete
+               if (!typeMatch(tp,at))
+                 throw new Error("Incompatible value in variable declaration: "
+                                 +e+"\n(expected "+at+" found "+tp+")")
+               at
           case Assign(d,u)
             => val ut = elemType(typecheck(u,env))    // u is lifted to a collection
                val dt = typecheck(d,env)
@@ -523,14 +586,26 @@ object Typechecker {
           case ExprS(u)
             => typecheck(u,env)
                env
-          case TypeMapS(f,tpd,at,st,lt,map,inv)
-            => Lifting.typeMap(f,tpd,at,st,lt,map,inv)
+          case TypeMapS(f,tps,ps,at,st,lt,view,store)
+            => typeMap(f,tps,ps,at,st,lt,view,store)
                env
           case _ => throw new Error("Illegal statement: "+s)
     } } catch { case m: Error => throw new Error(m.getMessage+"\nFound in: "+s) }
 
+    // clean cached type info in every Expr node
+    def clean ( e: Expr ): Boolean = {
+      e.tpe = null
+      accumulate[Boolean](e,x => clean(x),_||_,false)
+    }
+
+    def check ( e: Expr ): Boolean = {
+      if (e.tpe == null)
+        println("@@@ "+e)
+      accumulate[Boolean](e,x => check(x),_||_,false)
+    }
+
     val localEnv: Environment = Map()
 
     def typecheck ( s: Stmt ) { typecheck(s,Nil,localEnv) }
-    def typecheck ( e: Expr ) { typecheck(e,localEnv) }
+    def typecheck ( e: Expr ): Type = typecheck(e,localEnv)
 }

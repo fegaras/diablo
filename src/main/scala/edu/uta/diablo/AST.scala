@@ -57,7 +57,7 @@ sealed abstract class Expr ( var tpe: Type = null ) extends Positional
     case class groupBy ( input: Expr ) extends Expr
     case class reduce ( op: String, input: Expr ) extends Expr
     case class Let ( pat: Pattern, value: Expr, body: Expr ) extends Expr
-    case class Call ( name: String, args: List[Expr] ) extends Expr
+    case class Call ( var name: String, args: List[Expr] ) extends Expr
     case class MethodCall ( obj: Expr, method: String, args: List[Expr] ) extends Expr
     case class Apply ( function: Expr, arg: Expr ) extends Expr
     case class IfE ( predicate: Expr, thenp: Expr, elsep: Expr ) extends Expr
@@ -73,9 +73,9 @@ sealed abstract class Expr ( var tpe: Type = null ) extends Positional
     case class Assign ( destination: Expr, value: Expr ) extends Expr
     case class VarDecl ( name: String, atype: Type, value: Expr ) extends Expr
     case class Def ( name: String, params: Map[String,Type], rtype: Type, body: Expr ) extends Expr
-    // builder: storage of a value based on a storage mapping with type params and args
-    case class Store ( mapping: String, typeParams: List[Type], args: List[Expr], value: Expr ) extends Expr
-    // sparsifier: implicit lifting of the domain of a generator in a comprehension
+    // store: storage of a value based on a storage mapping with type params and args
+    case class Store ( var mapping: String, typeParams: List[Type], args: List[Expr], value: Expr ) extends Expr
+    // view: implicit lifting of the domain of a generator in a comprehension
     case class Lift ( mapping: String, storage: Expr ) extends Expr
     case class StringConst ( value: String ) extends Expr {
          override def toString: String = "StringConst(\""+value+"\")"
@@ -98,10 +98,10 @@ sealed abstract class Stmt extends Positional
     case class DefS ( name: String, params: Map[String,Type], rtype: Type, body: Stmt ) extends Stmt
     case class ReturnS ( value: Expr ) extends Stmt
     case class ExprS ( value: Expr ) extends Stmt
-    // declare a new storage mapping as an isomorphism map <-> inv
-    case class TypeMapS ( typeName: String, typeParams: List[String],
+    // declare a new storage mapping as an isomorphism store <-> view
+    case class TypeMapS ( typeName: String, typeParams: List[String], params: Map[String,Type],
                           abstractType: Type, storageType: Type, liftedType: Type,
-                          map: Lambda, inv: Lambda ) extends Stmt
+                          store: Lambda, view: Lambda ) extends Stmt
 
 
 object AST {

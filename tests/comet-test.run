@@ -20,24 +20,23 @@ echo "Number of executors = " $executors
 SPARK_OPTIONS="--driver-memory 60G --num-executors $executors --executor-cores 11 --executor-memory 60G --supervise"
 
 # location of spark, scala, and diablo
-SW=/oasis/projects/nsf/uot143/$USER
+SW=/oasis/projects/nsf/uot143/fegaras
 
 export HADOOP_CONF_DIR=$HOME/cometcluster
-module load hadoop/2.6.0
+module load hadoop
 
 DIABLO_HOME=$SW/diablo
 
 export JAVA_HOME=/lib/jvm/java
-
 export SCALA_HOME=$SW/scala-2.12.3
-
-export SPARK_HOME=$SW/spark-3.0.0-bin-hadoop2.7
+export HADOOP_HOME=$SW/hadoop-3.2.2
+export SPARK_HOME=$SW/spark-3.0.1-bin-hadoop3.2
 
 myhadoop-configure.sh
 source $HOME/cometcluster/spark/spark-env.sh
 export SPARK_MASTER_HOST=$SPARK_MASTER_IP
 # start HDFS
-start-dfs.sh
+$HADOOP_HOME/sbin/start-dfs.sh
 # start Spark
 $SPARK_HOME/sbin/start-all.sh -h $SPARK_MASTER_HOST
 
@@ -72,5 +71,5 @@ for ((i=1; i<=$ns; i++)); do   # for each different dataset
 done
 
 $SPARK_HOME/sbin/stop-all.sh
-stop-dfs.sh
+$HADOOP_HOME/sbin/stop-dfs.sh
 myhadoop-cleanup.sh

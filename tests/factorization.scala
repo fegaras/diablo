@@ -35,11 +35,11 @@ object Factorization extends Serializable {
     val m = args(2).toInt
     val d = args(3).toInt  // number of attributes
     val mode = args(4) == "1"
-    parami(tileSize,1000) // each tile has size N*N
+    parami(blockSize,1000000)
     val N = 1000
 
     val conf = new SparkConf().setAppName("tiles")
-    val spark_context = new SparkContext(conf)
+    spark_context = new SparkContext(conf)
     conf.set("spark.logConf","false")
     conf.set("spark.eventLog.enabled","false")
     LogManager.getRootLogger().setLevel(Level.ERROR)
@@ -65,9 +65,9 @@ object Factorization extends Serializable {
     val Pinit = new BlockMatrix(Pm,N,N)
     val Qinit = new BlockMatrix(Qm,N,N)
 
-    val RR = (n,m,Rm.map{ case ((i,j),a) => ((i,j),a.toArray) })
-    val PPinit = (n,d,Pm.map{ case ((i,j),a) => ((i,j),a.toArray) })
-    val QQinit = (m,d,Qm.map{ case ((i,j),a) => ((i,j),a.toArray) })
+    val RR = (n,m,Rm.map{ case ((i,j),a) => ((i,j),(N,N,a.toArray)) })
+    val PPinit = (n,d,Pm.map{ case ((i,j),a) => ((i,j),(N,N,a.toArray)) })
+    val QQinit = (m,d,Qm.map{ case ((i,j),a) => ((i,j),(N,N,a.toArray)) })
 
     def map ( m: BlockMatrix, f: Double => Double ): BlockMatrix
       = new BlockMatrix(m.blocks.map{ case (i,a) => (i,new DenseMatrix(N,N,a.toArray.map(f))) },
@@ -94,26 +94,27 @@ object Factorization extends Serializable {
       var Q = QQinit
       try {
         val E2 = q("""
-                   tiled(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
-                                             kk == k, let v = p*q, group by (i,j) ]
+                   tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
+                                               kk == k, let v = p*q, group by (i,j) ]
                    """)
         E = q("""
-              tiled(n,m)[ ((i,j),r-v) | ((i,j),r) <- RR, ((ii,jj),v) <- E2, ii == i, jj == j, r > 0.0 ]
+              tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <- RR, ((ii,jj),v) <- E2, ii == i, jj == j, r > 0.0 ]
               """)
         P = q("""
-              tiled(n,d)[ ((i,k),^/v)
-                        | ((i,j),e) <- E, ((k,jj),q) <- Q, jj == j,
-                          let v = 2*0.002*e*q, group by (i,k) ]
+              tensor*(n,d)[ ((i,k),^/v)
+                          | ((i,j),e) <- E, ((k,jj),q) <- Q, jj == j,
+                            let v = 2*0.002*e*q, group by (i,k) ]
               """)
         Q = q("""
-              tiled(m,d)[ ((k,j),^/v)
-                        | ((i,j),e) <- E, ((ii,k),p) <- P, ii == i,
-                          let v = 2*0.002*e*p, group by (k,j) ]
+              tensor*(m,d)[ ((k,j),^/v)
+                          | ((i,j),e) <- E, ((ii,k),p) <- P, ii == i,
+                            let v = 2*0.002*e*p, group by (k,j) ]
               """)
         val x = E._3.count+P._3.count+Q._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
+
     def testFactorizationDiabloLoop(): Double = {
       val t = System.currentTimeMillis()
       var E = RR

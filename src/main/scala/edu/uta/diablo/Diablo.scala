@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 University of Texas at Arlington
+ * Copyright © 2020-2021 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package edu.uta
 import scala.reflect.macros.whitebox.Context
 import scala.language.experimental.macros
 import scala.reflect.ClassTag
+import org.apache.spark.SparkContext
 import diablo.Parser.parse
 import diablo.Translator.translate
 
@@ -27,16 +28,87 @@ package object diablo {
   var trace = true
   var groupByJoin = true
   var parallel = true
-  var tileSize = 1000
+  var blockSize = 1000000
 
-  // Contains the natural transformations for type abstractions
-  var typeMaps: mutable.Map[String,TypeMapS] = mutable.Map[String,TypeMapS]()
+  var spark_context: SparkContext = null
 
   def range ( n1: Long, n2: Long, n3: Long ): List[Long]
     = n1.to(n2,n3).toList
 
   def inRange ( i: Long, n1: Long, n2: Long, n3: Long ): Boolean
     = i>=n1 && i<= n2 && (i-n1)%n3 == 0
+
+  def binarySearch[@specialized T] ( key: Int, from: Int, to: Int,
+                                     rows: Array[Int], values: Array[T], zero: T ): T = {
+    var low = from
+    var high = to-1
+    while (low <= high) {
+      val mid = (low + high) >>> 1
+      val d = rows(mid)
+      if (d == key)
+        return values(mid)
+      else if (d > key)
+        high = mid - 1
+      else if (d < key)
+        low = mid + 1
+    }
+    zero
+  }
+
+  def binarySearch ( key: Int, from: Int, to: Int, rows: Array[Int] ): Boolean = {
+    var low = from
+    var high = to-1
+    while (low <= high) {
+      val mid = (low + high) >>> 1
+      val d = rows(mid)
+      if (d == key)
+        return true
+      else if (d > key)
+        high = mid - 1
+      else if (d < key)
+        low = mid + 1
+    }
+    false
+  }
+
+  def sort[T] ( from: Int, rows: mutable.ArrayBuffer[Int], values: mutable.ArrayBuffer[T] ) {
+    val len = values.length-from
+    if (len <= 0)
+      return
+    var arr = new mutable.ArrayBuffer[(Int,T)](len)
+    var i = 0
+    while (i < len) {
+      arr.append( (rows(from+i),values(from+i)) )
+      i += 1
+    }
+    arr = arr.sortBy(_._1)
+    i = 0
+    while (i < len) {
+      rows(from+1) = arr(i)._1
+      values(from+1) = arr(i)._2
+      i += 1
+    }
+  }
+
+  def sort ( from: Int, rows: mutable.ArrayBuffer[Int] ) {
+    val len = rows.length-from
+    if (len <= 0)
+      return
+    var arr = Array.ofDim[Int](len)
+    var i = 0
+    while (i < len) {
+      arr(i) = rows(from+i)
+      i += 1
+    }
+    scala.util.Sorting.quickSort(arr)
+    i = 0
+    while (i < len) {
+      rows(from+1) = arr(i)
+      i += 1
+    }
+  }
+
+  private var typeMapsLib = false
 
   def q_impl ( c: Context ) ( query: c.Expr[String] ): c.Expr[Any] = {
     import c.universe.{Expr=>_,Type=>_,_}
@@ -51,23 +123,28 @@ package object diablo {
     Typechecker.typecheck_call
        = ( f: String, args: List[Type] ) => cg.typecheck_call(f,args)
     val env: cg.Environment = Nil
-    cg.var_decls = collection.mutable.Map[String,c.Tree]()
-    Lifting.initialize()
+    if (!typeMapsLib) {
+      TypeMappings.init()
+      typeMapsLib = true
+    }
     Typechecker.useStorageTypes = false
     val q = parse(s)
     def opt ( e: Expr): Expr = Optimizer.optimizeAll(Normalizer.normalizeAll(e))
-    if (trace) println("Imperative program:\n"+Pretty.print(q.toString))
+    if (trace) println("Imperative program:\n"+Pretty.print(q))
     Typechecker.typecheck(q)
     val sq = Translator.translate(q)
-    if (trace) println("Comprehension:\n"+Pretty.print(sq.toString))
+    if (trace) println("Comprehension:\n"+Pretty.print(sq))
     val n = opt(sq)
-    if (trace) println("Normalized comprehension:\n"+Pretty.print(n.toString))
+    if (trace) println("Normalized comprehension:\n"+Pretty.print(n))
     val le = opt(Lifting.lift(n))
-    if (trace) println("Lifted comprehension:\n"+Pretty.print(le.toString))
+    if (trace) println("Lifted comprehension:\n"+Pretty.print(le))
+    Typechecker.clean(le)
+    Typechecker.typecheck(le)  // the ComprehensionTranslator needs type info
+    //Typechecker.check(le)
     val to = opt(ComprehensionTranslator.translate(le))
     val pc = if (parallel) ComprehensionTranslator.parallelize(to) else to
-    if (trace) println("Compiled comprehension:\n"+Pretty.print(pc.toString))
-    val ec = q"${cg.codeGen(pc,env)}.head"
+    if (trace) println("Compiled comprehension:\n"+Pretty.print(pc))
+    val ec = cg.codeGen(pc,env)
     if (trace) println("Scala code:\n"+showCode(ec))
     val tc = cg.getType(ec,env)
     if (trace) println("Scala type: "+tc)
@@ -81,7 +158,7 @@ package object diablo {
     import c.universe._
     val Literal(Constant(bv:Int)) = b.tree
     x.tree.toString.split('.').last match {
-       case "tileSize" => tileSize = bv
+       case "blockSize" => blockSize = bv
        case p => throw new Error("Wrong param: "+p)
     }
     c.Expr[Unit](q"()")

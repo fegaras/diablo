@@ -31,12 +31,12 @@ object Multiply extends Serializable {
     val repeats = args(0).toInt
     val n = args(1).toInt   // each matrix has n*n elements
     val m = n
-    parami(tileSize,1000) // each tile has size N*N
+    parami(blockSize,1000000)
     val N = 1000
     val validate_output = false
 
     val conf = new SparkConf().setAppName("tiles")
-    val spark_context = new SparkContext(conf)
+    spark_context = new SparkContext(conf)
     conf.set("spark.logConf","false")
     conf.set("spark.eventLog.enabled","false")
     LogManager.getRootLogger().setLevel(Level.WARN)
@@ -84,18 +84,20 @@ object Multiply extends Serializable {
     val A = new BlockMatrix(Am,N,N)
     val B = new BlockMatrix(Bm,N,N)
 
-    val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),a.transpose.toArray) })
-    val BB = (n,m,Bm.map{ case ((i,j),a) => ((i,j),a.transpose.toArray) })
+    type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
+
+    val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
+    val BB = (n,m,Bm.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
     var CC = AA
 
-    def validate ( M: (Int,Int,RDD[((Int,Int),Array[Double])]) ) {
+    def validate ( M: tiled_matrix ) {
       if (!validate_output)
         M._3.count()
       else {
         val C = A.multiply(B).toLocalMatrix()
         val CC = M._3.collect
         println("Validating ...")
-        for { ((ii,jj),a) <- CC
+        for { ((ii,jj),(_,_,a)) <- CC
               i <- 0 until N
               j <- 0 until N }
            if (ii*N+i < M._1 && jj*N+j < M._2
@@ -124,7 +126,7 @@ object Multiply extends Serializable {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tiled(n,m)[ ((i,j),+/c) | ((i,k),m) <- AA, ((kk,j),n) <- BB, k == kk, let c = m*n, group by (i,j) ]
+                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),m) <- AA, ((kk,j),n) <- BB, k == kk, let c = m*n, group by (i,j) ]
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -137,7 +139,7 @@ object Multiply extends Serializable {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tiled(n,m)[ ((i,j),+/c) | ((i,k),m) <- AA, ((kk,j),n) <- BB, k == kk, let c = m*n, group by (i,j) ]
+                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),m) <- AA, ((kk,j),n) <- BB, k == kk, let c = m*n, group by (i,j) ]
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -151,7 +153,7 @@ object Multiply extends Serializable {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tiled(n,m)[ ((i,j),+/c) | ((i,k),m) <- AA, ((kk,j),n) <- BB, k == kk, let c = m*n, group by (i,j) ]
+                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),m) <- AA, ((kk,j),n) <- BB, k == kk, let c = m*n, group by (i,j) ]
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -181,8 +183,8 @@ object Multiply extends Serializable {
     def testMultiplyCode (): Double = {
       val t: Long = System.currentTimeMillis()
       try {
-        val C = (n,m,AA._3.map{ case ((i,k),a) => (k,(i,a)) }
-                       .join( BB._3.map{ case ((kk,j),b) => (kk,(j,b)) } )
+        val C = (n,m,AA._3.map{ case ((i,k),(_,_,a)) => (k,(i,a)) }
+                       .join( BB._3.map{ case ((kk,j),(_,_,b)) => (kk,(j,b)) } )
                        .map{ case (_,((i,a),(j,b)))
                                => val V = Array.ofDim[Double](N*N)
                                   for { i <- (0 until N).par } {
@@ -208,7 +210,8 @@ object Multiply extends Serializable {
                                              }
                                           }
                                           V
-                                   })
+                                   }
+                       .map{ case (k,v) => (k,(N,N,v)) })
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
@@ -265,8 +268,8 @@ object Multiply extends Serializable {
     def testMultiplyCodeGBJ (): Double = {
       val t = System.currentTimeMillis()
       try {
-        val C = (n,m,AA._3.flatMap{ case ((i,k),a) => (0 until n/N).map(j => ((i,j),(k,a))) }
-                          .cogroup( BB._3.flatMap{ case ((k,j),b) => (0 until n/N).map(i => ((i,j),(k,b))) } )
+        val C = (n,m,AA._3.flatMap{ case ((i,k),(_,_,a)) => (0 until n/N).map(j => ((i,j),(k,a))) }
+                          .cogroup( BB._3.flatMap{ case ((k,j),(_,_,b)) => (0 until n/N).map(i => ((i,j),(k,b))) } )
                           .mapValues{ case (as,bs)
                                      => val c = Array.ofDim[Double](N*N)
                                         for { (k1,a) <- as
@@ -282,7 +285,7 @@ object Multiply extends Serializable {
                                              k += 1
                                            }
                                         }
-                                        c
+                                        (N,N,c)
                                     })
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }

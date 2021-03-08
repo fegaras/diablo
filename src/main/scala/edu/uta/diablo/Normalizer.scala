@@ -148,10 +148,16 @@ object Normalizer {
         => if (opts.contains(w))
              normalize(head,r,freeEnv(p,env)+((v,opts(w))),opts)
            else Generator(p,substE(u,env))::normalize(head,r,freeEnv(p,env),opts+(w->Var(v)))
+      case Generator(p,Let(q,x,u))::r
+        => normalize(head,LetBinding(q,x)::Generator(p,u)::r,env,opts)
       case Generator(p,u)::r
         => Generator(p,normalize(substE(u,env)))::normalize(head,r,freeEnv(p,env),opts)
       case LetBinding(TuplePat(ps),Tuple(es))::r
         => normalize(head,(ps zip es).map{ case (p,e) => LetBinding(p,e) }++r,env,opts)
+      case LetBinding(p@VarPat(v),u)::r
+        => if (notGrouped(p,head,r) && (isSimple(u) || occurrences(v,Comprehension(head,r)) <= 1))
+             normalize(head,r,bindEnv(p,normalize(substE(u,env)))++freeEnv(p,env),opts)
+           else LetBinding(p,normalize(substE(u,env)))::normalize(head,r,env,opts)
       case LetBinding(p,u)::r
         => if (notGrouped(p,head,r))
              normalize(head,r,bindEnv(p,normalize(substE(u,env)))++freeEnv(p,env),opts)
@@ -161,7 +167,7 @@ object Normalizer {
       case Predicate(BoolConst(true))::r
         => normalize(head,r,env,opts)
       case Predicate(u)::r
-        => Predicate(substE(u,env))::normalize(head,r,env,opts)
+        => Predicate(normalize(substE(u,env)))::normalize(head,r,env,opts)
       case GroupByQual(p,u)::r
         => // lift all env vars except the group-by pattern vars
            val nenv = freeEnv(p,env).map{ case (v,x) => (v,Seq(List(x))) }
@@ -185,8 +191,12 @@ object Normalizer {
       case Let(VarPat(v),u,b)
         if isSimple(u) || occurrences(v,b) <= 1
         => normalize(subst(Var(v),u,b))
-//      case Let(TuplePat(ps),Tuple(us),b)
-//        => (ps zip us).foldLeft(b){ case (r,(p,u)) => Let(p,u,r) }
+      case Let(TuplePat(ps),Tuple(us),b)
+        if (ps zip us).forall {
+                    case (VarPat(v),u) => isSimple(u) || occurrences(v,b) <= 1
+                    case _ => false
+           }
+        => (ps zip us).foldLeft(b){ case (r,(p,u)) => subst(toExpr(p),u,r) }
       case Comprehension(h,List())
         => Seq(List(normalize(h)))
       case Comprehension(h,Predicate(p)::qs)
@@ -212,6 +222,9 @@ object Normalizer {
       case flatMap(Lambda(TuplePat(List(k,VarPat(v))),Let(p,Var(w),b)),x)
         if v == w && occurrences(v,b) == 0
         => normalize(flatMap(Lambda(TuplePat(List(k,p)),b),x))
+      case flatMap(Lambda(p1,Let(p2,d,b)),x)
+        if occurrences(patvars(p1),d) == 0
+        => normalize(Let(p2,d,flatMap(Lambda(p1,b),x)))
       case flatMap(f,flatMap(g,x))
         => val Lambda(p,b) = renameVars(g)
            normalize(flatMap(Lambda(p,flatMap(f,b)),x))
@@ -227,6 +240,8 @@ object Normalizer {
         => normalize((ps zip es).foldLeft(b){ case (r,(p,e)) => Let(p,e,r) })
       case flatMap(Lambda(p,b),Seq(List(x)))
         => normalize(Let(p,x,b))
+      case flatMap(f,Let(p,d,b))
+        => normalize(Let(p,d,flatMap(f,b)))
       case flatMap(f,IfE(c,e1,e2))
         => normalize(IfE(c,flatMap(f,e1),flatMap(f,e2)))
       case groupBy(x@Seq(List()))
@@ -252,21 +267,24 @@ object Normalizer {
                => normalize(s(x.toInt-1))
              case _ => Call(a,List(Tuple(s.map(normalize))))
            }
-      case Call("!",List(Call("||",List(x,y))))
-        => normalize(Call("&&",List(Call("!",List(x)),Call("!",List(y)))))
-      case Call("!",List(Call("&&",List(x,y))))
-        => normalize(Call("||",List(Call("!",List(x)),Call("!",List(y)))))
-      case Call("!",List(Call("!",List(x))))
+      case MethodCall(x,"==",List(y))
+        if x==y
+        => BoolConst(true)
+      case MethodCall(MethodCall(x,"||",List(y)),"!",Nil)
+        => normalize(MethodCall(MethodCall(x,"!",null),"&&",List(MethodCall(y,"!",null))))
+      case MethodCall(MethodCall(x,"&&",List(y)),"!",null)
+        => normalize(MethodCall(MethodCall(x,"!",null),"||",List(MethodCall(y,"!",null))))
+      case MethodCall(MethodCall(x,"!",null),"!",null)
         => normalize(x)
-      case Call("!",List(Call("!=",List(x,y))))
-        => normalize(Call("==",List(x,y)))
-      case Call("&&",List(BoolConst(b),x))
+      case MethodCall(MethodCall(x,"!=",List(y)),"!",null)
+        => normalize(MethodCall(x,"==",List(y)))
+      case MethodCall(BoolConst(b),"&&",List(x))
         => if (b) normalize(x) else BoolConst(false)
-      case Call("&&",List(x,BoolConst(b)))
+      case MethodCall(x,"&&",List(BoolConst(b)))
         => if (b) normalize(x) else BoolConst(false)
-      case Call("||",List(BoolConst(b),x))
+      case MethodCall(BoolConst(b),"||",List(x))
         => if (b) BoolConst(true) else normalize(x)
-      case Call("||",List(x,BoolConst(b)))
+      case MethodCall(x,"||",List(BoolConst(b)))
         => if (b) BoolConst(true) else normalize(x)
       case Nth(Tuple(es),n)
         => normalize(es(n-1))

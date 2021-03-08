@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 University of Texas at Arlington
+ * Copyright © 2020-2021 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package edu.uta.diablo
 
+import Typechecker.tuple
 import scala.util.parsing.combinator.lexical.StdLexical
 import scala.util.parsing.combinator.syntactical.StandardTokenParsers
 import scala.util.parsing.combinator.token.StdTokens
@@ -59,7 +60,7 @@ class MyLexical extends StdLexical with MyTokens {
   def infixOpr: Parser[Token]
       = regex("""[^\s\w$()\[\]{}'"`.;,\\/]+""".r) ^^
         { s => if (delimiters.contains(s)) Keyword(s) else InfixOpr(s) }
-}
+}//"
 
 object Parser extends StandardTokenParsers {
   import AST._
@@ -72,7 +73,7 @@ object Parser extends StandardTokenParsers {
                           "#", "^", "|", "&", "+=", "*=", "&&=", "||=", ".." )
 
   lexical.reserved += ( "var", "for", "in", "do", "while", "if", "else", "true", "false", "def", "let",
-                        "return", "typemap", "to", "with", "group", "by" )
+                        "return", "typemap", "group", "by", "tensor" )
 
   /* groups of infix operator precedence, from low to high */
   val operator_precedence: List[Parser[String]]
@@ -132,6 +133,8 @@ object Parser extends StandardTokenParsers {
        | "." ~ ident ~ "(" ~ repsep( expr, "," ) ~ ")" ^^
          { case _~m~_~el~_ => MethodCall(e,m,el) }
        | "." ~ ident ^^
+         { case _~a => MethodCall(e,a,null) }
+       | "#" ~ ident ^^
          { case _~a => Project(e,a) }
        | "#" ~ int ^^
          { case _~n => Nth(e,n) }
@@ -146,14 +149,28 @@ object Parser extends StandardTokenParsers {
                           case (r,MethodCall(_,m,el)) => MethodCall(r,m,el)
                           case (r,_) => r } }
 
+ def dest: Parser[Expr]
+      = ident ~ rep( factorList(IntConst(0)) ) ^^
+        { case nm~s
+            => val e: Expr = Var(nm)
+               s.foldLeft(e) {
+                  case (r,Project(_,a)) => Project(r,a)
+                  case (r,Nth(_,n)) => Nth(r,n)
+                  case (r,Index(_,s)) => Index(r,s)
+                  case (r,MethodCall(_,m,el)) => MethodCall(r,m,el)
+                  case (r,_) => r }
+        }
+
   def qual: Parser[Qualifier]
       = ( "group" ~ "by" ~ pat ~ opt( ":" ~ expr ) ^^
           { case _~_~p~Some(_~e) => GroupByQual(p,e)
             case _~_~p~None => GroupByQual(p,toExpr(p)) }
         | "let" ~ pat ~ "=" ~ expr ^^
           { case _~p~_~e => LetBinding(p,e) }
-        | pat ~ ("<-" | "=") ~ expr ^^
+        | pat ~ "<-" ~ expr ^^
           { case p~_~e => Generator(p,e) }
+        | dest ~ "=" ~ expr ^^
+          { case d~_~e => AssignQual(d,e) }
         | expr ^^ Predicate
         | failure("illegal start of qualifier")
         )
@@ -164,13 +181,31 @@ object Parser extends StandardTokenParsers {
 
   def term: Parser[Expr]
       = ( compr
+        | "tensor" ~ opt("*") ~ "(" ~ repsep( expr, "," ) ~ ")"
+              ~ opt( "(" ~ repsep( expr, "," ) ~ ")" ) ~ expr ^^
+          { case _~None~_~ds~_~Some(_~ss~_)~e
+              => Call(s"tensor_${ds.length}_${ss.length}",ds++ss:+e)
+            case _~None~_~ds~_~None~e
+              => Call(s"tensor_${ds.length}_0",ds:+e)
+            case _~_~_~ds~_~Some(_~ss~_)~e
+              => Call(s"block_tensor_${ds.length}_${ss.length}",ds++ss:+e)
+            case _~_~_~ds~_~None~e
+              => Call(s"block_tensor_${ds.length}_0",ds:+e) }
         | ident ~ "(" ~ repsep( expr, "," ) ~ ")" ~ opt( compr ) ^^
-          { case n~_~el~_~Some(c) => Call(n,el:+c)
+          { case "lift"~_~List(Var(n),e)~_~None => Lift(n,e)
+            case n~_~el~_~Some(c) => Call(n,el:+c)
             case n~_~es~_~None => Call(n,es) }
         | ident ~ compr ^^
           { case n~c => Call(n,List(c)) }
         | ident ~ "{" ~ ident ~ "=>" ~ compr ~ "}" ~ expr ^^
           { case n~_~v~_~c~_~e => Call(n,List(Lambda(VarPat(v),c),e)) }
+        | "var" ~ ident ~ ":" ~ stype ~ opt("=" ~ expr) ^^
+          { case _~v~_~t~None => VarDecl(v,t,Seq(Nil))
+            case _~v~_~t~Some(_~e) => VarDecl(v,t,Seq(List(e))) }
+        | dest ~ "=" ~ expr ^^
+          { case d~_~e => Assign(d,Seq(List(e))) }
+        | dest ~ ( "+=" | "*=" | "&&=" | "||=" ) ~ expr ^^
+          { case d~op~e => Assign(d,Seq(List(MethodCall(d,op.init,List(e))))) }
         | "if" ~ "(" ~ expr ~ ")" ~ expr ~ "else" ~ expr ^^
           { case _~_~p~_~t~_~e => IfE(p,t,e) }
         | "(" ~ repsep( expr, "," ) ~ ")" ^^
@@ -185,6 +220,9 @@ object Parser extends StandardTokenParsers {
                            MatchE(Var(nv),
                                   cs.map{ case _~p~Some(c)~_~b => Case(p,c,b)
                                           case _~p~_~_~b => Case(p,BoolConst(true),b) })) } }
+        | "{" ~ rep( expr ~ sem ) ~ "}" ^^
+          { case _~ss~_ => if (ss.length==1) ss.head match { case s~_ => s }
+                           else Block(ss.map{ case s~_ => s }) }
         | "(" ~ repsep( pat, "," ) ~ ")" ~ "=>" ~ expr ^^
           { case _~ps~_~_~b => Lambda(TuplePat(ps),b) }
         | ident ~ "=>" ~ expr ^^
@@ -212,6 +250,14 @@ object Parser extends StandardTokenParsers {
         | failure("illegal start of expression")
         )
 
+  def lambda: Parser[Lambda]
+      = ( "(" ~ repsep( pat, "," ) ~ ")" ~ "=>" ~ expr ^^
+          { case _~ps~_~_~b => Lambda(TuplePat(ps),b) }
+        | ident ~ "=>" ~ expr ^^
+          { case v~_~b => Lambda(VarPat(v),b) }
+        | failure("Expected a Lambda expression")
+        )
+
   def pat: Parser[Pattern]
       = ( "(" ~ repsep( pat, "," ) ~ ")"
           ^^ { case _~ps~_ => if (ps.length==1) ps.head else TuplePat(ps) }
@@ -235,32 +281,35 @@ object Parser extends StandardTokenParsers {
         case _ => apply(e,subst(_,s))
       }
 
+  def mapdef: Parser[(String,List[(String,Type)],Expr)]
+    = "def" ~ ident ~ "(" ~ repsep( ident ~ ":" ~ stype, "," ) ~ ")" ~ "=" ~ expr ^^
+      { case _~f~_~params~_~_~body
+          => (f,params.map{ case v~_~t => (v,t) },body) }
+
   def stmt: Parser[Stmt]
       = ( "var" ~ ident ~ ":" ~ stype ~ opt( "=" ~ expr ) ^^
           { case _~v~_~t~None => VarDeclS(v,Some(t),None)
             case _~v~_~t~Some(_~e) => VarDeclS(v,Some(t),Some(e)) }
         | "var" ~ ident ~ "=" ~ expr ^^
           { case _~v~_~e => VarDeclS(v,None,Some(e)) }
-        | "typemap" ~ ident ~ opt("[" ~ rep1sep(ident,",") ~ "]") ~ "=" ~ stype
-                    ~ "from" ~ stype ~ "to" ~ stype ~ "with" ~ expr ~ "," ~ expr ^?
-          { case _~v~Some(_~s~_)~_~at~_~ft~_~tt~_~(h1@Lambda(_,_))~_~(h2@Lambda(_,_))
-              => TypeMapS(v,s,subst(at,s),subst(ft,s),subst(tt,s),
-                          subst(h1,s).asInstanceOf[Lambda],subst(h2,s).asInstanceOf[Lambda])
-            case _~v~None~_~at~_~ft~_~tt~_~(h1@Lambda(_,_))~_~(h2@Lambda(_,_))
-              => TypeMapS(v,Nil,at,ft,tt,h1,h2) }
-        | "{" ~ rep( stmt ~ ";" ) ~ "}" ^^
+        | "typemap" ~ ident ~ opt("[" ~ rep1sep(ident,",") ~ "]") ~
+            "(" ~ repsep( ident ~ ":" ~ stype, "," ) ~ ")" ~ ":" ~ stype ~
+            "{" ~ mapdef ~ mapdef ~ "}" ^?
+          { case _~v~pts~_~args~_~_~at~_~Tuple3("view",vps,vb)~Tuple3("store",sps,sb)~_
+              => val ts = pts match { case Some(_~s~_) => s; case _ => Nil }
+                 val as = args.map{ case v~_~t => (v,subst(t,ts)) }
+                 val st = tuple(vps.map(_._2))
+                 val lt = tuple(sps.map(_._2))
+                 TypeMapS(v,ts,as.toMap,subst(at,ts),subst(st,ts),subst(lt,ts),
+                          Lambda(tuple(vps.map(x => VarPat(x._1))),subst(vb,ts)),
+                          Lambda(tuple(sps.map(x => VarPat(x._1))),subst(sb,ts))) }
+        | "{" ~ rep( stmt ~ sem ) ~ "}" ^^
           { case _~ss~_ => if (ss.length==1) ss.head match { case s~_ => s }
                            else BlockS(ss.map{ case s~_ => s }) }
-        | factor ~ "=" ~ expr ^?
-          { case (d:Var)~_~e => AssignS(d,e)
-            case (d:Nth)~_~e => AssignS(d,e)
-            case (d:Project)~_~e => AssignS(d,e)
-            case (d:Index)~_~e => AssignS(d,e) }
-        | factor ~ ( "+=" | "*=" | "&&=" | "||=" ) ~ expr ^?
-          { case (d:Var)~op~e => AssignS(d,MethodCall(d,op.init,List(e)))
-            case (d:Nth)~op~e => AssignS(d,MethodCall(d,op.init,List(e)))
-            case (d:Project)~op~e => AssignS(d,MethodCall(d,op.init,List(e)))
-            case (d:Index)~op~e => AssignS(d,MethodCall(d,op.init,List(e))) }
+        | dest ~ "=" ~ expr ^^
+          { case d~_~e => AssignS(d,e) }
+        | dest ~ ( "+=" | "*=" | "&&=" | "||=" ) ~ expr ^^
+          { case d~op~e => AssignS(d,MethodCall(d,op.init,List(e))) }
         | "for" ~ ident ~ "=" ~ expr ~ "," ~ expr ~ opt( "," ~ expr ) ~ "do" ~ stmt ^^
           { case _~v~_~a~_~b~None~_~s => ForS(v,a,b,IntConst(1),s)
             case _~v~_~a~_~b~Some(_~c)~_~s => ForS(v,a,b,c,s) }
@@ -284,20 +333,40 @@ object Parser extends StandardTokenParsers {
       = simpleType ~ rep( "->" ~ stype ) ^^
         { case d~ts => ts.foldRight(d){ case (_~t,r) => FunctionType(r,t) } }
 
+  val array_pat = """array(\d+)""".r
+
+  val tensor_pat = """tensor_(\d+)_(\d+)""".r
+  val bool_tensor_pat = """bool_tensor_(\d+)_(\d+)""".r
+  val block_tensor_pat = """(block_)?tensor_(\d+)_(\d+)""".r
+
   def simpleType: Parser[Type]
       = ( "(" ~ rep1sep( stype, "," ) ~ ")" ^^
           { case _~ts~_ => if (ts.length==1) ts.head else TupleType(ts) }
         | "<" ~ rep1sep( ident ~ ":" ~ stype, "," ) ~ ">" ^^
           { case _~cs~_ => RecordType(cs.map{ case n~_~t => (n,t)}.toMap) }
-        | ident ~ "[" ~ int ~ "," ~ stype ~ "]" ^?
-          { case "array"~_~d~_~t~_ => ArrayType(d,t)
-            case "darray"~_~d~_~t~_ if d <= 9 => ParametricType("darray"+d,List(t)) }
-        | ident ~ "[" ~ rep1sep( stype, "," ) ~ "]" ^^
-          { case "list"~_~List(t)~_ => SeqType(t)
-            case "vector"~_~List(t)~_ => ArrayType(1,t)
-            case "matrix"~_~List(t)~_ => ArrayType(2,t)
-            case n~_~ts~_ => ParametricType(n,ts) }
-        | ident ^^ { s => BasicType(s) }
+        | ident ~ "[" ~ stype ~ "]" ^^
+          { case "list"~_~t~_ => SeqType(t)
+            case "vector"~_~t~_ => ArrayType(1,t)
+            case "matrix"~_~t~_ => ArrayType(2,t)
+            case array_pat(n)~_~t~_ => ArrayType(n.toInt,t)
+            case (n@block_tensor_pat(_,dn,sn))~_~t~_
+              => val N = Math.pow(blockSize,1.0/(dn.toInt+sn.toInt)).toInt
+                 StorageType(n,List(t),1.to(dn.toInt+sn.toInt).map(i => IntConst(N)).toList)
+            case n~_~t~_ => ParametricType(n,List(t)) }
+        | ident ~ "*" ~ "[" ~ stype ~ "]" ^^
+          { case (n@tensor_pat(dn,sn))~_~_~t~_
+              => val N = Math.pow(blockSize,1.0/(dn.toInt+sn.toInt)).toInt
+                 StorageType("block_"+n,List(t),
+                             1.to(dn.toInt+sn.toInt).map(i => IntConst(N)).toList)
+            case n~_~_~t~_ => ParametricType(n+"*",List(t)) }
+        | rep1sep( ident, "." ) ~ "[" ~ rep1sep( stype, "," ) ~ "]" ^^
+          { case List("map")~_~List(kt,vt)~_ => MapType(kt,vt)
+            case ns~_~ts~_ => ParametricType(ns.mkString("."),ts) }
+        | ident ^^
+          { case n@bool_tensor_pat(dn,sn)
+              => val N = Math.pow(blockSize,1.0/(dn.toInt+sn.toInt)).toInt
+                 StorageType(n,Nil,1.to(dn.toInt+sn.toInt).map(i => IntConst(N)).toList)
+            case s => BasicType(s) }
         )
 
   def program: Parser[Stmt]
@@ -312,6 +381,6 @@ object Parser extends StandardTokenParsers {
         }
 
   def main ( args: Array[String] ) {
-    println(edu.uta.diablo.Pretty.print(parse(args(0)).toString))
+    println(edu.uta.diablo.Pretty.print(parse(args(0))))
   }
 }

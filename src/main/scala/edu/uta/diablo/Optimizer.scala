@@ -18,6 +18,7 @@ package edu.uta.diablo
 object Optimizer {
   import AST._
   import Normalizer.{normalizeAll,comprVars}
+  import ComprehensionTranslator.{isBlockTensor,isTensor}
 
   /* general span for comprehensions; if a qualifier matches, split there and continue with cont */
   def matchQ ( qs: List[Qualifier], filter: Qualifier => Boolean,
@@ -36,10 +37,8 @@ object Optimizer {
 
   def isArray ( e: Expr ): Boolean
     = e match {
-        case Lift("vector",_) => true
-        case Lift("matrix",_) => true
-        case Lift("tile",_) => true
-        case Lift("tiled",_) => true
+        case Lift(name,_) if isBlockTensor(name) => true
+        case Lift(name,_) if isTensor(name) => true
         case _ => false
       }
 
@@ -95,14 +94,14 @@ object Optimizer {
   /* finds a sequence of predicates in qs that imply x=y */
   def findEqPred ( x: String, y: String, qs: List[Qualifier] ): Option[List[Qualifier]]
     = matchQ(qs,{ case Predicate(MethodCall(Var(v1),"==",List(Var(v2))))
-                    => v1==x || v1==y || v2==x || v2==y
+                    => v1!=v2 && (v1==x || v1==y || v2==x || v2==y)
                   case _ => false },
                 { case (p@Predicate(MethodCall(Var(v1),"==",List(Var(v2)))))::s
                     => (if ((v1==x && v2==y) || (v2==x && v1==y))
                            Some(Nil)
-                        else if (v1==x) findEqPred(v2,y,s)
-                        else if (v1==y) findEqPred(x,v2,s)
-                        else if (v2==x) findEqPred(v1,y,s)
+                        else if (v1==x && v2==y) findEqPred(v2,y,s)
+                        else if (v1==y && v2==x) findEqPred(x,v2,s)
+                        else if (v2==x && v1==y) findEqPred(v1,y,s)
                         else findEqPred(x,v1,s)).map(p::_)
                   case _ => None })
 
@@ -129,13 +128,14 @@ object Optimizer {
     = matchQ(qs,{ case Generator(VarPat(_),Range(_,_,_)) => true; case _ => false },
                 { case (g1@Generator(VarPat(v),Range(_,_,_)))::s
                     => matchQ(s,{ case Predicate(MethodCall(Var(v1),"==",List(e)))
-                                    => v==v1; case _ => false },
+                                    => v!=e && v==v1
+                                  case _ => false },
                                 { case g2::_ => Some(List(g1,g2))
                                   case _ => None })
                   case _ => None })
 
   def findLetBound ( qs: List[Qualifier] ): Option[List[Qualifier]]
-    = matchQ(qs,{ case Predicate(MethodCall(Var(v),"==",List(e))) => true; case _ => false },
+    = matchQ(qs,{ case Predicate(MethodCall(Var(v),"==",List(e))) => v!=e; case _ => false },
                 { case (c@Predicate(MethodCall(_,_,List(e))))::s
                     => matchQ(s,{ case LetBinding(p,u) => u == e; case _ => false },
                                 { case lb::_ => Some(List(c,lb))
