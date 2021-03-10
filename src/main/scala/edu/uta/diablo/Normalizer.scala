@@ -290,12 +290,6 @@ object Normalizer {
         => normalize(es(n-1))
       case Project(Record(es),a)
         => normalize(es(a))
-      case Project(x,"length")
-        => normalize(MethodCall(x,"length",null))
-      case Project(x,"rows")
-        => normalize(Nth(x,1))
-      case Project(x,"cols")
-        => normalize(Nth(x,2))
       case _ => apply(e,normalize)
     }
 

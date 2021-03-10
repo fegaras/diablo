@@ -16,6 +16,7 @@
 package edu.uta.diablo
 
 import scala.annotation.tailrec
+import scala.util.matching.Regex
 
 
 object ComprehensionTranslator {
@@ -62,8 +63,8 @@ object ComprehensionTranslator {
   def tuple ( s: List[Pattern] ): Pattern
     = s match { case List(x) => x; case _ => TuplePat(s) }
 
-  val tensor_pat = """tensor_(\d+)_(\d+)""".r
-  val bool_tensor_pat = """bool_tensor_(\d+)_(\d+)""".r
+  val tensor_pat: Regex = """tensor_(\d+)_(\d+)""".r
+  val bool_tensor_pat: Regex = """bool_tensor_(\d+)_(\d+)""".r
 
   def isTensor ( name: String ): Boolean
     = name match { case tensor_pat(_,_) => true; case bool_tensor_pat(_,_) => true; case _ => false }
@@ -78,8 +79,8 @@ object ComprehensionTranslator {
          case _ => (0,0)
        }
 
-  val block_tensor_pat = """block_tensor_(\d+)_(\d+)""".r
-  val block_bool_tensor_pat = """block_bool_tensor_(\d+)_(\d+)""".r
+  val block_tensor_pat: Regex = """block_tensor_(\d+)_(\d+)""".r
+  val block_bool_tensor_pat: Regex = """block_bool_tensor_(\d+)_(\d+)""".r
 
   def isBlockTensor ( name: String ): Boolean
     = name match {
@@ -166,7 +167,7 @@ object ComprehensionTranslator {
                    val usedVars = freevars(head,groupByVars).intersect(comprVars(qs)).distinct
                    val rt = findReducedTerms(yieldReductions(Comprehension(head,ts),usedVars),
                                              usedVars).distinct
-                   assert(rt.length > 0,"Expected aggregations in a group-by comprehension")
+                   assert(rt.nonEmpty,"Expected aggregations in a group-by comprehension")
                    val reducedTerms = rt.filter{ case (_,reduce(_,_)) => true; case _ => false }
                                         .map(x => (newvar,x._2))
                    // non-groupby variables that are used in a reduction in head
@@ -287,7 +288,7 @@ object ComprehensionTranslator {
                    val usedVars = freevars(head,groupByVars).intersect(comprVars(qs)).distinct
                    val rt = findReducedTerms(yieldReductions(Comprehension(head,ts),usedVars),
                                              usedVars).distinct
-                   assert(rt.length > 0,"Expected aggregations in a group-by comprehension")
+                   assert(rt.nonEmpty,"Expected aggregations in a group-by comprehension")
                    val reducedTerms = rt.filter{ case (_,reduce(_,_)) => true; case _ => false }
                                         .map(x => (newvar,x._2))
                    // non-groupby variables that are used in a reduction in head
@@ -498,7 +499,7 @@ object ComprehensionTranslator {
                                               .intersect(comprVars(r)).distinct
                    val rt = findReducedTerms(yieldReductions(Comprehension(hs,s),usedVars),
                                              usedVars).distinct
-                   assert(rt.length > 0,"Expected aggregations in a group-by comprehension")
+                   assert(rt.nonEmpty,"Expected aggregations in a group-by comprehension")
                    val gs = rt.map(_._2)
                               .map{ case reduce(_,Var(v))
                                       => Var(v)
@@ -695,17 +696,6 @@ object ComprehensionTranslator {
               else s"tensor_${dn}_$sn"
       }
   }
-/*
-  def tile_generators ( block: String, p: Pattern ): List[Qualifier]
-    = p match {
-        case TuplePat(List(VarPat(_),VarPat(v)))
-          => List(Generator(p,Lift(block,Var("_"+v))))
-        case TuplePat(List(TuplePat(ps),VarPat(v)))
-          if ps.forall(_.isInstanceOf[VarPat])
-          => List(Generator(p,Lift(block,Var("_"+v))))
-        case _ => Nil
-      }
-*/
 
   def tile_generators ( block: String, p: Pattern ): List[Qualifier]
     = p match {
@@ -723,12 +713,6 @@ object ComprehensionTranslator {
 
   def tile_qualifiers ( qs: List[Qualifier], vars: List[String] ): List[Qualifier]
     = qs.foldLeft[(List[Qualifier],List[String])] ((Nil,vars)) {
-/*
-          case ((r,s),Generator(TuplePat(List(p1,p2)),Lift(b1,Lift(b2,u))))
-            => (r++tile_qualifiers(List(Generator(p1,Lift(b1,u))),vars)
-                 ++tile_qualifiers(List(Generator(p2,Lift(b2,u))),vars),
-                s++patvars(p1)++patvars(p2))
-*/
           case ((r,s),Generator(p,Lift(block,_)))
             if isBlockTensor(block)
             => (r++tile_generators(tile_type(block),p),
@@ -766,12 +750,6 @@ object ComprehensionTranslator {
 
   def tile_qualifiers_shuffle ( qs: List[Qualifier], vars: List[String] ): List[Qualifier]
     = qs.foldLeft[(List[Qualifier],List[String])] ((Nil,vars)) {
-/*
-          case ((r,s),Generator(TuplePat(List(p1,p2)),Lift(b1,Lift(b2,u))))
-            => (r++tile_qualifiers_shuffle(List(Generator(p1,Lift(b1,u))),vars)
-                 ++tile_qualifiers_shuffle(List(Generator(p2,Lift(b2,u))),vars),
-                s++patvars(p1)++patvars(p2))
-*/
           case ((r,s),Generator(p,Lift(block,_)))
             if isBlockTensor(block)
             => ((r:+Generator(usc(p),Var(tiles_var(p))))
@@ -874,7 +852,7 @@ object ComprehensionTranslator {
                    val h = yieldReductions(head,usedVars)
                    val rt = findReducedTerms(yieldReductions(Comprehension(hs,s),usedVars),
                                              usedVars).distinct
-                   assert(rt.length > 0,"Expected aggregations in a group-by comprehension")
+                   assert(rt.nonEmpty,"Expected aggregations in a group-by comprehension")
                    val gs = rt.map(_._2)
                               .map{ case reduce(_,Var(v))
                                       => Var(v)
@@ -1022,17 +1000,6 @@ object ComprehensionTranslator {
     val N = Math.pow(blockSize,1.0/(dims.length)).toInt
     val tile_dims = 1.to(dims.length).map(i => IntConst(N)).toList
     hs match {
-      case Tuple(List(kp,_))   // group-by tiled comprehension with group-by-key == comprehension key
-        if hasGroupByKey(qs,kp)
-        => qs.span{ case GroupByQual(p,_) => toExpr(p) != kp; case _ => true } match {
-                    case (r,GroupByQual(p,k)::s)
-                      => // a tiled comprehension with a group-by
-                         groupBy_tiles(block,hs,qs,vars,tp,dims,tile_dims)
-                    case _ => throw new Error("Unexpected error in tiled groupBy")
-                  }
-      case Tuple(List(kp,_)) // group-by tiled comprehension with group-by-key != comprehension key
-        if hasGroupBy(qs)
-        => throw new Error("Cannot translate group-by tiled comprehension with group-by-key != comprehension key")
       case Tuple(List(p,_))   // a tiled comprehension that preserves tiling
         if !hasGroupBy(qs)
            && { val indices = tile_indices(qs)      // TODO: all other indices must be ==
@@ -1071,31 +1038,47 @@ object ComprehensionTranslator {
                                                Predicate(MethodCall(Var("k1"),"==",List(Var("k2")))))++
                                           tile_qualifiers(r,vars):+g)
                     val tile = Store(tile_type(block,tp),List(tp),tile_dims,c)
-                    def tiles ( e: Expr )
-                      = MethodCall(MethodCall(MethodCall(e,"+",List(IntConst(blockSize-1))),
-                                   "/",List(IntConst(blockSize))),"-",List(IntConst(1)))
+                    def num_of_tiles ( size: Expr )
+                      = MethodCall(MethodCall(MethodCall(size,"+",List(IntConst(N-1))),
+                                   "/",List(IntConst(N))),"-",List(IntConst(1)))
                     val kv = newvar
+                    val left_size::right_size::_ = dims
                     val left = translate_rdd(Tuple(List(Tuple(List(ngx,Var(kv))),
-                                                        Tuple(List(tuple(jt1),tuple(tile_values(p1).map(Var)))))),
+                                                        Tuple(List(tuple(jt1),
+                                                                   tuple(tile_values(p1).map(Var)))))),
                                              List(Generator(p1,d1),
                                                   Generator(VarPat(kv),
-                                                            Range(IntConst(0),tiles(IntConst(100)),IntConst(1)))),vars)
+                                                            Range(IntConst(0),
+                                                                  num_of_tiles(right_size),
+                                                                  IntConst(1)))),vars)
                     val right = translate_rdd(Tuple(List(Tuple(List(Var(kv),ngy)),
-                                                         Tuple(List(tuple(jt2),tuple(tile_values(p2).map(Var)))))),
+                                                         Tuple(List(tuple(jt2),
+                                                                    tuple(tile_values(p2).map(Var)))))),
                                               List(Generator(p2,d2),
                                                    Generator(VarPat(kv),
-                                                             Range(IntConst(0),tiles(IntConst(100)),IntConst(1)))),vars)
-
-
+                                                             Range(IntConst(0),
+                                                                   num_of_tiles(left_size),
+                                                                   IntConst(1)))),vars)
                     val nq = Generator(TuplePat(List(p,TuplePat(List(VarPat("__v1"),VarPat("__v2"))))),
                                        Lift("rdd",MethodCall(left,"cogroup",List(right))))
                     val rdd = translate_rdd(Tuple(List(toExpr(p),tile)),
                                             rdd_qualifiers(qs.flatMap( q => if ((g::g2::cs).contains(q)) Nil
-                                                                            else if (q==g1) List(nq) else List(q)),
+                                                                            else if (q==g1) List(nq) else List(q) ),
                                                            vars),vars)
                     tuple(dims:+rdd)
                case _ => throw new Error("Unexpected error in groupByJoin")
              }
+       case Tuple(List(kp,_))   // group-by tiled comprehension with group-by-key == comprehension key
+         if hasGroupByKey(qs,kp)
+         => qs.span{ case GroupByQual(p,_) => toExpr(p) != kp; case _ => true } match {
+                     case (r,GroupByQual(p,k)::s)
+                       => // a tiled comprehension with a group-by
+                          groupBy_tiles(block,hs,qs,vars,tp,dims,tile_dims)
+                     case _ => throw new Error("Unexpected error in tiled groupBy")
+                   }
+       case Tuple(List(kp,_)) // group-by tiled comprehension with group-by-key != comprehension key
+         if hasGroupBy(qs)
+         => throw new Error("Cannot translate group-by tiled comprehension with group-by-key != comprehension key")
         case _
           => findTileJoin(qs) match {
                 // join between tile collections
@@ -1232,7 +1215,7 @@ object ComprehensionTranslator {
           => true
         case Assign(MapAccess(_,_),_)   // Map is not thread-safe
           => true
-        case _ => accumulate[Boolean](e,has_side_effects(_),_||_,false)
+        case _ => accumulate[Boolean](e,has_side_effects,_||_,false)
       }
 
   /* parallelize first range flatMap */

@@ -15,6 +15,8 @@
  */
 package edu.uta.diablo
 
+import scala.util.matching.Regex
+
 object Lifting {
   import AST._
   import Typechecker._
@@ -32,8 +34,8 @@ object Lifting {
       = tp match {
           case ParametricType(f,ts)
             if typeMaps.contains(f)
-            => StorageType(f,ts.map(storage_type(_)),Nil)
-          case _ => apply(tp,storage_type(_))
+            => StorageType(f,ts.map(storage_type),Nil)
+          case _ => apply(tp,storage_type)
         }
     val st = storage_type(storageType)
     val Lambda(vp,vb) = view
@@ -52,10 +54,10 @@ object Lifting {
                                      liftedType,Lambda(nvp,vb),Lambda(nsp,nsb))
   }
 
-  val btpat = """bool_tensor_(\d+)_(\d+)""".r
-  val tpat = """tensor_(\d+)_(\d+)""".r
-  val bpat = """block_tensor_(\d+)_(\d+)""".r
-  val bbtpat = """block_bool_tensor_(\d+)_(\d+)""".r
+  val btpat: Regex = """bool_tensor_(\d+)_(\d+)""".r
+  val tpat: Regex = """tensor_(\d+)_(\d+)""".r
+  val bpat: Regex = """block_tensor_(\d+)_(\d+)""".r
+  val bbtpat: Regex = """block_bool_tensor_(\d+)_(\d+)""".r
 
   /** get a type map if exists, or create a type map from a tensor */
   def getTypeMap ( name: String ): Option[TypeMapS]
@@ -97,7 +99,7 @@ object Lifting {
     e.tpe = null    // clear the type info of e
     typecheck(e,env) match {
         case StorageType(f,tps,args)
-          => val TypeMapS(_,_,_,_,t1,_,map,_) = fresh(typeMaps(f))
+          => val Some(TypeMapS(_,_,_,_,t1,_,map,_)) = getTypeMap(f).map(fresh)
              Apply(map,e)
         case _ => e
      }
@@ -108,7 +110,7 @@ object Lifting {
         case StorageType(f,tps,args)
           if !typeMatch(dtype,stype)
           => val nv = newvar
-             val TypeMapS(_,ps,_,tp,_,t2,_,inv) = fresh(typeMaps(f))
+             val Some(TypeMapS(_,ps,_,tp,_,t2,_,inv)) = getTypeMap(f).map(fresh)
              val ev = tmatch(t2,stype)
              if (ev.nonEmpty)
                 Comprehension(Store(f,ps.map(ev.get(_)),args,Var(nv)),
@@ -180,7 +182,7 @@ object Lifting {
                          lu.tpe = null    // clear the type info of e
                          typecheck(lu,r) match {
                             case StorageType(f,tps,args)
-                              => val TypeMapS(_,ps,_,_,t1,lt,map,_) = fresh(typeMaps(f))
+                              => val Some(TypeMapS(_,ps,_,_,t1,lt,map,_)) = getTypeMap(f).map(fresh)
                                  val tp = substType(lt,Some((ps zip tps).toMap))
                                  ( bindPattern(p,elemType(tp),r),
                                    s ++ patvars(p),

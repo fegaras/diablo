@@ -19,8 +19,8 @@ cd tests/
 
 ```scala
 val X = q("""
-          var M = tiled(n,n)[ ((i,j),random()) | i <- 0..n-1, j <- 0..n-1 ];
-          var N = tiled(n,n)[ ((i,j),random()) | i <- 0..n-1, j <- 0..n-1 ];
+          var M = tensor*(n,n)[ ((i,j),random()) | i <- 0..n-1, j <- 0..n-1 ];
+          var N = tensor*(n,n)[ ((i,j),random()) | i <- 0..n-1, j <- 0..n-1 ];
           var R = M;
 
           for i = 0, n-1 do
@@ -37,7 +37,7 @@ val X = q("""
 
 ```scala
 val X = q("""
-          tiled(n,n)[ ((i,j),+/v) | ((i,k),m) <- M, ((kk,j),n) <- N, kk == k, let v = m*n, group by (i,j) ];
+          tensor*(n,n)[ ((i,j),+/v) | ((i,k),m) <- M, ((kk,j),n) <- N, kk == k, let v = m*n, group by (i,j) ];
           """)
 ```
 
@@ -45,9 +45,9 @@ val X = q("""
 
 ```scala
     q("""
-      var R = tiled(n,m)[ ((i,j),random()) | i <- 0..n-1, j <- 0..m-1 ];
-      var P = tiled(n,l)[ ((i,j),random()) | i <- 0..n-1, j <- 0..l-1 ];
-      var Q = tiled(l,m)[ ((i,j),random()) | i <- 0..l-1, j <- 0..m-1 ];
+      var R = tensor*(n,m)[ ((i,j),random()) | i <- 0..n-1, j <- 0..m-1 ];
+      var P = tensor*(n,l)[ ((i,j),random()) | i <- 0..n-1, j <- 0..l-1 ];
+      var Q = tensor*(l,m)[ ((i,j),random()) | i <- 0..l-1, j <- 0..m-1 ];
       var pq = R;
       var E = R;
 

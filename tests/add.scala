@@ -58,9 +58,20 @@ object Add {
 
     type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
 
-    val AA = (n,n,Am.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
-    val BB = (n,n,Bm.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
+    // dense block tensors
+    val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
+    val BB = (n,m,Bm.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
     var CC = AA
+
+    // sparse block tensors with no zeros
+    val As = q("tensor*(n)(m)[ ((i,j),a) | ((i,j),a) <- AA ]")
+    val Bs = q("tensor*(n)(m)[ ((i,j),b) | ((i,j),b) <- BB ]")
+
+    val rand = new Random()
+    def random () = rand.nextDouble()*10
+
+    val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.5 ]")
+    val Bz = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.5 ]")
 
     def validate ( M: tiled_matrix ) = {
       if (!validate_output)
@@ -94,7 +105,19 @@ object Add {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n,m)[ ((i,j),m+n) | ((i,j),m) <- AA, ((ii,jj),n) <- BB, ii == i, jj == j ];
+                  tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <- AA, ((ii,jj),b) <- BB, ii == i, jj == j ];
+                  """)
+        validate(C)
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix addition of sparse tiled matrices using Diablo array comprehensions
+    def testAddDiabloDACsparse (): Double = {
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <- Az, ((ii,jj),b) <- Bz, ii == i, jj == j ];
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -122,7 +145,7 @@ object Add {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n,m)[ ((i,j),m+n) | ((i,j),m) <- AA, ((ii,jj),n) <- BB, ii == i, jj == j ]
+                  tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <- AA, ((ii,jj),b) <- BB, ii == i, jj == j ]
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -202,6 +225,7 @@ object Add {
 
     test("MLlib Add",testAddMLlib)
     test("DIABLO Add",testAddDiabloDAC)
+    test("DIABLO Add sparse",testAddDiabloDACsparse)
     test("DIABLO loop Add",testAddDiabloDACloop)
     test("Hand-written Add",testAddCode)
     test("SQL Add",testAddSQL)

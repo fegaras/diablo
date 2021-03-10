@@ -51,14 +51,8 @@ object TypeMappings {
     val dvars2 = 1.to(dn).map("ii"+_).mkString(",")
     val svars = 1.to(sn).map("j"+_).mkString(",")
     val deq = 1.to(dn).map(i => s"ii$i == i$i").mkString(", ")
-    val dkey = if (dn==1) "i1"
-               else dn.until(0,-1).map("d"+_).tails.map(_.mkString("*")).toList.tail
-                      .zip(dn.until(1,-1).map("i"+_)).map{ case (x,y) => x+"*"+y }
-                      .mkString("+")+"+i1"
-    val skey = if (sn==1) "j1"
-               else sn.until(0,-1).map("s"+_).tails.map(_.mkString("*")).toList.tail
-                      .zip(sn.until(1,-1).map("j"+_)).map{ case (x,y) => x+"*"+y }
-                      .mkString("+")+"+j1"
+    val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d$i+i$i)" }
+    val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s$i+j$i)" }
     val set_sparse = 1.to(sn).map(i => s"sparse.append(j$i)").mkString("; ")
     if (sn == 0)   // a dense tensor
       s"""

@@ -15,14 +15,12 @@
  */
 package edu.uta
 
-import scala.reflect.macros.whitebox.Context
 import scala.language.experimental.macros
-import scala.reflect.ClassTag
 import org.apache.spark.SparkContext
 import diablo.Parser.parse
-import diablo.Translator.translate
-
 import scala.collection.mutable
+import scala.reflect.macros.whitebox
+import scala.reflect.macros.whitebox.Context
 
 package object diablo {
   var trace = true
@@ -30,7 +28,7 @@ package object diablo {
   var parallel = true
   var blockSize = 1000000
 
-  var spark_context: SparkContext = null
+  var spark_context: SparkContext = _
 
   def range ( n1: Long, n2: Long, n3: Long ): List[Long]
     = n1.to(n2,n3).toList
@@ -110,6 +108,8 @@ package object diablo {
 
   private var typeMapsLib = false
 
+  def opt ( e: Expr): Expr = Optimizer.optimizeAll(Normalizer.normalizeAll(e))
+
   def q_impl ( c: Context ) ( query: c.Expr[String] ): c.Expr[Any] = {
     import c.universe.{Expr=>_,Type=>_,_}
     val context: c.type = c
@@ -129,7 +129,6 @@ package object diablo {
     }
     Typechecker.useStorageTypes = false
     val q = parse(s)
-    def opt ( e: Expr): Expr = Optimizer.optimizeAll(Normalizer.normalizeAll(e))
     if (trace) println("Imperative program:\n"+Pretty.print(q))
     Typechecker.typecheck(q)
     val sq = Translator.translate(q)
@@ -154,7 +153,7 @@ package object diablo {
   /** translate an array comprehension to Scala code */
   def q ( query: String ): Any = macro q_impl
 
-  def parami_impl ( c: Context ) ( x: c.Expr[Int], b: c.Expr[Int] ): c.Expr[Unit] = {
+  def parami_impl( c: whitebox.Context )(x: c.Expr[Int], b: c.Expr[Int] ): c.Expr[Unit] = {
     import c.universe._
     val Literal(Constant(bv:Int)) = b.tree
     x.tree.toString.split('.').last match {
@@ -167,7 +166,7 @@ package object diablo {
   /** set compilation parameters */
   def parami ( x:Int, b: Int ): Unit = macro parami_impl
 
-  def param_impl ( c: Context ) ( x: c.Expr[Boolean], b: c.Expr[Boolean] ): c.Expr[Unit] = {
+  def param_impl( c: whitebox.Context )(x: c.Expr[Boolean], b: c.Expr[Boolean] ): c.Expr[Unit] = {
     import c.universe._
     val Literal(Constant(bv:Boolean)) = b.tree
     x.tree.toString.split('.').last match {

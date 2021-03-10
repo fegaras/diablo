@@ -15,6 +15,8 @@
  */
 package edu.uta.diablo
 
+import scala.util.matching.Regex
+
 object Typechecker {
     import AST._
     import Lifting.{typeMap,getTypeMap}
@@ -155,12 +157,21 @@ object Typechecker {
     def import_type ( tp: Type, vname: String ): Type
       = tp match {
           case TupleType(is:+ParametricType(rdd,List(TupleType(List(TupleType(ks),
-                                                    TupleType(js:+ArrayType(1,etp)))))))
-            // imported block tensor variable
+                                       TupleType(js:+ArrayType(1,etp)))))))
+            // imported dense block tensor variable
             if rdd == rddClass && is.length == js.length && is.length == ks.length
                && (is++ks++js).forall(_ == intType)
             => if (useStorageTypes)
                  StorageType("block_tensor_"+is.length+"_0",List(etp),
+                             (1 to is.length).map(i => Nth(Var(vname),i)).toList)
+               else ArrayType(is.length,etp)
+          case TupleType(is:+ParametricType(rdd,List(TupleType(List(TupleType(ks),
+                     TupleType(js:+TupleType(List(ArrayType(1,ct),ArrayType(1,rt),ArrayType(1,etp)))))))))
+            // imported sparse block tensor variable
+            if rdd == rddClass && is.length == js.length && is.length == ks.length
+               && (ct::rt::is++ks++js).forall(_ == intType)
+            => if (useStorageTypes)
+                 StorageType("block_tensor_"+(is.length-1)+"_1",List(etp),
                              (1 to is.length).map(i => Nth(Var(vname),i)).toList)
                else ArrayType(is.length,etp)
           case TupleType(is:+ArrayType(1,etp))     // imported tensor variable
@@ -177,8 +188,8 @@ object Typechecker {
           case _ => tp
       }
 
-    val tpat = """tensor_(\d+)_(\d+)""".r
-    val btpat = """block_tensor_(\d+)_(\d+)""".r
+    val tpat: Regex = """tensor_(\d+)_(\d+)""".r
+    val btpat: Regex = """block_tensor_(\d+)_(\d+)""".r
 
     def typecheck ( e: Expr, env: Environment ): Type
       = if (e.tpe != null)// && !e.isInstanceOf[Var])
@@ -205,15 +216,6 @@ object Typechecker {
                     => if (cs.contains(a))
                          cs(a)
                        else throw new Error("Unknown record attribute: "+a)
-                  case ArrayType(d,_)
-                    if a == "dims"
-                    => TupleType((1 to d).map(i => intType).toList)
-                  case ArrayType(1,_)
-                    if a == "length"
-                    => intType
-                  case ArrayType(2,_)
-                    if a == "rows" || a == "cols"
-                    => intType
                   case _ => typecheck(MethodCall(u,a,null),env)
                }
           case Index(u,is)
@@ -385,8 +387,19 @@ object Typechecker {
           case MethodCall(u,m,null)
             => // call the Scala typechecker to find method m
                val tu = typecheck(u,env)
-               typecheck_method(tu,m,null)
-                 .getOrElse(throw new Error("Wrong method call: "+e+" for type "+tu))
+               tu match {
+                  case ArrayType(d,_)
+                    if m == "dims"
+                    => TupleType((1 to d).map(i => intType).toList)
+                  case ArrayType(1,_)
+                    if m == "length"
+                    => intType
+                  case ArrayType(2,_)
+                    if m == "rows" || m == "cols"
+                    => intType
+                  case _ => typecheck_method(tu,m,null)
+                                .getOrElse(throw new Error("Wrong method call: "+e+" for type "+tu))
+               }
           case MethodCall(u,m,args)
             => // call the Scala typechecker to find method m
                val tu = typecheck(u,env)
@@ -475,6 +488,10 @@ object Typechecker {
                   case ((_,r),e)
                     => (typecheck(e,r),r)
                }._1
+          case While(p,b)
+            => if (elemType(typecheck(p,env)) != boolType)
+                  throw new Error("The while-statement condition "+p+" must be a boolean")
+               typecheck(b,env)
           case VarDecl(_,at,u)
             => val tp = elemType(typecheck(u,env))  // type of u is concrete
                if (!typeMatch(tp,at))

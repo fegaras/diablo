@@ -58,7 +58,7 @@ object Multiply extends Serializable {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  rdd[ ((i,j),+/v) | ((i,k),m) <- MM, ((kk,j),n) <- NN, let v = m*n, k == kk, group by (i,j) ]
+                  rdd[ ((i,j),+/v) | ((i,k),mm) <- MM, ((kk,j),nn) <- NN, let v = mm*nn, k == kk, group by (i,j) ]
                   """)
         val x = C.count
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -86,9 +86,23 @@ object Multiply extends Serializable {
 
     type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
 
+    // dense block tensors
     val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
     val BB = (n,m,Bm.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
     var CC = AA
+
+    // sparse block tensors with no zeros
+    val As = q("tensor*(n)(m)[ ((i,j),a) | ((i,j),a) <- AA ]")
+    val Bs = q("tensor*(n)(m)[ ((i,j),b) | ((i,j),b) <- BB ]")
+
+    val rand = new Random()
+    def random () = rand.nextDouble()*10
+
+    val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.5 ]")
+    val Bz = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.5 ]")
+
+    println("@@@ "+Az._3.count())
+    println("@@@ "+Az._3.map{ case (_,(_,_,(_,a,_))) => a.length }.collect.toList)
 
     def validate ( M: tiled_matrix ) {
       if (!validate_output)
@@ -126,7 +140,7 @@ object Multiply extends Serializable {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),m) <- AA, ((kk,j),n) <- BB, k == kk, let c = m*n, group by (i,j) ]
+                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -139,7 +153,7 @@ object Multiply extends Serializable {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),m) <- AA, ((kk,j),n) <- BB, k == kk, let c = m*n, group by (i,j) ]
+                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -153,7 +167,21 @@ object Multiply extends Serializable {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),m) <- AA, ((kk,j),n) <- BB, k == kk, let c = m*n, group by (i,j) ]
+                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
+                  """)
+        validate(C)
+      } catch { case x: Throwable => println(x); return -1.0 }
+      param(groupByJoin,true)
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix multiplication of sparse tiled matrices using Diablo array comprehensions - no groupBy-join
+    def testMultiplyDiabloDACsparse (): Double = {
+      param(groupByJoin,false)
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),a) <- Az, ((kk,j),b) <- Bz, k == kk, let c = a*b, group by (i,j) ]
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -393,6 +421,7 @@ object Multiply extends Serializable {
     test("DIABLO groupByJoin Multiply",testMultiplyDiabloDAC)
     //test("DIABLO groupByJoin Multiply sequential",testMultiplyDiabloDACs)
     test("DIABLO groupBy Multiply",testMultiplyDiabloDACn)
+    test("DIABLO groupBy Multiply sparse",testMultiplyDiabloDACsparse)
     test("DIABLO loop Multiply",testMultiplyDiabloLoop)
     test("Hand-written groupByJoin Multiply",testMultiplyCodeGBJ)
     test("Hand-written groupBy Multiply",testMultiplyCode)

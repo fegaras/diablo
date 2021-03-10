@@ -112,7 +112,7 @@ abstract class CodeGeneration {
         => val tcs = cs.map(Type2Tree)
            tq"(..$tcs)"
       case RecordType(cs) if cs.nonEmpty
-        => val tcs = cs.map(_._2).map(Type2Tree).toList
+        => val tcs = cs.values.map(Type2Tree).toList
            tq"(..$tcs)"
       case ParametricType(n,cs) if cs.nonEmpty
         => val tcs = cs.map(Type2Tree)
@@ -190,21 +190,21 @@ abstract class CodeGeneration {
     val vs = args.zipWithIndex.map{ case (_,i) => "x"+i }
     val env: Environment
           = vs.zip(args).map{ case (v,t) => (code(VarPat(v)),Type2Tree(t)) }.toList
-    typecheckOpt(Call(f,vs.map(Var(_))),env).map(Tree2Type(_))
+    typecheckOpt(Call(f,vs.map(Var)),env).map(Tree2Type)
   }
 
   /** Return the result type of a method using the Scala's typechecker */
   def typecheck_method ( o: DType, m: String, args: List[DType] ): Option[DType] = {
-    if (args == null)
-       typecheckOpt(MethodCall(Var("x"),m,null),
-                    List((code(VarPat("x")),Type2Tree(o)))).map(Tree2Type(_))
-    else {
-      val vs = args.zipWithIndex.map{ case (_,i) => "x"+i }
-      val vo = "x"
+    val vo = c.freshName("x")
+    if (args == null) {
+       typecheckOpt(MethodCall(Var(vo),m,null),
+                    List((code(VarPat(vo)),Type2Tree(o)))).map(Tree2Type)
+    } else {
+      val vs = args.zipWithIndex.map{ case (_,i) => vo+i }
       val env: Environment
-          = (code(VarPat("x")),Type2Tree(o))::
+          = (code(VarPat(vo)),Type2Tree(o))::
                vs.zip(args).map{ case (v,t) => (code(VarPat(v)),Type2Tree(t)) }.toList
-      typecheckOpt(MethodCall(Var("x"),m,vs.map(Var(_))),env).map(Tree2Type(_))
+      typecheckOpt(MethodCall(Var(vo),m,vs.map(Var)),env).map(Tree2Type)
     }
   }
 
@@ -238,7 +238,7 @@ abstract class CodeGeneration {
                 => throw ex
               case Left(tp)
                 => c.abort(c.universe.NoPosition,
-                           s"Expression $ec is not a collection (found type $tp)")
+                           s"Expression $ec is not a collection (found type $tp)\nBindings: "+env)
            }
     }
   }
@@ -290,24 +290,6 @@ abstract class CodeGeneration {
              tq"Array[$ntp]"
         case _ => etp
       }
-
-/*
-  def mapAccess ( x: Expr, i: Expr, env: Environment ): c.Tree = {
-    val xc = codeGen(x,env)
-    val ic = codeGen(i,env)
-    (getOptionalType(xc,env),ic,getOptionalType(ic,env)) match {
-      case (Left(tq"Array[$t]"),q"(..$is)",_)
-        => is.foldLeft[c.Tree](xc) { case (r,n) => q"$r($n)" }
-      case (Left(tq"Array[$t]"),_,Left(tq"(..$its)"))
-        if its.length > 1
-        => val as = (1 to its.length).foldLeft[c.Tree](xc) {
-                          case (r,n) => val v = TermName("_"+n); q"$r(k.$v)"
-                    }
-           q"{ val k = $ic; $as }"
-      case _ => q"$xc($ic)"
-    }
-  }
-*/
 
   /** Generate Scala code for e as a statement */
   def codeStmt ( e: Expr, env: Environment ): c.Tree
@@ -380,7 +362,7 @@ abstract class CodeGeneration {
          case BasicType("Boolean") => q"false"
          case SeqType(_) => q"Nil"
          case TupleType(ts)
-           => val tts = ts.map(zero(_))
+           => val tts = ts.map(zero)
               q"(..$tts)"
          case ParametricType(ab,List(etp))
            if ab == TypeMappings.arrayBuffer
@@ -438,7 +420,7 @@ abstract class CodeGeneration {
       case Tuple(es)
         => codeList(es,cs => q"(..$cs)",env)
       case Record(es)
-        => codeList(es.map(_._2).toList,cs => q"(..$cs)",env)
+        => codeList(es.values.toList, cs => q"(..$cs)",env)
       case Call("map",Nil)
         => q"scala.collection.mutable.Map[Any,Any]()"
       case Call("array",d)
@@ -498,6 +480,23 @@ abstract class CodeGeneration {
            val p = q"val $nv: $tpt"
            q"($p) => $nv.$fm"
       case MethodCall(x,m,null)
+        if List("length","rows","cols","dims").contains(m)
+        => val xc = codeGen(x,env)
+           getOptionalType(xc,env) match {
+             case Left(tq"(..$ts)") if ts.length>1
+               => m match {
+                    case "length" => q"$xc._1"
+                    case "rows" => q"$xc._1"
+                    case "cols" => q"$xc._2"
+                    case _
+                      => val es = (1 until ts.length).map(i => q"$xc.${TermName("_"+i)}")
+                         q"(..$es)"
+                  }
+             case _
+               => val fm = TermName(method_name(m))
+                  q"$xc.$fm"
+           }
+      case MethodCall(x,m,null)
         if m.length == 1 && char_maps.contains(m(0))
         => val xc = codeGen(x,env)
            val fm = TermName("unary_"+method_name(m))
@@ -514,8 +513,7 @@ abstract class CodeGeneration {
         => val fm = TermName(method_name(m))
            codeList(x+:es,{ case cx+:cs => q"$cx.$fm(..$cs)" },env)
       case MapAccess(x,i)
-        => //mapAccess(v,k,env)
-           val xc = codeGen(x,env)
+        => val xc = codeGen(x,env)
            val ic = codeGen(i,env)
            q"$xc($ic)"
       case Seq(Nil)
@@ -698,16 +696,6 @@ abstract class CodeGeneration {
                                  => (s:+codeGen(u,el),el)
                             }._1
            q"{ ..$ns }"
-/*
-      case BlockS(s)
-        => val nenv = s.foldLeft(env){ case (r,VarDeclS(v,_,Some(u)))
-                                         => val tv = TermName(v)
-                                            (pq"$tv",typecheck(u,r))::r
-                                       case (r,u) => r }
-           val stmts = s.flatMap{ case VarDeclS(_,_,_) => Nil; case x => List(codeGen(x,nenv)) }
-           val decls = s.flatMap{ case x@VarDeclS(_,_,_) => List(codeGen(x,nenv)); case x => Nil }
-           q"{ ..$decls; ..$stmts }"
-*/
       case AssignS(d,u)
         => val dc = codeGen(d,env)
            val uc = codeGen(u,env)

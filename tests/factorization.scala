@@ -118,11 +118,13 @@ object Factorization extends Serializable {
     def testFactorizationDiabloLoop(): Double = {
       val t = System.currentTimeMillis()
       var E = RR
+      var R = RR
       var P = PPinit
       var Q = QQinit
+      var pq = E
       try {
 
-       val (P,Q) = q("""
+        q("""
           var a = 0.002;
           var b = 0.02;
 
