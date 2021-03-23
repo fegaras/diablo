@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 University of Texas at Arlington
+ * Copyright © 2020-2021 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -101,6 +101,12 @@ object Normalizer {
           => patvars(p).map( s => occurrences(s,Comprehension(head,r)) ).sum == 0
         case _::r => notGrouped(p,head,r)
         case Nil => true
+      }
+
+  def has_side_effects ( e: Expr ): Boolean
+    = e match {
+        case Call(_,_) => true   // any call has potentially side-effects
+        case _ => accumulate[Boolean](e,has_side_effects,_||_,false)
       }
 
   def renameVars ( e: Comprehension ): Comprehension
@@ -225,6 +231,15 @@ object Normalizer {
       case flatMap(Lambda(p1,Let(p2,d,b)),x)
         if occurrences(patvars(p1),d) == 0
         => normalize(Let(p2,d,flatMap(Lambda(p1,b),x)))
+      case flatMap(f,Block(es:+u))
+        => val env = es.foldLeft[List[(String,String)]](Nil) {
+                         case (r,VarDecl(v,_,_)) => (v,newvar)::r
+                         case (r,_) => r
+                     }.toMap
+           val nes = es.map{ case VarDecl(v,tp,b) => VarDecl(env(v),tp,b); case x => x }
+           // need to avoid variable capture
+           val Block(ns:+nu) = env.foldLeft[Expr](Block(nes:+u)){ case (r,(v,n)) => subst(v,Var(n),r) }
+           normalize(Block(ns:+flatMap(f,nu)))
       case flatMap(f,flatMap(g,x))
         => val Lambda(p,b) = renameVars(g)
            normalize(flatMap(Lambda(p,flatMap(f,b)),x))
@@ -242,6 +257,9 @@ object Normalizer {
         => normalize(Let(p,x,b))
       case flatMap(f,Let(p,d,b))
         => normalize(Let(p,d,flatMap(f,b)))
+      case flatMap(Lambda(p,IfE(c,u,Seq(Nil))),b)
+        if occurrences(patvars(p),c) == 0 && !has_side_effects(c)
+        => normalize(IfE(c,flatMap(Lambda(p,u),b),Seq(Nil)))
       case flatMap(f,IfE(c,e1,e2))
         => normalize(IfE(c,flatMap(f,e1),flatMap(f,e2)))
       case groupBy(x@Seq(List()))

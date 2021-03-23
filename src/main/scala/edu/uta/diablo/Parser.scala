@@ -369,9 +369,16 @@ object Parser extends StandardTokenParsers {
             case s => BasicType(s) }
         )
 
+  // if true, display query string at run-time
+  val print_queries = false
+
   def program: Parser[Stmt]
       = rep( stmt ~ sem ) ^^
-        { ss => BlockS(ss.map{ case s~_ => s }) }
+        { ss => BlockS(ss.flatMap {
+                  case s~_ => if (print_queries)
+                                List(ExprS(Call("println",List(StringConst(s.toString)))),s)
+                              else List(s)
+                }) }
 
   /** Parse a statement */
   def parse ( line: String ): Stmt
@@ -381,6 +388,6 @@ object Parser extends StandardTokenParsers {
         }
 
   def main ( args: Array[String] ) {
-    println(edu.uta.diablo.Pretty.print(parse(args(0))))
+    println(Pretty.print(parse(args(0))))
   }
 }

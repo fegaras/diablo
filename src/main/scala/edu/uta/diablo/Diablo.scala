@@ -71,7 +71,7 @@ package object diablo {
 
   def sort[T] ( from: Int, rows: mutable.ArrayBuffer[Int], values: mutable.ArrayBuffer[T] ) {
     val len = values.length-from
-    if (len <= 0)
+    if (len <= 1)
       return
     var arr = new mutable.ArrayBuffer[(Int,T)](len)
     var i = 0
@@ -82,15 +82,15 @@ package object diablo {
     arr = arr.sortBy(_._1)
     i = 0
     while (i < len) {
-      rows(from+1) = arr(i)._1
-      values(from+1) = arr(i)._2
+      rows(from+i) = arr(i)._1
+      values(from+i) = arr(i)._2
       i += 1
     }
   }
 
   def sort ( from: Int, rows: mutable.ArrayBuffer[Int] ) {
     val len = rows.length-from
-    if (len <= 0)
+    if (len <= 1)
       return
     var arr = Array.ofDim[Int](len)
     var i = 0
@@ -101,7 +101,7 @@ package object diablo {
     scala.util.Sorting.quickSort(arr)
     i = 0
     while (i < len) {
-      rows(from+1) = arr(i)
+      rows(from+i) = arr(i)
       i += 1
     }
   }

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020 University of Texas at Arlington
+ * Copyright © 2020-2021 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,12 +27,27 @@ object Optimizer {
         case q::r
           if filter(q)
           => cont(qs) match {
-               case r@Some(s) => r
+               case c@Some(_) => c
                case _ => matchQ(r,filter,cont)
              }
         case _::r
           => matchQ(r,filter,cont)
         case _ => None
+      }
+
+  def matchF ( e: Expr, filter: Expr => Boolean,
+               cont: Expr => Option[List[Expr]] ): Option[List[Expr]]
+    = if (filter(e))
+        cont(e) match {
+          case c@Some(_) => c
+          case _ => accumulate[Option[List[Expr]]](e,matchF(_,filter,cont),_.orElse(_),None)
+        }
+      else e match {
+        case flatMap(f,u)
+          => matchF(f,filter,cont)
+        case Block(_:+b)
+          => matchF(b,filter,cont)
+        case _ => accumulate[Option[List[Expr]]](e,matchF(_,filter,cont),_.orElse(_),None)
       }
 
   def isArray ( e: Expr ): Boolean
@@ -203,6 +218,21 @@ object Optimizer {
         case _ => MethodCall(Var("Math"),"min",List(x,y))
     }
 
+  def correlatedRangeTraversals ( e: Expr ): Option[List[Expr]]
+    = matchF(e,{ case flatMap(_,Range(_,_,_)) => true; case _ => false },
+               { case b1@flatMap(Lambda(VarPat(i),c1),_)
+                   => matchF(c1,{ case flatMap(_,Range(_,_,_)) => true; case _ => false },
+                                { case b2@flatMap(Lambda(VarPat(j),c2),_)
+                                    => matchF(c2,{ case c@IfE(MethodCall(e1,"==",List(e2)),b,Seq(Nil))
+                                                     => (e1 == Var(i) && e2 == Var(j)) ||
+                                                        (e2 == Var(i) && e1 == Var(j))
+                                                   case _ => false },
+                                                 c => Some(List(b1,b2,c)))
+                                  case _ => None })
+                 case _ => None })
+
+  var CRTcache: Option[List[Expr]] = None
+
   def optimize ( e: Expr ): Expr =
     e match {
       case Comprehension(h,qs)
@@ -308,6 +338,13 @@ object Optimizer {
                              case _ => apply(e,optimize)
                            }
                    }
+           }
+      case _  // nested correlated flatMaps over ranges
+        if { CRTcache = correlatedRangeTraversals(e); CRTcache.nonEmpty }
+        => CRTcache match {
+              case Some(List(flatMap(Lambda(i,_),_),f2@flatMap(Lambda(j,b2),_),c))
+                => optimize(subst(f2,Let(j,toExpr(i),b2),e))  // don't remove c
+              case _ => apply(e,optimize)
            }
       case _ => apply(e,optimize)
     }

@@ -144,6 +144,9 @@ abstract class CodeGeneration {
    */
   def getOptionalType ( code: c.Tree, env: Environment ): Either[c.Tree,TypecheckException] = {
     val fc = env.foldLeft(code) {
+                case (r,(Bind(v@TermName(_),_),tp))
+                  => val nv = TermName(c.freshName("x"))
+                     q"($nv:$tp) => { var $v = $nv; $r }"
                 case (r,(p,tp))
                   => val nv = TermName(c.freshName("x"))
                      q"($nv:$tp) => $nv match { case $p => $r }"
@@ -335,6 +338,10 @@ abstract class CodeGeneration {
         => codeStmt(Block(es:+x),env)
       case Block(s@(es:+x))
         => val (nes,nenv) = es.foldLeft[(List[c.Tree],Environment)]((Nil,env)) {
+                               case ((s,el),u@VarDecl(v,TypeParameter(_),b))
+                                 => val vc = TermName(v)
+                                    val (tc,_) = typedCode(b,el)
+                                    ( s:+codeGen(u,el), (pq"$vc",tc)::el )
                                case ((s,el),u@VarDecl(v,tp,_))
                                  => val vc = TermName(v)
                                     val tc = Type2Tree(tp)
@@ -432,6 +439,14 @@ abstract class CodeGeneration {
            val nc2 = codeGen(n2,env)
            val nc3 = codeGen(n3,env)
            q"$ic >= $nc1 && $ic <= $nc2 && ($ic-$nc1) % $nc3 == 0"
+      case Call("zero",List(v))
+        => val (tp,vc) = typedCode(v,env)
+           tp match {
+             case tq"Int" => q"0"
+             case tq"Long" => q"0L"
+             case tq"Double" => q"0.0"
+             case _ => q"null"
+           }
       case Call("binarySearch",s:+v)
         if s.length == 4
         => // add a zero to the arguments
@@ -599,6 +614,10 @@ abstract class CodeGeneration {
         => codeGen(Block(es:+x),env)
       case Block(s@(es:+x))
         => val (nes,nenv) = es.foldLeft[(List[c.Tree],Environment)]((Nil,env)) {
+                               case ((s,el),u@VarDecl(v,TypeParameter(_),b))
+                                 => val vc = TermName(v)
+                                    val (tc,_) = typedCode(b,el)
+                                    ( s:+codeGen(u,el), (pq"$vc",tc)::el )
                                case ((s,el),u@VarDecl(v,tp,_))
                                  => val vc = TermName(v)
                                     val tc = Type2Tree(tp)
@@ -618,6 +637,16 @@ abstract class CodeGeneration {
            val init = zero(tp)
            val tc = Type2Tree(tp)
            q"var $vc:$tc = $init"
+      case VarDecl(v,_,Seq(List(Call("zero",List(u)))))
+        => val (tp,_) = typedCode(u,env)
+           val zero = tp match {
+                        case tq"Int" => q"0"
+                        case tq"Long" => q"0L"
+                        case tq"Double" => q"0.0"
+                        case _ => q"null"
+                      }
+           val vc = TermName(v)
+           q"val $vc: $tp = $zero"
       case VarDecl(v,tp,Seq(List(Call("map",Nil))))
         => val vc = TermName(v)
            val tq"Map[$kt,$vt]" = Type2Tree(tp)

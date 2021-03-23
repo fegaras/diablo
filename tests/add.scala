@@ -70,8 +70,8 @@ object Add {
     val rand = new Random()
     def random () = rand.nextDouble()*10
 
-    val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.5 ]")
-    val Bz = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.5 ]")
+    val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
+    val Bz = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
 
     def validate ( M: tiled_matrix ) = {
       if (!validate_output)
@@ -119,7 +119,7 @@ object Add {
         val C = q("""
                   tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <- Az, ((ii,jj),b) <- Bz, ii == i, jj == j ];
                   """)
-        validate(C)
+        C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -203,6 +203,7 @@ object Add {
     println("@@@@ IJV matrix size: %.2f GB".format(sizeof(((1,1),0.0D)).toDouble*n*m/(1024.0*1024.0*1024.0)))
     val tile_size = sizeof(((1,1),randomTile())).toDouble
     println("@@@@ tile matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
+    println("@@@@ sparse partition sizes: "+Az._3.map{ case (_,(_,_,(_,a,_))) => a.length }.collect.toList)
 
     def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()

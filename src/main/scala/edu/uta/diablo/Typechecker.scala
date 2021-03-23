@@ -299,7 +299,6 @@ object Typechecker {
             => val Some(TypeMapS(_,_,_,at,st,_,_,_)) = getTypeMap(f)
                val ev = tmatch(st,typecheck(ne,env))
                substType(at,ev)
-               //typecheck(Lifting.lift(f,ne),env)
           case x@Store(f,tps,args,u)
             => tps match {
                  case List(BasicType("Boolean"))

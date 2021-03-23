@@ -15,6 +15,7 @@
  */
 package edu.uta.diablo
 
+import TypeMappings.{tensor,block_tensor,first_sparse_tensor}
 import scala.util.matching.Regex
 
 object Lifting {
@@ -60,27 +61,35 @@ object Lifting {
   val bbtpat: Regex = """block_bool_tensor_(\d+)_(\d+)""".r
 
   /** get a type map if exists, or create a type map from a tensor */
-  def getTypeMap ( name: String ): Option[TypeMapS]
-    = if (typeMaps.contains(name))
-        Some(typeMaps(name))
+  def getTypeMap ( name: String, first: Boolean = false ): Option[TypeMapS] = {
+     val fn = if (first) "first_"+name else name
+     if (typeMaps.contains(fn))
+        Some(typeMaps(fn))
       else {
         val tm = name match {
           case btpat(dn,sn)
-            => TypeMappings.tensor(dn.toInt,sn.toInt,true)
+            if first
+            => first_sparse_tensor(dn.toInt,sn.toInt,true)
           case tpat(dn,sn)
-            => TypeMappings.tensor(dn.toInt,sn.toInt)
+            if first
+            => first_sparse_tensor(dn.toInt,sn.toInt)
+          case btpat(dn,sn)
+            => tensor(dn.toInt,sn.toInt,true)
+          case tpat(dn,sn)
+            => tensor(dn.toInt,sn.toInt)
           case bbtpat(dn,sn)
-            => TypeMappings.block_tensor(dn.toInt,sn.toInt,true)
+            => block_tensor(dn.toInt,sn.toInt,true)
           case bpat(dn,sn)
-            => TypeMappings.block_tensor(dn.toInt,sn.toInt)
+            => block_tensor(dn.toInt,sn.toInt)
           case _ => ""
         }
         if (tm != "") {
-          if (trace) println(s"Loading $name:"+tm)
+          if (trace) println(s"Loading $fn:"+tm)
           typecheck(Parser.parse(tm))
-          Some(typeMaps(name))
+          Some(typeMaps(fn))
         } else None
     }
+  }
 
   /* return a type mapping with fresh type variables */
   def fresh ( tm: TypeMapS ): TypeMapS
@@ -105,27 +114,26 @@ object Lifting {
      }
   }
 
+  /* if the source type doesn't match the destination type in an assignment, coerce the source */
   def lift_assign ( src: Expr, dtype: Type, stype: Type, env: Environment ): Expr
-    = dtype match {
-        case StorageType(f,tps,args)
-          if !typeMatch(dtype,stype)
+    = if (typeMatch(dtype,stype))
+        src
+      else (dtype,stype) match {
+        case (StorageType(f,tps,args),SeqType(tp))
           => val nv = newvar
-             val Some(TypeMapS(_,ps,_,tp,_,t2,_,inv)) = getTypeMap(f).map(fresh)
-             val ev = tmatch(t2,stype)
-             if (ev.nonEmpty)
-                Comprehension(Store(f,ps.map(ev.get(_)),args,Var(nv)),
-                              List(Generator(VarPat(nv),src)))
-             else src
-        case _
-          => (dtype,stype) match {
-                case (TupleType(ts1),TupleType(ts2))
-                  => tuple((ts1 zip ts2).zipWithIndex
-                           .map{ case ((t1,t2),i) => lift_assign(Nth(src,i+1),t1,t2,env) })
-                case (RecordType(rs1),RecordType(rs2))
-                  => Record((((rs1.values) zip (rs2.values)) zip rs1.keys)
-                            .map{ case ((t1,t2),a) => a -> lift_assign(Project(src,a),t1,t2,env) }.toMap)
-                case _ => src
-             }
+             Comprehension(Store(f,tps,args,Var(nv)),
+                           List(Generator(VarPat(nv),src)))
+        case (StorageType(f,tps,args),StorageType(g,_,_))
+          => val nv = newvar
+             Comprehension(Store(f,tps,args,Lift(g,Var(nv))),
+                           List(Generator(VarPat(nv),src)))
+        case (TupleType(ts1),TupleType(ts2))
+          => tuple((ts1 zip ts2).zipWithIndex
+                       .map{ case ((t1,t2),i) => lift_assign(Nth(src,i+1),t1,t2,env) })
+        case (RecordType(rs1),RecordType(rs2))
+          => Record((((rs1.values) zip (rs2.values)) zip rs1.keys)
+                       .map{ case ((t1,t2),a) => a -> lift_assign(Project(src,a),t1,t2,env) }.toMap)
+        case _ => src
       }
 
   def lift_expr ( e: Expr, env: Environment ): Expr
@@ -216,9 +224,14 @@ object Lifting {
         case _ => apply(e,lift_expr(_,env))
       }
 
-  def lift ( mapping: String, storage: Expr ): Expr = {
-    val Some(TypeMapS(_,_,_,_,_,_,map,_)) = getTypeMap(mapping).map(fresh)
-    Apply(map,storage)
+  def lift ( mapping: String, storage: Expr, first: Boolean = false ): Expr = {
+    val Some(TypeMapS(_,tps,_,_,st,_,map,_)) = getTypeMap(mapping,first).map(fresh)
+    if (storage.tpe == null)
+      Apply(map,storage)
+    else {
+      val ev = tmatch(st,storage.tpe)
+      substType(Apply(map,storage),ev)
+    }
   }
 
   def store ( mapping: String, typeParams: List[Type], args: List[Expr], value: Expr ): Expr = {

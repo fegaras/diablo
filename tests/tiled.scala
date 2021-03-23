@@ -119,8 +119,9 @@ object Test {
 
         tensor*(N)[ (i,tensor(N) w) | ((i,j),m) <- M2, let w = (j,m), group by i ];
 
-/* Typechecking error
+/* Not working yet: nested comprehensions
         tensor*(N,N)[ ((i,j),m+1) | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
+        +/[ m | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
 */
     """)
 

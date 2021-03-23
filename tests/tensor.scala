@@ -100,15 +100,15 @@ object Test {
 
         tensor(N,N)[ ((i,j),tensor(N)[ (ii,v+1) | (ii,v) <- V1 ]) | ((i,j),m) <- M1 ];
         tensor(N,N)[ ((i,j),tensor(N)[ (ii,(v+1,i+j)) | (ii,v) <- V2 ]) | ((i,j),m) <- M2 ];
-
         tensor(N,N)[ ((i,j),m+1) | ((i,j),m) <- M1, +/[ v | (ii,v) <- V1 ] < 10 ];
 
         tensor(N)[ (i,tensor(N) w) | ((i,j),m) <- M2, let w = (j,m), group by i ];
 
         map[ (i,v+1) | (i,v) <- V2 ];
 
-        // typechecking error
-        //tensor(N,N)[ ((i,j),m+1) | ((i,j),m) <- M, (+/[ v | ((ii,jj),v) <- MM, ii == i, jj == j ]) < 10 ];
+        tensor(N,N)[ ((i,j),m+1) | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
+
+        +/[ m | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
 
     """)
 

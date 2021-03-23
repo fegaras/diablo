@@ -67,7 +67,9 @@ object ComprehensionTranslator {
   val bool_tensor_pat: Regex = """bool_tensor_(\d+)_(\d+)""".r
 
   def isTensor ( name: String ): Boolean
-    = name match { case tensor_pat(_,_) => true; case bool_tensor_pat(_,_) => true; case _ => false }
+    = name match { case tensor_pat(_,_) => true
+                   case bool_tensor_pat(_,_) => true
+                   case _ => false }
 
   def isBoolTensor ( name: String ): Boolean
     = name match { case bool_tensor_pat(_,_) => true; case _ => false }
@@ -97,36 +99,49 @@ object ComprehensionTranslator {
         case _ => Nil
     }
 
+  def isSparseTensor ( e: Expr ): Boolean
+    = e match {
+        case Lift(name,_)
+          => name match {
+                case tensor_pat(_,sn) => sn.toInt > 0
+                case bool_tensor_pat(_,sn) => sn.toInt > 0
+                case _ => false }
+        case _ => false
+      }
+
+  /* default translator for list comprehensions with no group-by */
+  def default_translator_nogb ( h: Expr, qs: List[Qualifier], vars: List[String] ): Expr
+    = qs.foldRight[(Expr,List[String])]((Seq(List(translate(h,vars))),vars)) {
+         case (Generator(p,u),(r,s))
+           => (flatMap(Lambda(p,r),translate(u,s)),
+               patvars(p)++s)
+         case (LetBinding(p,u),(r,s))
+           => (Let(p,translate(u,s),r),
+               patvars(p)++s)
+         case (Predicate(p),(r,s))
+           => (IfE(translate(p,s),r,Seq(Nil)),s)
+         case (AssignQual(d,u),(r,s))
+           => (Block(List(Assign(d,Seq(List(u))),r)),s)
+         case (_,(r,s)) => (r,s)
+      }._1
+
   /* default translator for list comprehensions */
   def default_translator ( h: Expr, qs: List[Qualifier], vars: List[String] ): Expr
     = qs.span{ case GroupByQual(_,_) => false; case _ => true } match {
                case (r,GroupByQual(p,k)::s)
-               => val groupByVars = patvars(p)
-                  val usedVars = freevars(Comprehension(h,s),groupByVars)
+                 => val groupByVars = patvars(p)
+                    val usedVars = freevars(Comprehension(h,s),groupByVars)
                                               .intersect(comprVars(r)).distinct
-                  val sv = newvar
-                  val nr = default_translator(Tuple(List(k,tuple(usedVars.map(Var)))),r,vars)
-                  val unzips = usedVars.map(v => LetBinding(VarPat(v),
-                                                            flatMap(Lambda(tuple(usedVars.map(VarPat)),
-                                                                           Seq(List(Var(v)))),
-                                                                    Var(sv))))
-                  default_translator(h,Generator(TuplePat(List(p,VarPat(sv))),
-                                                 groupBy(nr))::(unzips++s),vars)
-             case _
-               => qs.foldRight[(Expr,List[String])]((Seq(List(translate(h,vars))),vars)) {
-                     case (Generator(p,u),(r,s))
-                       => (flatMap(Lambda(p,r),translate(u,s)),
-                           patvars(p)++s)
-                     case (LetBinding(p,u),(r,s))
-                       => (Let(p,translate(u,s),r),
-                           patvars(p)++s)
-                     case (Predicate(p),(r,s))
-                       => (IfE(translate(p,s),r,Seq(Nil)),s)
-                     case (AssignQual(d,u),(r,s))
-                       => (Block(List(Assign(d,Seq(List(u))),r)),s)
-                     case (_,(r,s)) => (r,s)
-                  }._1
-    }
+                    val sv = newvar
+                    val nr = default_translator(Tuple(List(k,tuple(usedVars.map(Var)))),r,vars)
+                    val unzips = usedVars.map(v => LetBinding(VarPat(v),
+                                                              flatMap(Lambda(tuple(usedVars.map(VarPat)),
+                                                                             Seq(List(Var(v)))),
+                                                                      Var(sv))))
+                    default_translator(h,Generator(TuplePat(List(p,VarPat(sv))),
+                                                   groupBy(nr))::(unzips++s),vars)
+               case _ => default_translator_nogb(h,qs,vars)
+             }
 
 /*---------------------------- Generate tensor operations ------------------------------------------*/
 
@@ -262,14 +277,17 @@ object ComprehensionTranslator {
                                tuple(dims:+b)    // the result is a dense tensor
                              else { val vv = newvar
                                     val iv = newvar
+                                    val ivars = tuple(1.to(ndims).map(i => Var("i"+i)).toList)
+                                    val pvars = tuple(1.to(ndims).map(i => VarPat("i"+i)).toList)
                                     // copy the dense result to a sparse tensor
                                     Block(List(VarDecl(vv,StorageType(s"tensor_${ndims}_0",List(tp),dims),
                                                        Seq(List(tuple(dims:+b)))),
                                                Store(tensor,List(tp),dims,
-                                                     Comprehension(Var(iv),
-                                                                   List(Generator(VarPat(iv),
-                                                                                  Lift(s"tensor_${ndims}_0",
-                                                                                       Var(vv))))))))
+                                                     Comprehension(Tuple(List(ivars,Var(iv))),
+                                                             List(Generator(TuplePat(List(pvars,
+                                                                                     VarPat(iv))),
+                                                                            Lift(s"tensor_${ndims}_0",
+                                                                                 Var(vv))))))))
                                   }
                    translate(res,vars)
               case _ => default_translator(head,cqs,Nil)
@@ -378,14 +396,17 @@ object ComprehensionTranslator {
                                tuple(dims:+b)    // the result is already a dense tensor
                              else { val vv = newvar
                                     val iv = newvar
+                                    val ivars = tuple(1.to(ndims).map(i => Var("i"+i)).toList)
+                                    val pvars = tuple(1.to(ndims).map(i => VarPat("i"+i)).toList)
                                     // copy the dense result to a sparse tensor
                                     Block(List(VarDecl(vv,StorageType(s"tensor_${ndims}_0",List(tp),dims),
                                                        Seq(List(tuple(dims:+b)))),
                                                Store(tensor,List(tp),dims,
-                                                     Comprehension(Var(iv),
-                                                                   List(Generator(VarPat(iv),
-                                                                                  Lift(s"tensor_${ndims}_0",
-                                                                                       Var(vv))))))))
+                                                     Comprehension(Tuple(List(ivars,Var(iv))),
+                                                             List(Generator(TuplePat(List(pvars,
+                                                                                     VarPat(iv))),
+                                                                            Lift(s"tensor_${ndims}_0",
+                                                                                 Var(vv))))))))
                                   }
                    translate(res,vars)
               case _ => default_translator(head,cqs,Nil)
@@ -1176,7 +1197,7 @@ object ComprehensionTranslator {
         // total aggregation
         => val nv = newvar
            val nr = qs:+AssignQual(Var(nv),MethodCall(Var(nv),op,List(h)))
-           val etp = elemType(typecheck(x))
+           val etp = typecheck(h)
            val zero = zeroValue(op,etp)
            translate(Block(List(VarDecl(nv,etp,Seq(List(zero))),
                                 Comprehension(ignore,nr),Var(nv))),vars)
@@ -1188,12 +1209,19 @@ object ComprehensionTranslator {
         // if no special rule applies, lift x: map(x)
         => translate(optimize(lift(f,x)),vars)
       case Comprehension(h,qs)
-        => val nqs = qs.map {  // lift generator domains
+        => val nqs = qs.span{ case Generator(_,e) => !isSparseTensor(e); case _ => true } match {
+                              case (r,Generator(p,e@Lift(f,u))::s)
+                                if isSparseTensor(e)  // first sparse generator can be compiled to faster code
+                                => val ne = lift(f,u,true)   // uses first_tensor_*
+                                   Generator(p,ne)::r++s
+                              case _ => qs
+                            }
+           val lqs = nqs.map {  // lift generator domains
                         case Generator(p,Lift(f,x))
                           => Generator(p,lift(f,x))
                         case q => q
                      }
-           val Comprehension(nh,s) = optimize(Comprehension(h,nqs))
+           val Comprehension(nh,s) = optimize(Comprehension(h,lqs))
            translate(default_translator(nh,s,vars),vars)
       case Block(es)
         => Block(es.foldLeft[(List[Expr],List[String])]((Nil,vars)) {
