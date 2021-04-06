@@ -24,7 +24,7 @@ import scala.reflect.macros.whitebox.Context
 
 package object diablo {
   var trace = true
-  var groupByJoin = true
+  var groupByJoin = false
   var parallel = true
   var blockSize = 1000000
 

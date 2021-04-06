@@ -191,6 +191,8 @@ object Parser extends StandardTokenParsers {
               => Call(s"block_tensor_${ds.length}_${ss.length}",ds++ss:+e)
             case _~_~_~ds~_~None~e
               => Call(s"block_tensor_${ds.length}_0",ds:+e) }
+        | ident ~ "*" ~ expr ^?
+          { case "map"~_~e => Call("block_map",List(e)) }
         | ident ~ "(" ~ repsep( expr, "," ) ~ ")" ~ opt( compr ) ^^
           { case "lift"~_~List(Var(n),e)~_~None => Lift(n,e)
             case n~_~el~_~Some(c) => Call(n,el:+c)
@@ -359,6 +361,8 @@ object Parser extends StandardTokenParsers {
                  StorageType("block_"+n,List(t),
                              1.to(dn.toInt+sn.toInt).map(i => IntConst(N)).toList)
             case n~_~_~t~_ => ParametricType(n+"*",List(t)) }
+        | ident ~ "*" ~ "[" ~ stype ~ "," ~ stype ~ "]" ^?
+          { case "map"~_~_~k~_~v~_ => StorageType("block_map",List(k,v),Nil) }
         | rep1sep( ident, "." ) ~ "[" ~ rep1sep( stype, "," ) ~ "]" ^^
           { case List("map")~_~List(kt,vt)~_ => MapType(kt,vt)
             case ns~_~ts~_ => ParametricType(ns.mkString("."),ts) }

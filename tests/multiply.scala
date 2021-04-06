@@ -134,6 +134,7 @@ object Multiply extends Serializable {
 
     // matrix multiplication of tiled matrices using Diablo array comprehensions
     def testMultiplyDiabloDAC (): Double = {
+      param(groupByJoin,true)
       val t = System.currentTimeMillis()
       try {
         val C = q("""
@@ -146,6 +147,7 @@ object Multiply extends Serializable {
 
     // matrix multiplication of tiled matrices using Diablo array comprehensions - no in-tile parallelism
     def testMultiplyDiabloDACs (): Double = {
+      param(groupByJoin,false)
       param(parallel,false)
       val t = System.currentTimeMillis()
       try {

@@ -63,6 +63,9 @@ object ComprehensionTranslator {
   def tuple ( s: List[Pattern] ): Pattern
     = s match { case List(x) => x; case _ => TuplePat(s) }
 
+  def tuple ( s: List[Type] ): Type
+    = s match { case List(x) => x; case _ => TupleType(s) }
+
   val tensor_pat: Regex = """tensor_(\d+)_(\d+)""".r
   val bool_tensor_pat: Regex = """bool_tensor_(\d+)_(\d+)""".r
 
@@ -441,6 +444,15 @@ object ComprehensionTranslator {
         case Lift("rdd",x) => x
         case _ => e
       }
+
+  def block_arrays_to_rdds ( qs: List[Qualifier] ): List[Qualifier]
+    = qs.flatMap {
+               case Generator(p,Lift(f@block_tensor_pat(dn,sn),x))
+                 => List(Generator(p,lift(f,x)))
+               case Generator(p,Lift(f@block_bool_tensor_pat(dn,sn),x))
+                 => List(Generator(p,lift(f,x)))
+               case q => List(q)
+             }
 
   /* finds a sequence of predicates in qs that refer to the pattern variables xs */
   def findFilterPred ( xs: Set[String], qs: List[Qualifier] ): Option[List[Qualifier]]
@@ -1097,6 +1109,21 @@ object ComprehensionTranslator {
                           groupBy_tiles(block,hs,qs,vars,tp,dims,tile_dims)
                      case _ => throw new Error("Unexpected error in tiled groupBy")
                    }
+       case Tuple(List(kp,u)) // group-by tiled comprehension with group-by-key != comprehension key
+         if hasGroupBy(qs)
+         => qs.span{ case GroupByQual(p,_) => false; case _ => true } match {
+                     case (r,gb@GroupByQual(p,k)::s)
+                       => val nhs = Tuple(List(toExpr(p),u))
+                          val sgb = translate(Store("block_map",List(typecheck(kp),typecheck(u)),Nil,
+                                                    Comprehension(hs,qs)),vars)
+                          val nv = newvar
+                          val nk = newvar
+                          translate(Store(block,List(tp),dims,
+                                          Comprehension(Tuple(List(Var(nk),Var(nv))),
+                                                        List(Generator(TuplePat(List(VarPat(nk),VarPat(nv))),sgb)))),
+                                    vars)
+                     case _ => throw new Error("Unexpected error in tiled groupBy")
+                   }
        case Tuple(List(kp,_)) // group-by tiled comprehension with group-by-key != comprehension key
          if hasGroupBy(qs)
          => throw new Error("Cannot translate group-by tiled comprehension with group-by-key != comprehension key")
@@ -1161,10 +1188,11 @@ object ComprehensionTranslator {
   /** Translate comprehensions to optimized algebra */
   def translate ( e: Expr, vars: List[String] ): Expr = {
     e match {
-      case Store("rdd",tps,args,c@Comprehension(_,_))
-        => val Comprehension(h,qs) = optimize(c)
+      case Store("rdd",tps,args,Comprehension(hh,qqs))
+        => val Comprehension(h,qs) = optimize(Comprehension(hh,block_arrays_to_rdds(qqs)))
            translate(if (is_rdd_comprehension(qs))
-                       translate_rdd(h,qs,vars)  // special rules for RDD comprehensions
+                       // special rules for RDD comprehensions
+                       translate_rdd(h,qs,vars)
                      else optimize(store("rdd",tps,args,Comprehension(h,qs))),vars)
       case Store(block,tps,dims,c@Comprehension(_,_))
         if isBlockTensor(block)
@@ -1201,6 +1229,14 @@ object ComprehensionTranslator {
            val zero = zeroValue(op,etp)
            translate(Block(List(VarDecl(nv,etp,Seq(List(zero))),
                                 Comprehension(ignore,nr),Var(nv))),vars)
+/*
+      case Store(array,tps@List(tp),args,c@Comprehension(_,qs))
+        if isTensor(array) && is_rdd_comprehension(qs)
+        => val rtp = TupleType(List(tuple(args.map( i => intType )),tp))
+           val rdd = translate(Store("rdd",List(rtp),Nil,c))
+           rdd.tpe = typecheck(c)
+           translate(store(array,tps,args,MethodCall(rdd,"collect",null)))
+*/
       case Store(f,tps,args,u)
         // if no special rule applies, return storage of u: inv(u)
         => val su = optimize(store(f,tps,args,u))

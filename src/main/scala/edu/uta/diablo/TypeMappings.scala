@@ -36,6 +36,18 @@ object TypeMappings {
        def view ( R: $rddClass[T] ) = R.collect.toList
        def store ( L: list[T] ) = spark_context.parallelize(L)
     }
+
+    typemap block_map[K,V] (): map[K,V] {
+       def view ( b: rdd[(Int,$mapClass[K,V])] )
+         = [ (k,v) |
+             (i,m) <- b,
+             (k,v) <- lift(map,m) ]
+       def store ( L: list[(K,V)] )
+         = rdd[ (i,map(w)) |
+                (k,v) <- L,
+                let w = (k,v),
+                group by i: (k.hashCode % $blockSize) ]
+    }
     """
 
   /* generate a typemap for a tensor with dn dense and sn sparse dimensions */
@@ -268,7 +280,7 @@ object TypeMappings {
        typemap block_bool_tensor_${dn}_$sn $dims: array${dn+sn}[Boolean] {
           def view ( b: rdd[($ldims,bool_tensor_${dn}_$sn)] )
             = [ (($idx),v) |
-                (($vars2),a) <- b,
+                (($vars2),a) <- lift(rdd,b),
                 (($vars),v) <- lift(bool_tensor_${dn}_$sn,a) ]
           def store ( L: list[($ldims,Boolean)] )
             = rdd[ (($vars2),bool_tensor_${dn}_$sn($ddims,w)) |
@@ -282,7 +294,7 @@ object TypeMappings {
        typemap block_tensor_${dn}_$sn[T] $dims: array${dn+sn}[T] {
           def view ( b: rdd[($ldims,tensor_${dn}_$sn[T])] )
             = [ (($idx),v) |
-                (($vars2),a) <- b,
+                (($vars2),a) <- lift(rdd,b),
                 (($vars),v) <- lift(tensor_${dn}_$sn,a) ]
           def store ( L: list[($ldims,T)] )
             = rdd[ (($vars2),tensor_${dn}_$sn($ddims,w)) |

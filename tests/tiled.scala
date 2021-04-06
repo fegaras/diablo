@@ -112,6 +112,7 @@ object Test {
         tensor*(N,N,10)[ ((i,j,(i+j)%10),+/v) | ((i,k),m) <- M1, ((kk,j),n) <- M1, kk==k, let v = m*n, group by (i,j) ];
         tensor*(N)(N,10)[ ((i,j,(i+j)%10),+/v) | ((i,k),m) <- M2, ((kk,j),n) <- M1, kk==k, let v = m*n, group by (i,j) ];
 */
+
         tensor*(N,N)[ ((i,j),tensor(N)[ (ii,v+1) | (ii,v) <- V1 ]) | ((i,j),m) <- M1 ];
         tensor*(N,N)[ ((i,j),tensor(N)[ (ii,(v+1,i+j)) | (ii,v) <- V2 ]) | ((i,j),m) <- M2 ];
 
