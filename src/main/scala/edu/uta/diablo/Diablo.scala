@@ -132,7 +132,7 @@ package object diablo {
     if (trace) println("Imperative program:\n"+Pretty.print(q))
     Typechecker.typecheck(q)
     val sq = Translator.translate(q)
-    if (trace) println("Comprehension:\n"+Pretty.print(sq))
+    //if (trace) println("Comprehension:\n"+Pretty.print(sq))
     val n = opt(sq)
     if (trace) println("Normalized comprehension:\n"+Pretty.print(n))
     val le = opt(Lifting.lift(n))

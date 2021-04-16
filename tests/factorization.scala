@@ -34,7 +34,6 @@ object Factorization extends Serializable {
     val n = args(1).toInt
     val m = args(2).toInt
     val d = args(3).toInt  // number of attributes
-    val mode = args(4) == "1"
     parami(blockSize,1000000)
     val N = 1000
 
@@ -73,7 +72,7 @@ object Factorization extends Serializable {
       = new BlockMatrix(m.blocks.map{ case (i,a) => (i,new DenseMatrix(N,N,a.toArray.map(f))) },
                         m.rowsPerBlock,m.colsPerBlock)
 
-    def testFactorizationMLlib(): Double = {
+    def testFactorizationMLlib (): Double = {
       val t = System.currentTimeMillis()
       var E = R
       var P = Pinit
@@ -87,35 +86,30 @@ object Factorization extends Serializable {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    def testFactorizationDiablo(): Double = {
+    def testFactorizationDiablo (): Double = {
       val t = System.currentTimeMillis()
       var E = RR
       var P = PPinit
       var Q = QQinit
       try {
-        val E2 = q("""
-                   tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
-                                               kk == k, let v = p*q, group by (i,j) ]
-                   """)
-        E = q("""
-              tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <- RR, ((ii,jj),v) <- E2, ii == i, jj == j, r > 0.0 ]
-              """)
-        P = q("""
-              tensor*(n,d)[ ((i,k),^/v)
+        q("""
+          var E2 = tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
+                                               kk == k, let v = p*q, group by (i,j) ];
+          E = tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <- RR, ((ii,jj),v) <- E2,
+                                          ii == i, jj == j, r > 0.0 ];
+          P = tensor*(n,d)[ ((i,k),^/v)
                           | ((i,j),e) <- E, ((k,jj),q) <- Q, jj == j,
-                            let v = 2*0.002*e*q, group by (i,k) ]
-              """)
-        Q = q("""
-              tensor*(m,d)[ ((k,j),^/v)
+                            let v = 2*a*e*q, group by (i,k) ];
+          Q = tensor*(m,d)[ ((k,j),^/v)
                           | ((i,j),e) <- E, ((ii,k),p) <- P, ii == i,
-                            let v = 2*0.002*e*p, group by (k,j) ]
-              """)
+                            let v = 2*a*e*p, group by (k,j) ]
+          """)
         val x = E._3.count+P._3.count+Q._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    def testFactorizationDiabloLoop(): Double = {
+    def testFactorizationDiabloLoop (): Double = {
       val t = System.currentTimeMillis()
       var E = RR
       var R = RR
@@ -123,11 +117,7 @@ object Factorization extends Serializable {
       var Q = QQinit
       var pq = E
       try {
-
         q("""
-          var a = 0.002;
-          var b = 0.02;
-
           for i = 0, n-1 do
              for j = 0, m-1 do {
                 pq[i,j] = 0.0;
@@ -141,7 +131,7 @@ object Factorization extends Serializable {
              };
           (P,Q);
           """)
-        val x = P._3.count+Q._3.count
+        val x = E._3.count+P._3.count+Q._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -161,13 +151,14 @@ object Factorization extends Serializable {
         }
       }
       if (i > 0) s = s/i
-      print("*** %s cores=%d n=%d m=%d d=%d N=%d %.2f GB ".format(name,cores,n,m,d,N,(8.0*n.toDouble*n)/(1024.0*1024.0*1024.0)))
+      print("*** %s cores=%d n=%d m=%d d=%d N=%d %.2f GB ".format(name,cores,n,m,d,N,
+                                               (8.0*n.toDouble*n)/(1024.0*1024.0*1024.0)))
       println("tries=%d %.3f secs".format(i,s))
     }
 
-    if (!mode)
-      test("MLlib Factorization",testFactorizationMLlib)
-    else test("DIABLO Factorization",testFactorizationDiablo)
+    test("MLlib Factorization",testFactorizationMLlib)
+    test("DIABLO Factorization",testFactorizationDiablo)
+    test("DIABLO Factorization with loops",testFactorizationDiabloLoop)
 
     spark_context.stop()
   }

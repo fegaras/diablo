@@ -188,6 +188,14 @@ object Typechecker {
           case _ => tp
       }
 
+    def is_reduction ( op: String, tp: Type ): Boolean = {
+      tp match {
+        case SeqType(etp)
+          => typecheck_call(op,List(etp,etp)) == Some(etp)
+        case _ => false
+      }
+    }
+
     val tpat: Regex = """tensor_(\d+)_(\d+)""".r
     val btpat: Regex = """block_tensor_(\d+)_(\d+)""".r
 
@@ -399,6 +407,9 @@ object Typechecker {
                   case _ => typecheck_method(tu,m,null)
                                 .getOrElse(throw new Error("Wrong method call: "+e+" for type "+tu))
                }
+          case MethodCall(Var(op),"/",List(u))    // reduction such as max/e
+            if is_reduction(op,typecheck(u,env))
+            => typecheck(reduce(op,u),env)
           case MethodCall(u,m,args)
             => // call the Scala typechecker to find method m
                val tu = typecheck(u,env)
@@ -468,10 +479,13 @@ object Typechecker {
                     case _ => throw new Error("The monoid "+m+" in reduction "+e+" is ill-formed")
                  } else {
                     val tp = elemType(typecheck(u,env))
-                    if (!typeMatch(typecheck_method(tp,m,List(tp))
-                            .getOrElse(throw new Error("Wrong monoid in "+e)),tp))
-                      throw new Error("Wrong monoid in "+e)
-                    tp
+                    typecheck_method(tp,m,List(tp)) match {
+                      case Some(ftp) if ftp == tp => tp
+                      case _ => typecheck_call(m,List(tp,tp)) match {
+                                  case Some(ftp) if ftp == tp => tp
+                                  case _ => throw new Error("Wrong monoid in "+e)
+                                }
+                    }
                  }
           case Block(es)
             => es.foldLeft((AnyType():Type,env)) {

@@ -51,6 +51,14 @@ object Test {
                    for k = 0, M.cols-1 do
                        R[i,j] += M[i,k]*N[k,j];
               };
+
+          for i = 0, M.rows-1 do
+              for j = 0, N.cols-1 do {
+                   R[i,j] = Double.MaxValue;
+                   for k = 0, M.cols-1 do
+                       R[i,j] = min(R[i,j],M[i,k]+N[k,j]);
+              };
+
           R;
         """)
 

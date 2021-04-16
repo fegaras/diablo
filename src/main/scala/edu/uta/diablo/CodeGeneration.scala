@@ -95,10 +95,12 @@ abstract class CodeGeneration {
     = name.split('.').toList match {
             case List(m)
               => tq"${TypeName(m)}"
+            case List(n,"type")
+              => SingletonTypeTree(Ident(TermName(n)))
             case (m::s):+n
               => Select(s.foldLeft[c.Tree](Ident(TermName(m))) {
-                                case (r,m) => Select(r,TermName(m))
-                              },
+                                    case (r,m) => Select(r,TermName(m))
+                        },
                         TypeName(n))
             case _ => tq""
            }
@@ -412,6 +414,11 @@ abstract class CodeGeneration {
       case groupBy(x)
         => val xc = codeGen(x,env)
            q"$xc.groupBy(_._1).mapValues( _.map(_._2)).toList"
+      case reduce(m,x)
+        if m.matches("^[a-zA-Z0-9_]*$")
+        => val xc = codeGen(x,env)
+           val fnc = TermName(method_name(m))
+           q"$xc.reduce( (x,y) => $fnc(x,y) )"
       case reduce(m,x)
         => val xc = codeGen(x,env)
            val fnc = TermName(method_name(m))

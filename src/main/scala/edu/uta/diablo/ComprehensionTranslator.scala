@@ -27,13 +27,13 @@ object ComprehensionTranslator {
   val ignore: Expr = Block(Nil)
 
   def zeroValue ( monoid: String, tp: Type ): Expr = {
-    def error (): Expr = throw new Error("Wrong monoid "+monoid+" for type "+tp)
+    def error (): Expr = throw new Error("The monoid "+monoid+" for type "+tp+" does not have a zero value")
     if (tp == intType)
-       monoid match { case "+" => IntConst(0); case "*" => IntConst(1); case _ => error() }
+       monoid match { case "+" => IntConst(0); case "*" => IntConst(1); case "min" => IntConst(Int.MinValue); case "max" => IntConst(Int.MaxValue); case _ => error() }
     else if (tp == longType)
-       monoid match { case "+" => LongConst(0); case "*" => LongConst(1); case _ => error() }
+       monoid match { case "+" => LongConst(0); case "*" => LongConst(1); case "min" => LongConst(Long.MinValue); case "max" => LongConst(Long.MaxValue); case _ => error() }
     else if (tp == doubleType)
-       monoid match { case "+" => DoubleConst(0.0); case "*" => DoubleConst(1.0); case _ => error() }
+       monoid match { case "+" => DoubleConst(0.0); case "*" => DoubleConst(1.0); case "min" => DoubleConst(Double.MinValue); case "max" => DoubleConst(Double.MaxValue); case _ => error() }
     else if (tp == boolType)
        monoid match { case "&&" => BoolConst(true); case "||" => BoolConst(false); case _ => error() }
     else error()
@@ -173,6 +173,11 @@ object ComprehensionTranslator {
         case _ => accumulate[List[(String,Expr)]](e,findReducedTerms(_,vars),_++_,Nil)
       }
 
+  def mcall ( m: String, x: Expr, y: Expr ): Expr
+    = if (m.matches("^[a-zA-Z0-9_]*$"))
+        Call(m,List(x,y))
+      else MethodCall(x,m,List(y))
+
   /* translate a tensor comprehension with a group-by when the group-by key is equal to the head key */
   def tensor_groupby_eqkey ( tensor: String, tp: Type, dims: List[Expr], head: Expr, cqs: List[Qualifier] ): Expr = {
     val Tuple(List(key,body)) = head
@@ -236,14 +241,10 @@ object ComprehensionTranslator {
                    val incr = reducedTerms.flatMap {
                                 case (v,reduce(m,flatMap(Lambda(p,Seq(List(u))),x)))
                                   => List(AssignQual(Index(Var(v),List(idx)),
-                                                     MethodCall(Index(Var(v),List(idx)),
-                                                                m,
-                                                                List(Apply(Lambda(p,u),x)))))
+                                                     mcall(m,Index(Var(v),List(idx)),Apply(Lambda(p,u),x))))
                                 case (v,reduce(m,x))
                                   => List(AssignQual(Index(Var(v),List(idx)),
-                                                     MethodCall(Index(Var(v),List(idx)),
-                                                                m,
-                                                                List(x))))
+                                                     mcall(m,Index(Var(v),List(idx)),x)))
                                 case _ => Nil
                               }
                    // the traversal indices are i1, i2, ... with i1<d1, i2<d2, ...
@@ -360,16 +361,12 @@ object ComprehensionTranslator {
                                 case (v,reduce(m,flatMap(Lambda(p,Seq(List(u))),x)))
                                   => List(AssignQual(MapAccess(Var(v),idx),
                                                      IfE(MethodCall(Var(v),"contains",List(idx)),
-                                                         MethodCall(MapAccess(Var(v),idx),
-                                                                    m,
-                                                                    List(Apply(Lambda(p,u),x))),
+                                                         mcall(m,MapAccess(Var(v),idx),Apply(Lambda(p,u),x)),
                                                          Apply(Lambda(p,u),x))))
                                 case (v,reduce(m,x))
                                   => List(AssignQual(MapAccess(Var(v),idx),
                                                      IfE(MethodCall(Var(v),"contains",List(idx)),
-                                                         MethodCall(MapAccess(Var(v),idx),
-                                                                    m,
-                                                                    List(x)),
+                                                         mcall(m,MapAccess(Var(v),idx),x),
                                                          x)))
                                 case _ => Nil
                               }
@@ -548,14 +545,14 @@ object ComprehensionTranslator {
                    // the reduceByKey merge function
                    val m = if (ms.length == 1)
                               Lambda(TuplePat(List(VarPat("x"),VarPat("y"))),
-                                     MethodCall(Var("x"),ms.head,List(Var("y"))))
+                                     mcall(ms.head,Var("x"),Var("y")))
                            else { val xs = rt.map(_ => newvar)
                                   val ys = rt.map(_ => newvar)
                                   Lambda(TuplePat(List(TuplePat(xs.map(VarPat)),
                                                        TuplePat(ys.map(VarPat)))),
                                          Tuple((ms zip (xs zip ys))
                                                  .map{ case (m,(x,y))
-                                                         => MethodCall(Var(x),m,List(Var(y))) }))
+                                                         => mcall(m,Var(x),Var(y)) }))
                                 }
                    val env = rt.map{ case (n,e) => (e,newvar) }
                    def lift ( x: Expr ): Expr
@@ -742,7 +739,7 @@ object ComprehensionTranslator {
       }
 
   def local_expr ( e: Expr, vars: List[String] ): Boolean
-    = freevars(e,vars).isEmpty
+    = freevars(e,vars).filter(v => typecheck_var(v).isEmpty).isEmpty
 
   def tile_qualifiers ( qs: List[Qualifier], vars: List[String] ): List[Qualifier]
     = qs.foldLeft[(List[Qualifier],List[String])] ((Nil,vars)) {
@@ -901,10 +898,10 @@ object ComprehensionTranslator {
                    def nvar ( s: String ) = 1.to(ndims).map(i => Var(s+i)).toList
                    def nvarp ( s: String ) = 1.to(ndims).map(i => VarPat(s+i)).toList
                    def combine ( x: String, y: String, m: String, tp: Type ): Expr = {
-                     val tileType =  tile_type(block,tp)
+                     val tileType = tile_type(block,tp)
                      val cb = Store(tileType,List(tp),tile_dims,
                              Comprehension(Tuple(List(tuple(nvar("i")),
-                                                      MethodCall(Var("v"),m,List(Var("w"))))),
+                                                      mcall(m,Var("v"),Var("w")))),
                                            List(Generator(TuplePat(List(tuple(nvarp("i")),
                                                                         VarPat("v"))),
                                                           Lift(tileType,Var(x))),
@@ -913,8 +910,9 @@ object ComprehensionTranslator {
                                                           Lift(tileType,Var(y))))
                                            ++1.to(ndims).map(i => Predicate(MethodCall(Var("j"+i),
                                                                          "==",List(Var("i"+i)))))))
-                     val ctp = TupleType((1 to ndims).map(i => intType).toList:+ArrayType(1,tp))
-                     typecheck(cb,Map(x->ctp,y->ctp))  // needed to set array type
+                     val Some(TypeMapS(_,List(tv),_,_,st,_,_,_)) = Lifting.getTypeMap(tileType)
+                     val ctp = substType(st,Some(Map((tv,tp))))
+                     typecheck(cb,Map(x->ctp,y->ctp))
                      cb
                    }
                    val md = h match {
@@ -1224,7 +1222,7 @@ object ComprehensionTranslator {
       case reduce(op,x@Comprehension(h,qs))
         // total aggregation
         => val nv = newvar
-           val nr = qs:+AssignQual(Var(nv),MethodCall(Var(nv),op,List(h)))
+           val nr = qs:+AssignQual(Var(nv),mcall(op,Var(nv),h))
            val etp = typecheck(h)
            val zero = zeroValue(op,etp)
            translate(Block(List(VarDecl(nv,etp,Seq(List(zero))),

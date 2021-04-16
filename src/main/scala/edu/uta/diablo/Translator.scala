@@ -85,6 +85,9 @@ object Translator {
           => val vo = newvar
              Comprehension(MethodCall(Var(vo),m,null),
                            List(Generator(VarPat(vo),translate(o,env,vars,fncs))))
+        case MethodCall(Var(op),"/",List(u))    // reduction such as max/e
+          if is_reduction(op,typecheck(u,env))
+          => translate(reduce(op,u),env,vars,fncs)
         case MethodCall(o,m,es)
           => val vs = es.map(_ => newvar)
              val vo = newvar
@@ -148,8 +151,30 @@ object Translator {
              Comprehension(Var(w),
                            List(Generator(VarPat(v),translate(arg,env,vars,fncs)),
                                 Generator(VarPat(w),Apply(translate(f,env,vars,fncs),Var(v)))))
+//        case Comprehension(h,qs)
+//          => Seq(List(e))
         case Comprehension(h,qs)
-          => Seq(List(e))
+          => val nqs = qs.flatMap {
+                         case Generator(p,u)
+                           => val v = newvar
+                              List(Generator(VarPat(v),translate(u,env,vars,fncs)),
+                                   Generator(p,Var(v)))
+                         case LetBinding(p,u)
+                            => val v = newvar
+                               List(Generator(VarPat(v),translate(u,env,vars,fncs)),
+                                    LetBinding(p,Var(v)))
+                          case Predicate(u)
+                            => val v = newvar
+                               List(Generator(VarPat(v),translate(u,env,vars,fncs)),
+                                    Predicate(Var(v)))
+                           case GroupByQual(p,k)
+                            => val v = newvar
+                               List(Generator(VarPat(v),translate(k,env,vars,fncs)),
+                                    GroupByQual(p,Var(v)))
+                          case q => List(apply( q, (x:Expr) => translate(x,env,vars,fncs) ))
+                       }
+            val v = newvar
+            elem(Comprehension(Var(v),nqs:+Generator(VarPat(v),translate(h,env,vars,fncs))))
         case reduce(op,e)
           => var w = newvar
              Comprehension(reduce(op,Var(w)),
@@ -380,6 +405,29 @@ object Translator {
                                           Comprehension(Var(v),
                                               quals++List(Generator(VarPat(v),
                                                              translate(ne,env,vars,fncs)))))))))
+          case (d@Index(Var(a),is),Call(op,List(x,e)))
+            if d == x
+            => val v = newvar
+               val k = newvar
+               val vs = is.map(x => newvar)
+               val (calls,ne) = unfoldCalls(e,quals,env,vars,fncs)
+               val qs = Generator(VarPat(v),translate(ne,env,vars,fncs))::
+                        ((vs zip is).map{ case (v,i) => Generator(VarPat(v),translate(i,env,vars,fncs)) }:+
+                         GroupByQual(VarPat(k),tuple(vs.map(Var))))
+               calls:+Assign(Var(a),
+                             ((//Call("increment",List(Var(a),StringConst(op),
+                                       elem(Comprehension(Tuple(List(Var(k),reduce(op,Var(v)))),
+                                                     quals++qs)))))
+          case (d@Var(a),Call(op,List(x,e)))
+            if d == x
+            => val v = newvar
+               val (calls,ne) = unfoldCalls(e,quals,env,vars,fncs)
+               calls:+Assign(Var(a),
+                             elem(Call(op,
+                                    List(d,reduce(op,
+                                          Comprehension(Var(v),
+                                              quals++List(Generator(VarPat(v),
+                                                             translate(ne,env,vars,fncs)))))))))
           case (d@Index(Var(a),is),e)
             => val v = newvar
                val vs = is.map(x => newvar)
@@ -391,6 +439,19 @@ object Translator {
                                        elem(Comprehension(Tuple(List(tuple(vs.map(Var)),Var(v))),
                                                      quals++qs)))))
           case (d,MethodCall(x,op,List(e)))
+            if d == x
+            => val v = newvar
+               val k = newvar
+               val w = newvar
+               val (calls,ne) = unfoldCalls(e,quals,env,vars,fncs)
+               calls ++
+               update(d,Comprehension(Tuple(List(Var(k),Call(op,List(Var(w),reduce(op,Var(v)))))),
+                                      quals++List(Generator(VarPat(v),translate(ne,env,vars,fncs)),
+                                                  Generator(VarPat(k),key(d,env,vars,fncs)),
+                                                  GroupByQual(VarPat(k),Var(k)),
+                                                  Generator(VarPat(w),destination(d,Var(k),vars)))),
+                      env,vars,fncs)
+          case (d,Call(op,List(x,e)))
             if d == x
             => val v = newvar
                val k = newvar
@@ -476,8 +537,11 @@ object Translator {
                  case _
                    => throw new Error("A return statement can only appear inside a function body: "+e)
                }
+//          case ExprS(e)
+//            => List(translate(Comprehension(e,quals),env,vars,fncs))
           case ExprS(e)
-            => List(translate(Comprehension(e,quals),env,vars,fncs))
+            => val v = newvar
+               List(Comprehension(Var(v),quals:+Generator(VarPat(v),translate(e,env,vars,fncs))))
           case BlockS(ss)
             => val (m,_,_,_) = ss.foldLeft(( Nil:List[Expr], env, vars, fncs )) {
                     case ((ns,ls,vs,fs),VarDeclS(v,Some(t),None))

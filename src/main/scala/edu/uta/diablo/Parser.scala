@@ -27,6 +27,7 @@ trait MyTokens extends StdTokens {
   case class DoubleLit ( chars: String ) extends Token
   case class CharLit ( chars: String ) extends Token
   case class InfixOpr ( chars: String ) extends Token
+  case class IncrOpr ( chars: String ) extends Token
 }
 
 class MyLexical extends StdLexical with MyTokens {
@@ -42,7 +43,7 @@ class MyLexical extends StdLexical with MyTokens {
                   }
       }
 
-  override def token: Parser[Token] = infixOpr | longLit | doubleLit | charLit | super.token
+  override def token: Parser[Token] = incrOpr | infixOpr | longLit | doubleLit | charLit | super.token
 
   /* long integers */
   def longLit: Parser[Token]
@@ -60,7 +61,11 @@ class MyLexical extends StdLexical with MyTokens {
   def infixOpr: Parser[Token]
       = regex("""[^\s\w$()\[\]{}'"`.;,\\/]+""".r) ^^
         { s => if (delimiters.contains(s)) Keyword(s) else InfixOpr(s) }
-}//"
+
+  def incrOpr: Parser[Token]
+      = regex("""[^\s\w$()\[\]{}'"`.;,\\/\=]+\=""".r) ^^
+        { s => if (delimiters.contains(s)) Keyword(s) else IncrOpr(s) }
+}
 
 object Parser extends StandardTokenParsers {
   import AST._
@@ -70,7 +75,7 @@ object Parser extends StandardTokenParsers {
 
   lexical.delimiters += ( "(" , ")" , "[", "]", "{", "}", "," , ":", ";", ".", "=>", "=", "->", "<-",
                           "||", "&&", "!", "==", "<=", ">=", "<", ">", "!=", "+", "-", "*", "/", "%",
-                          "#", "^", "|", "&", "+=", "*=", "&&=", "||=", ".." )
+                          "#", "^", "|", "&", ".." )
 
   lexical.reserved += ( "var", "for", "in", "do", "while", "if", "else", "true", "false", "def", "let",
                         "return", "typemap", "group", "by", "tensor" )
@@ -82,6 +87,8 @@ object Parser extends StandardTokenParsers {
   /* all infix operators not listed in operator_precedence have the same highest precedence */  
   val infixOpr: Parser[String]
       = accept("infix operator",{ case t: lexical.InfixOpr => t.chars })
+  val incrOpr: Parser[String]
+      = accept("increment operator",{ case t: lexical.IncrOpr => t.chars })
   val precedence: List[Parser[String]]
       = operator_precedence :+ infixOpr
   val allInfixOpr: Parser[String]
@@ -206,7 +213,7 @@ object Parser extends StandardTokenParsers {
             case _~v~_~t~Some(_~e) => VarDecl(v,t,Seq(List(e))) }
         | dest ~ "=" ~ expr ^^
           { case d~_~e => Assign(d,Seq(List(e))) }
-        | dest ~ ( "+=" | "*=" | "&&=" | "||=" ) ~ expr ^^
+        | dest ~ incrOpr ~ expr ^^
           { case d~op~e => Assign(d,Seq(List(MethodCall(d,op.init,List(e))))) }
         | "if" ~ "(" ~ expr ~ ")" ~ expr ~ "else" ~ expr ^^
           { case _~_~p~_~t~_~e => IfE(p,t,e) }
@@ -310,7 +317,7 @@ object Parser extends StandardTokenParsers {
                            else BlockS(ss.map{ case s~_ => s }) }
         | dest ~ "=" ~ expr ^^
           { case d~_~e => AssignS(d,e) }
-        | dest ~ ( "+=" | "*=" | "&&=" | "||=" ) ~ expr ^^
+        | dest ~ incrOpr ~ expr ^^
           { case d~op~e => AssignS(d,MethodCall(d,op.init,List(e))) }
         | "for" ~ ident ~ "=" ~ expr ~ "," ~ expr ~ opt( "," ~ expr ) ~ "do" ~ stmt ^^
           { case _~v~_~a~_~b~None~_~s => ForS(v,a,b,IntConst(1),s)

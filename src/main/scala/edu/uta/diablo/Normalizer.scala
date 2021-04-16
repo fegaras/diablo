@@ -145,10 +145,6 @@ object Normalizer {
         => normalize(head,LetBinding(p,u)::r,env,opts)
       case Generator(_,Seq(Nil))::r
         => Nil
-      case Generator(p,u)::r
-        if occurrences(patvars(p),Comprehension(head,r)) == 0
-           && notGrouped(r)
-        => normalize(head,r,env,opts)
       case Generator(p@VarPat(v),u@Var(w))::r
         if (u.tpe match { case ParametricType("option",_) => true; case _ => false })
         => if (opts.contains(w))
