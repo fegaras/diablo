@@ -27,7 +27,7 @@ object Add {
     val repeats = args(0).toInt
     val n = args(1).toInt   // each matrix has n*n elements
     val m = n
-    parami(blockSize,1000000)
+    parami(block_dim_size,1000)  // size of each dimension
     val N = 1000
     val validate_output = false
 

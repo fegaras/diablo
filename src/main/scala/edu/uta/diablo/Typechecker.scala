@@ -343,7 +343,7 @@ object Typechecker {
                val Some(TypeMapS(_,tps,ps,at,st,lt,view,store)) = getTypeMap(x.name)
                val ev = tmatch(tuple(ps.values.toList:+lt),tuple(args.map(typecheck(_,env))))
                if (ev.isEmpty)
-                 throw new Error("Wrong type storage: "+x+"\n(expected: "
+                 throw new Error("Wrong tensor storage: "+x+"\n(expected: "
                                  +tuple(ps.values.toList:+lt)+", found: "
                                  +tuple(args.map(typecheck(_,env)))+")")
                if (useStorageTypes)
@@ -383,7 +383,12 @@ object Typechecker {
                }
           case Call(f,args)
             => // call the Scala typechecker to find function f
-               val tas = args.map(typecheck(_,env))
+               val tas = args.map(typecheck(_,env)).map {
+                                       case ArrayType(n,t)   // convert abstract arrays to storage tensors
+                                         if !List("binarySearch","zero").contains(f)
+                                         => TupleType(1.to(n).map(i => intType).toList:+ArrayType(1,t))
+                                       case t => t
+                                  }
                typecheck_call(f,tas)
                  .getOrElse(throw new Error("Wrong function call: "+e+" for type "+tas))
           case MethodCall(u,"reduceByKey",List(Lambda(TuplePat(List(p1,p2)),b)))

@@ -49,12 +49,12 @@ is stored in sparse row format as (d<sub>1</sub>,...,d<sub>n</sub>,s<sub>1</sub>
 * values: Array[T] contains the tensor values and has the same size as sparse
 
 For example, a 4-dimensional array `A` constructed using `tensor(d1,d2)(s1,s2)` has value
-`A[i,j,k,l]` equal to `values[z]` where `sparse[z]=k*s2+l` and `z` is between `dense[i*d2+j]` and `dense[i*d2+j+1]`.
+`A[i,j,k,l]` equal to `values[z]` where `sparse[z]=k*s2+l` and `z` is between `dense[i*d2+j]` and `dense[i*d2+j+1]-1`.
 The index `z` is found in `sparse` using binary search. If it doesn't exist, it's zero (0, 0.0, false, or null).<br/>
 A boolean sparse tensor does not have a `values` array.<br/>
 A block tensor, tensor*(d<sub>1</sub>,...,d<sub>n</sub>)(s<sub>1</sub>,...,s<sub>m</sub>) e, is stored as a distributed collection of blocks of type
 RDD[(coord,block)], where coord is the block coordinates (of type (Int,...,Int)) and block is a fixed-size tensor constructed
-using tensor(N,...,N)(N,...,N). A block has fixed size `block_size` (default is 1000000 bytes), which means that each dimension N has N<sup>n+m</sup>=`block_size` .
+using tensor(N,...,N)(N,...,N). A block has fixed size `block_size` (default is 100M int/float), which means that each dimension N has N<sup>n+m</sup>=`block_size` .
 
 ## Matrix multiplication using array comprehensions:
 

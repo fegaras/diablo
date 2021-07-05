@@ -15,6 +15,7 @@
  */
 package edu.uta.diablo
 import Lifting.{typeMaps,getTypeMap}
+import scala.util.matching.Regex
 
 
 object TypeMappings {
@@ -261,43 +262,120 @@ object TypeMappings {
       """
   }
 
+  /* generate code that calculates the tile sizes from the tensor dimensions */
+  def tile_sizes ( dn: Int, sn: Int ): String = {
+    val prod = 1.to(dn+sn).map(k => s"d$k").mkString("*")
+    val h = if (sn == 0)
+              s"var _h: Double = pow($prod/${blockSize*1.0},${1.0/dn}); "
+            else s"var _h: Double = pow($prod*sparsity/${blockSize*1.0},${1.0/(dn+sn)}); "
+    h+(1.to(dn).map(k => s"var _N$k: Int = ceil(d$k/_h).toInt; ")
+       ++1.to(sn).map(k => s"var _N${dn+k}: Int = ceil(d${dn+k}*pow(sparsity,1.0/$sn)/_h).toInt; ")).mkString("\n")
+  }
+
+  val block_pat: Regex = """block_(bool_)?tensor_(\d+)_(\d+)""".r
+
+  def tile_sizes ( block: String ): Expr
+    = block match {
+        case block_pat(_,ds,ss)
+          => val dn = ds.toInt
+             val sn = ss.toInt
+             val dims = 1.to(dn+sn).map(i => s"d$i").mkString(",")+",sparsity"
+             Parser.parse_expr("("+dims+") => { "+tile_sizes(dn,sn)+" _result; }")
+      }
+
+  /* generate a typemap for a distributed block tensor with dn dense and sn sparse dimensions */
+  def block_tensor2 ( dn: Int, sn: Int, boolean_values: Boolean = false ): String = {
+    assert(sn+dn > 0)
+    def rep ( f: Int => String, sep: String = "," ): String = 1.to(dn+sn).map(f).mkString(sep)
+    val ldims = rep(i => "Int")
+    val ndims = rep(i => s"_N$i")
+    val dims = rep(i => s"d$i: Int")+", sparsity: Double"
+    val vars = rep("i"+_)
+    val vars2 = rep("ii"+_)
+    val div_vars = rep(k => s"let ii$k = i$k/_N$k")
+    val mod_vars = rep(k => s"i$k%_N$k")
+    val idx = rep(k => s"ii$k*_N$k+i$k")
+    val ranges = rep(k => s"ii$k*_N$k+i$k < d$k")
+    val sizes = tile_sizes(dn,sn)
+    if (boolean_values) {
+      s"""
+       typemap block_bool_tensor_${dn}_$sn ($dims): array${dn+sn}[Boolean] {
+          def view ( x: (($ldims),rdd[(($ldims),bool_tensor_${dn}_$sn)]) )
+            = [ (($idx),v) |
+                let (($ndims),b) = x,
+                (($vars2),a) <- lift(rdd,b),
+                (($vars),v) <- lift(bool_tensor_${dn}_$sn,a),
+                $ranges ]
+          def store ( L: list[(($ldims),Boolean)] )
+            = { $sizes
+                (($ndims),rdd[ (($vars2),bool_tensor_${dn}_$sn(($ndims),w)) |
+                               (($vars),v) <- L, v,
+                               $div_vars,
+                               let w = (($mod_vars),v),
+                               group by ($vars2) ]);
+              }
+       }
+    """
+    } else s"""
+       typemap block_tensor_${dn}_$sn[T] ($dims): array${dn+sn}[T] {
+          def view ( x: (($ldims),rdd[(($ldims),tensor_${dn}_$sn[T])]) )
+            = [ (($idx),v) |
+                let (($ndims),b) = x,
+                (($vars2),a) <- lift(rdd,b),
+                (($vars),v) <- lift(tensor_${dn}_$sn,a),
+                $ranges ]
+          def store ( L: list[(($ldims),T)] )
+            = { $sizes
+                (($ndims),rdd[ (($vars2),tensor_${dn}_$sn($ndims,w)) |
+                               (($vars),v) <- L,
+                               $div_vars,
+                               let w = (($mod_vars),v),
+                               group by ($vars2) ]);
+              }
+    }
+    """
+  }
+
   /* generate a typemap for a distributed block tensor with dn dense and sn sparse dimensions */
   def block_tensor ( dn: Int, sn: Int, boolean_values: Boolean = false ): String = {
     assert(sn+dn > 0)
-    val N = Math.pow(blockSize,1.0/(dn+sn)).toInt
-    val ldims = "("+1.to(dn+sn).map(i => "Int").mkString(",")+")"
-    val ddims = 1.to(dn+sn).map(i => N).mkString(",")
-    //val sdims = 1.to(sn).map(i => N).mkString(",")
-    val dims = "( "+(1.to(dn).map(k => s"d$k: Int")
-                     ++1.to(sn).map(k => s"s$k: Int")).mkString(", ")+" )"
-    val vars = 1.to(dn+sn).map("i"+_).mkString(",")
-    val vars2 = 1.to(dn+sn).map("ii"+_).mkString(",")
-    val idx = 1.to(dn+sn).map(k => s"ii$k*$N+i$k").mkString(",")
-    val div_vars = 1.to(dn+sn).map(k => s"let ii$k = i$k/$N").mkString(", ")
-    val mod_vars = 1.to(dn+sn).map(k => s"i$k%$N").mkString(",")
-    if (boolean_values && sn > 0)
+    def rep ( f: Int => String, sep: String = "," ): String = 1.to(dn+sn).map(f).mkString(sep)
+    val N = block_dim_size
+    val ldims = rep(i => "Int")
+    val ndims = rep(k => s"if ((ii$k+1)*$N > d$k) d$k%$N else $N")
+    val dims = rep(k => s"d$k: Int")
+    val vars = rep("i"+_)
+    val vars2 = rep("ii"+_)
+    val div_vars = rep(k => s"let ii$k = i$k/$N")
+    val mod_vars = rep(k => s"i$k%$N")
+    val idx = rep(k => s"ii$k*$N+i$k")
+    val ranges = rep(k => s"ii$k*$N+i$k < d$k")
+    //val sizes = tile_sizes(dn,sn)
+    if (boolean_values) {
       s"""
-       typemap block_bool_tensor_${dn}_$sn $dims: array${dn+sn}[Boolean] {
-          def view ( b: rdd[($ldims,bool_tensor_${dn}_$sn)] )
+       typemap block_bool_tensor_${dn}_$sn ($dims): array${dn+sn}[Boolean] {
+          def view ( x: rdd[(($ldims),bool_tensor_${dn}_$sn)] )
             = [ (($idx),v) |
-                (($vars2),a) <- lift(rdd,b),
-                (($vars),v) <- lift(bool_tensor_${dn}_$sn,a) ]
-          def store ( L: list[($ldims,Boolean)] )
-            = rdd[ (($vars2),bool_tensor_${dn}_$sn($ddims,w)) |
+                (($vars2),a) <- lift(rdd,x),
+                (($vars),v) <- lift(bool_tensor_${dn}_$sn,a),
+                $ranges ]
+          def store ( L: list[(($ldims),Boolean)] )
+            = rdd[ (($vars2),bool_tensor_${dn}_$sn(($ndims),w)) |
                    (($vars),v) <- L, v,
                    $div_vars,
                    let w = (($mod_vars),v),
                    group by ($vars2) ]
-    }
+       }
     """
-    else s"""
-       typemap block_tensor_${dn}_$sn[T] $dims: array${dn+sn}[T] {
-          def view ( b: rdd[($ldims,tensor_${dn}_$sn[T])] )
+    } else s"""
+       typemap block_tensor_${dn}_$sn[T] ($dims): array${dn+sn}[T] {
+          def view ( x: rdd[(($ldims),tensor_${dn}_$sn[T])] )
             = [ (($idx),v) |
-                (($vars2),a) <- lift(rdd,b),
-                (($vars),v) <- lift(tensor_${dn}_$sn,a) ]
-          def store ( L: list[($ldims,T)] )
-            = rdd[ (($vars2),tensor_${dn}_$sn($ddims,w)) |
+                (($vars2),a) <- lift(rdd,x),
+                (($vars),v) <- lift(tensor_${dn}_$sn,a),
+                $ranges ]
+          def store ( L: list[(($ldims),T)] )
+            = rdd[ (($vars2),tensor_${dn}_$sn($ndims,w)) |
                    (($vars),v) <- L,
                    $div_vars,
                    let w = (($mod_vars),v),
@@ -306,7 +384,16 @@ object TypeMappings {
     """
   }
 
+  // retrieve the tiles from a block tensor
+  def block_tensor_tiles ( dn: Int, sn: Int, e: Expr ): Expr
+    = Nth(e,dn+sn+1)
+
   def init () {
     Typechecker.typecheck(Parser.parse(inits))
+  }
+
+  def main ( args: Array[String] ) {
+     println(tensor(args(0).toInt,args(1).toInt,args(3).toInt == 1))
+     println(block_tensor(args(0).toInt,args(1).toInt,args(2).toInt == 1))
   }
 }

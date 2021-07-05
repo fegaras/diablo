@@ -75,7 +75,7 @@ object Parser extends StandardTokenParsers {
 
   lexical.delimiters += ( "(" , ")" , "[", "]", "{", "}", "," , ":", ";", ".", "=>", "=", "->", "<-",
                           "||", "&&", "!", "==", "<=", ">=", "<", ">", "!=", "+", "-", "*", "/", "%",
-                          "#", "^", "|", "&", ".." )
+                          ":=", "#", "^", "|", "&", ".." )
 
   lexical.reserved += ( "var", "for", "in", "do", "while", "if", "else", "true", "false", "def", "let",
                         "return", "typemap", "group", "by", "tensor" )
@@ -217,6 +217,8 @@ object Parser extends StandardTokenParsers {
           { case d~op~e => Assign(d,Seq(List(MethodCall(d,op.init,List(e))))) }
         | "if" ~ "(" ~ expr ~ ")" ~ expr ~ "else" ~ expr ^^
           { case _~_~p~_~t~_~e => IfE(p,t,e) }
+        | "(" ~ repsep( pat, "," ) ~ ")" ~ "=>" ~ expr ^^
+          { case _~ps~_~_~b => Lambda(TuplePat(ps),b) }
         | "(" ~ repsep( expr, "," ) ~ ")" ^^
           { case _~es~_ => if (es.length==1) es.head else Tuple(es) }
         | "<" ~ rep1sep( ident ~ "=" ~ expr, "," ) ~ ">" ^^
@@ -232,8 +234,6 @@ object Parser extends StandardTokenParsers {
         | "{" ~ rep( expr ~ sem ) ~ "}" ^^
           { case _~ss~_ => if (ss.length==1) ss.head match { case s~_ => s }
                            else Block(ss.map{ case s~_ => s }) }
-        | "(" ~ repsep( pat, "," ) ~ ")" ~ "=>" ~ expr ^^
-          { case _~ps~_~_~b => Lambda(TuplePat(ps),b) }
         | ident ~ "=>" ~ expr ^^
           { case v~_~b => Lambda(VarPat(v),b) }
         | "[" ~ repsep( expr, "," ) ~ "]" ^^
@@ -396,6 +396,13 @@ object Parser extends StandardTokenParsers {
       = phrase(program)(new lexical.Scanner(line)) match {
           case Success(e,_) => e:Stmt
           case m => println(m); BlockS(Nil)
+        }
+
+  /** Parse an expression */
+  def parse_expr ( line: String ): Expr
+      = phrase(expr)(new lexical.Scanner(line)) match {
+          case Success(e,_) => e:Expr
+          case m => println(m); Block(Nil)
         }
 
   def main ( args: Array[String] ) {

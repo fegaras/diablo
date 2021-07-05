@@ -155,7 +155,8 @@ abstract class CodeGeneration {
              }
     val te = try c.Expr[Any](c.typecheck(q"{ import edu.uta.diablo._; $fc }")).actualType
              catch { case ex: TypecheckException
-                       => return Right(ex)
+                       => //println("%%% "+fc)
+                          return Right(ex)
                    }
     Left(returned_type(type2tree(te)))
   }
@@ -226,8 +227,7 @@ abstract class CodeGeneration {
                          => try {
                                val ctp = c.Expr[Any](c.typecheck(q"(x:$atp) => x.first()")).actualType
                                Some(returned_type(type2tree(ctp)))
-                            } catch { case ex: TypecheckException
-                                 => return None }
+                            } catch { case ex: TypecheckException => return None }
                      }
         case Right(ex) => None
       }
@@ -242,8 +242,7 @@ abstract class CodeGeneration {
               case Right(ex)
                 => throw ex
               case Left(tp)
-                => c.abort(c.universe.NoPosition,
-                           s"Expression $ec is not a collection (found type $tp)\nBindings: "+env)
+                => throw new Error(s"Expression $ec is not a collection (found type $tp)\nBindings: "+env)
            }
     }
   }
@@ -334,12 +333,12 @@ abstract class CodeGeneration {
              val tc = getType(uc,env)
              val bc = codeStmt(b,add(p,tc,env))
              q"{ val $pc: $tc = $uc; $bc }"
-      case Block(Nil)
-        => q"()"
-      case Block(es:+Seq(x::_))
-        => codeStmt(Block(es:+x),env)
-      case Block(s@(es:+x))
-        => val (nes,nenv) = es.foldLeft[(List[c.Tree],Environment)]((Nil,env)) {
+        case Block(Nil)
+          => q"()"
+        case Block(es:+Seq(x::_))
+          => codeStmt(Block(es:+x),env)
+        case Block(s@(es:+x))
+          => val (nes,nenv) = es.foldLeft[(List[c.Tree],Environment)]((Nil,env)) {
                                case ((s,el),u@VarDecl(v,TypeParameter(_),b))
                                  => val vc = TermName(v)
                                     val (tc,_) = typedCode(b,el)
@@ -359,8 +358,8 @@ abstract class CodeGeneration {
                             }
            val xc = codeStmt(x,nenv)
            q"{ ..$nes; $xc }"
-      case u
-        => codeGen(u,env)
+        case u
+          => codeGen(u,env)
     }
 
   def zero ( tp: DType ): c.Tree
@@ -405,10 +404,12 @@ abstract class CodeGeneration {
       case MethodCall(x,"reduceByKey",List(Lambda(p,b)))
         => val (tp,xc) = typedCode(x,env)
            val pc = code(p)
+           val nx = TermName(c.freshName("x"))
+           val ny = TermName(c.freshName("y"))
            tp match {
              case tq"($kt,$et)"
                => val bc = codeGen(b,add(p,tq"($et,$et)",env))
-                  q"$xc.reduceByKey{ case $pc => $bc }"
+                  q"$xc.reduceByKey(($nx:$et,$ny:$et) => ($nx,$ny) match { case $pc => $bc })"
              case _ => throw new Exception("Wrong reduceByKey: "+e)
            }
       case groupBy(x)
@@ -440,6 +441,11 @@ abstract class CodeGeneration {
       case Call("array",d)
         => val dc = d.map(codeGen(_,env))
            q"Array.ofDim[Any](..$dc)"
+      case Call("inRange",List(i,n1,n2,IntConst(1)))
+        => val ic = codeGen(i,env)
+           val nc1 = codeGen(n1,env)
+           val nc2 = codeGen(n2,env)
+           q"$ic >= $nc1 && $ic <= $nc2"
       case Call("inRange",List(i,n1,n2,n3))
         => val ic = codeGen(i,env)
            val nc1 = codeGen(n1,env)
@@ -692,6 +698,10 @@ abstract class CodeGeneration {
                                   val tc = Type2Tree(tp)
                                   q"val $vc: $tc" }
            q"def $fc (..$psc): $tc = $bc"
+      case While(Seq(List(p)),b)
+        => val pc = codeGen(p,env)
+           val bc = codeGen(b,env)
+           q"while($pc) $bc"
       case While(p,b)
         => val pc = codeGen(p,env)
            val bc = codeGen(b,env)

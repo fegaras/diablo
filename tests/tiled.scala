@@ -6,7 +6,7 @@ object Test {
   def main ( args: Array[String] ) {
     val conf = new SparkConf().setAppName("Test")
     val spark_context = new SparkContext(conf)
-    parami(blockSize,10000)
+    parami(block_dim_size,100)  // size of each dimension
     val N = 200
 
     def f ( i: Int, j: Int = 1 ): Double = (i*11)%3+j*1.1
@@ -19,7 +19,7 @@ object Test {
         var M1 = tensor*(N,N)[ ((i,j),f(i,j)) | i <- 0..(N-1), j <- 0..(N-1) ]     // dense block matrix
         var M2 = tensor*(N)(N)[ ((i,j),f(i,j)) | i <- 0..(N-1), j <- 0..(N-1) ]    // dense rows, sparse columns
         var M3 = tensor*()(N,N)[ ((i,j),f(i,j)) | i <- 0..(N-1), j <- 0..(N-1) ]   // sparse rows & columns
-
+/*
         V1 = [ (i,v+1) | (i,v) <- V1 ];
         V2 = [ (i,v+1) | (i,v) <- V1 ];
         V1 = [ (i,v+1) | (i,v) <- V2 ];
@@ -89,17 +89,16 @@ object Test {
                              let v = m*n*z, group by (i,j) ];
 
         tensor*(N)(N)[ ((i,j),(+/v)<10) | ((i,k),m) <- M2, ((kk,j),n) <- M3, kk==k, let v = m*n, group by (i,j) ];
-
         tensor*(N)[ (k,* /m) | ((i,j),m) <- M1, group by k:i+j ];
         tensor*(N)[ (k,(+ /m)/m.length) | ((i,j),m) <- M1, group by k:i+j, * /m > 10 ];
-
         tensor*(N)[ (k,(* /m)/m.length) | ((i,j),m) <- M1, m > 3, group by k:i+j, +/m > 10 ];
-
+*/
 /* Not working yet: group-by != comprehension key
         tensor*(10)[ (i%10,+/m) | ((i,j),m) <- M1, group by i ];
         tensor*(10)[ (i%10,(+/m)/m.length) | ((i,j),m) <- M2, group by i ];
 */
         tensor*(10)(20)[ (k,+/m) | ((i,j),m) <- M1, group by k: (i%10,j%20) ];
+/*
         tensor*(10)(20)[ (k,(+/m)<10) | ((i,j),m) <- M2, group by k: (i%10,j%20) ];
         tensor*(10)(20)[ (k,((+/m)/m.length,m,m.length,m.length)) | ((i,j),m) <- M1, group by k: (i%10,j%20) ];
         tensor*(10)(20)[ (k,((+/m)/m.length,m,m.length,m.length)) | ((i,j),m) <- M2, group by k: (i%10,j%20) ];
@@ -107,24 +106,25 @@ object Test {
         tensor*(N,N,10)[ ((i,j,(i+j)%10),m+1) | ((i,j),m) <- M2 ];
         tensor*(N,N)(10)[ ((i,j,(i+j)%10),m+1) | ((i,j),m) <- M2 ];
         tensor*(N)(N,10)[ ((i,j,(i+j)%10),m+1) | ((i,j),m) <- M2 ];
-
+*/
 /* Not working yet: group-by != comprehension key
         tensor*(N,N,10)[ ((i,j,(i+j)%10),+/v) | ((i,k),m) <- M1, ((kk,j),n) <- M1, kk==k, let v = m*n, group by (i,j) ];
         tensor*(N)(N,10)[ ((i,j,(i+j)%10),+/v) | ((i,k),m) <- M2, ((kk,j),n) <- M1, kk==k, let v = m*n, group by (i,j) ];
 */
-
+/*
         tensor*(N,N)[ ((i,j),tensor(N)[ (ii,v+1) | (ii,v) <- V1 ]) | ((i,j),m) <- M1 ];
         tensor*(N,N)[ ((i,j),tensor(N)[ (ii,(v+1,i+j)) | (ii,v) <- V2 ]) | ((i,j),m) <- M2 ];
 
         tensor*(N,N)[ ((i,j),m+1) | ((i,j),m) <- M1, +/[ v | (ii,v) <- V1 ] < 10 ];
 
         tensor*(N)[ (i,tensor(N) w) | ((i,j),m) <- M2, let w = (j,m), group by i ];
-
+*/
 /* Not working yet: nested comprehensions
         tensor*(N,N)[ ((i,j),m+1) | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
         +/[ m | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
 */
     """)
+
 
   }
 }

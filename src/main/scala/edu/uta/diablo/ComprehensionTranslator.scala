@@ -23,19 +23,33 @@ object ComprehensionTranslator {
   import AST._
   import Typechecker._
   import Lifting.{store,lift}
+  import TypeMappings.{block_tensor_tiles,tile_sizes}
 
   val ignore: Expr = Block(Nil)
 
   def zeroValue ( monoid: String, tp: Type ): Expr = {
     def error (): Expr = throw new Error("The monoid "+monoid+" for type "+tp+" does not have a zero value")
     if (tp == intType)
-       monoid match { case "+" => IntConst(0); case "*" => IntConst(1); case "min" => IntConst(Int.MinValue); case "max" => IntConst(Int.MaxValue); case _ => error() }
+       monoid match { case "+" => IntConst(0); case "*" => IntConst(1)
+                      case "min" => IntConst(Int.MinValue)
+                      case "max" => IntConst(Int.MaxValue)
+                      case _ => error() }
     else if (tp == longType)
-       monoid match { case "+" => LongConst(0); case "*" => LongConst(1); case "min" => LongConst(Long.MinValue); case "max" => LongConst(Long.MaxValue); case _ => error() }
+       monoid match { case "+" => LongConst(0)
+                      case "*" => LongConst(1)
+                      case "min" => LongConst(Long.MinValue)
+                      case "max" => LongConst(Long.MaxValue)
+                      case _ => error() }
     else if (tp == doubleType)
-       monoid match { case "+" => DoubleConst(0.0); case "*" => DoubleConst(1.0); case "min" => DoubleConst(Double.MinValue); case "max" => DoubleConst(Double.MaxValue); case _ => error() }
+       monoid match { case "+" => DoubleConst(0.0)
+                      case "*" => DoubleConst(1.0)
+                      case "min" => DoubleConst(Double.MinValue)
+                      case "max" => DoubleConst(Double.MaxValue)
+                      case _ => error() }
     else if (tp == boolType)
-       monoid match { case "&&" => BoolConst(true); case "||" => BoolConst(false); case _ => error() }
+       monoid match { case "&&" => BoolConst(true)
+                      case "||" => BoolConst(false)
+                      case _ => error() }
     else error()
   }
 
@@ -179,7 +193,8 @@ object ComprehensionTranslator {
       else MethodCall(x,m,List(y))
 
   /* translate a tensor comprehension with a group-by when the group-by key is equal to the head key */
-  def tensor_groupby_eqkey ( tensor: String, tp: Type, dims: List[Expr], head: Expr, cqs: List[Qualifier] ): Expr = {
+  def tensor_groupby_eqkey ( tensor: String, tp: Type, dims: List[Expr],
+                             head: Expr, cqs: List[Qualifier] ): Expr = {
     val Tuple(List(key,body)) = head
     val (dn,sn) = tensor_dims(tensor)
     cqs.span{ case GroupByQual(p,k) => false; case _ => true } match {
@@ -219,7 +234,7 @@ object ComprehensionTranslator {
                    // replace the reduced terms in head and ts with vector values using env
                    val Comprehension(ne,nts) = env.foldLeft(yieldReductions(Comprehension(body,ts),
                                                                             usedVars)) {
-                                                   case (r,(from,to)) => AST.subst(from,to,r)
+                                                   case (r,(from,to)) => subst(from,to,r)
                                                }
                    // all vectors used in aggregations are vectors of size d1*d2*...
                    def vector_decl ( v: String, tp: Type )
@@ -299,7 +314,8 @@ object ComprehensionTranslator {
     }
 
   /* translate a tensor comprehension with a group-by when the group-by key is NOT equal to the head key */
-  def tensor_groupby_neqkey ( tensor: String, tp: Type, dims: List[Expr], head: Expr, cqs: List[Qualifier] ): Expr = {
+  def tensor_groupby_neqkey ( tensor: String, tp: Type, dims: List[Expr],
+                              head: Expr, cqs: List[Qualifier] ): Expr = {
     val Tuple(List(key,body)) = head
     val result_keys = key match { case Tuple(ks) => ks; case _ => List(key) }
     val (dn,sn) = tensor_dims(tensor)
@@ -339,7 +355,7 @@ object ComprehensionTranslator {
                    // replace the reduced terms in head with vector values using env
                    val Comprehension(ne,nts) = env.foldLeft(yieldReductions(Comprehension(body,ts),
                                                                             usedVars)) {
-                                                   case (r,(from,to)) => AST.subst(from,to,r)
+                                                   case (r,(from,to)) => subst(from,to,r)
                                                }
                    // all collections used in aggregations are Maps
                    def map_decl ( v: String, tp: Type )
@@ -413,6 +429,7 @@ object ComprehensionTranslator {
             }
     }
 
+
 /*---------------------------- Generate RDD operations ------------------------------------------*/
 
   /* Is this generator domain an RDD? Generator domains have been lifted by the Lifter */
@@ -426,18 +443,27 @@ object ComprehensionTranslator {
   def is_rdd_comprehension ( qs: List[Qualifier] ): Boolean
     = qs.exists{ case Generator(p,u) => isRDD(u); case _ => false }
 
-  def subsetOrEq ( e: Expr, s: Set[String] ): Boolean = {
-    val r = freevars(e).toSet
-    r == s || r.subsetOf(s)
+  def qual_vars ( qs: List[Qualifier] ): Set[String]
+    = qs.flatMap {
+        case Generator(p,_) => patvars(p)
+        case LetBinding(p,_) => patvars(p)
+        case GroupByQual(p,_) => patvars(p)
+        case _ => Nil
+      }.toSet
+
+  def contains ( e: Expr, includes: Set[String], excludes: Set[String] ): Boolean = {
+    val vars = freevars(e).toSet
+    vars.intersect(includes).nonEmpty &&
+      vars.intersect(excludes.diff(includes)).isEmpty
   }
 
   // for a lifted RDD storage, return the RDD collection
   def get_rdd ( e: Expr ): Expr
     = e match {
         case Lift(block_tensor_pat(dn,sn),x)
-          => Nth(x,dn.toInt+sn.toInt+1)
+          => block_tensor_tiles(dn.toInt,sn.toInt,x)
         case Lift(block_bool_tensor_pat(dn,sn),x)
-          => Nth(x,dn.toInt+sn.toInt+1)
+          => block_tensor_tiles(dn.toInt,sn.toInt,x)
         case Lift("rdd",x) => x
         case _ => e
       }
@@ -452,9 +478,10 @@ object ComprehensionTranslator {
              }
 
   /* finds a sequence of predicates in qs that refer to the pattern variables xs */
-  def findFilterPred ( xs: Set[String], qs: List[Qualifier] ): Option[List[Qualifier]]
-    = matchQ(qs,{ case Predicate(e)
-                    => subsetOrEq(e,xs)
+  def findFilterPred ( xs: Set[String], qs: List[Qualifier] ): Option[List[Qualifier]] = {
+    val qvars = qual_vars(qs)
+    matchQ(qs,{ case Predicate(e)
+                    => contains(e,xs,qvars)
                   case _ => false },
                 { case (p::s)
                     => findFilterPred(xs,s) match {
@@ -462,6 +489,7 @@ object ComprehensionTranslator {
                           case Some(r) => Some(p::r)
                        }
                   case _ => None })
+  }
 
   def findFilter ( qs: List[Qualifier] ): Option[List[Qualifier]]
     = matchQ(qs,{ case Generator(_,e) if isRDD(e) => true; case _ => false },
@@ -473,10 +501,11 @@ object ComprehensionTranslator {
                   case _ => None })
 
   /* finds a sequence of predicates in qs that imply x=y */
-  def findEqPred ( xs: Set[String], ys: Set[String], qs: List[Qualifier] ): Option[List[Qualifier]]
-    = matchQ(qs,{ case Predicate(MethodCall(e1,"==",List(e2)))
-                    => ((subsetOrEq(e1,xs) && subsetOrEq(e2,ys))
-                        || (subsetOrEq(e2,xs) && subsetOrEq(e1,ys)))
+  def findEqPred ( xs: Set[String], ys: Set[String], qs: List[Qualifier] ): Option[List[Qualifier]] = {
+    val qvars = qual_vars(qs)
+    matchQ(qs,{ case Predicate(MethodCall(e1,"==",List(e2)))
+                    => ((contains(e1,xs,qvars) && contains(e2,ys,qvars))
+                        || (contains(e2,xs,qvars) && contains(e1,ys,qvars)))
                   case _ => false },
                 { case (p::s)
                     => findEqPred(xs,ys,s) match {
@@ -484,6 +513,7 @@ object ComprehensionTranslator {
                           case Some(r) => Some(p::r)
                        }
                   case _ => None })
+  }
 
   /* matches the equi-join ...,p1 <- e1,...,p2 <- e2,...,e3 == e4,...   */
   def findJoin ( qs: List[Qualifier] ): Option[List[Qualifier]]
@@ -508,7 +538,13 @@ object ComprehensionTranslator {
                                   case _ => None })
                   case _ => None })
 
-  @tailrec
+  /* matches an RDD traversal */
+  def findTraversal ( qs: List[Qualifier] ): Option[List[Qualifier]]
+    = matchQ(qs,{ case Generator(_,e) if isRDD(e) => true; case _ => false },
+                { case q::_
+                    => Some(q::qs.filter(_ != q))
+                  case _ => None })
+
   def translate_rdd ( hs: Expr, qs: List[Qualifier], vars: List[String] ): Expr
     = findFilter(qs) match {
         case Some(Generator(p,e)::ps)
@@ -556,9 +592,9 @@ object ComprehensionTranslator {
                                 }
                    val env = rt.map{ case (n,e) => (e,newvar) }
                    def lift ( x: Expr ): Expr
-                     = env.foldLeft(x) { case (r,(from,to)) => AST.subst(from,Var(to),r) }
+                     = env.foldLeft(x) { case (r,(from,to)) => subst(from,Var(to),r) }
                    val Comprehension(nh,ns) = lift(Comprehension(hs,s))
-                   val red = MethodCall(Store("rdd",Nil,Nil,
+                   val red = MethodCall(Store("rdd",Nil,Nil,       // type parameter?
                                               Comprehension(Tuple(List(toExpr(p),tuple(gs))),r)),
                                         "reduceByKey",List(m))
                    translate_rdd(nh,Generator(TuplePat(List(p,tuple(env.map(x => VarPat(x._2))))),
@@ -566,10 +602,11 @@ object ComprehensionTranslator {
               case _
                 => findJoin(qs) match {      // RDD join
                      case Some((Generator(p1,d1))::(Generator(p2,d2))::cs)
-                       => val jt1 = tuple(cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
-                                                    => if (subsetOrEq(e1,patvars(p1).toSet)) e1 else e2 })
+                       => val qvars = qual_vars(qs)
+                          val jt1 = tuple(cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
+                                                    => if (contains(e1,patvars(p1).toSet,qvars)) e1 else e2 })
                           val jt2 = tuple(cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
-                                                    => if (subsetOrEq(e1,patvars(p2).toSet)) e1 else e2 })
+                                                    => if (contains(e1,patvars(p2).toSet,qvars)) e1 else e2 })
                           val left = flatMap(Lambda(p1,Seq(List(Tuple(List(jt1,toExpr(p1)))))),
                                              get_rdd(d1))
                           val right = flatMap(Lambda(p2,Seq(List(Tuple(List(jt2,toExpr(p2)))))),
@@ -597,6 +634,11 @@ object ComprehensionTranslator {
                                case Generator(p,_) if p==p2 => Nil     // remove 2nd generator
                                case x => List(x)
                               },vars)
+              case _
+                => findTraversal(qs) match {    // an RDD traversal
+                     case Some(Generator(p,e)::nqs)
+                       => flatMap(Lambda(p,translate_rdd(hs,nqs,patvars(p)++vars)),
+                                  get_rdd(e))
                      case _ 
                        => qs.foldRight[(Expr,List[String])]((Seq(List(translate(hs,vars))),vars)) {
                              case (Generator(p,u),(r,s))
@@ -610,11 +652,13 @@ object ComprehensionTranslator {
                              case (_,(r,s)) => (r,s)
                           }._1
                    }
+                 }
                 }
           }
     }
 
-/*---------------------------- Distributed Arrays as Tiled RDDs ------------------------------------------*/
+
+/*---------------------------- Tiled Comprehensions ------------------------------------------*/
 
   /* Is this generator domain a Tiled RDD? Generator domains have been lifted by the Lifter */
   def isTiled ( e: Expr ): Boolean
@@ -631,18 +675,6 @@ object ComprehensionTranslator {
 
   def hasGroupByKey ( qs: List[Qualifier], key: Expr ): Boolean
     = qs.exists{ case GroupByQual(p,_) => key == toExpr(p); case _ => false }
-
-  def preserves_tiling ( hs: List[Expr], qs: List[Qualifier] ): Boolean
-    = hs match {
-        case List(Tuple(List(k,_)))
-          if hasGroupByKey(qs,k)
-          => true
-        case List(Tuple(List(p,_)))
-          if !hasGroupBy(qs)
-          => val indices = tile_indices(qs)
-             freevars(p).forall(indices.contains(_))
-        case _ => false
-      }
 
   def tile_indices ( p: Pattern ): List[String]
     = p match {
@@ -674,43 +706,12 @@ object ComprehensionTranslator {
   def tile_values ( qs: List[Qualifier] ): List[String]
     = qs.flatMap{ case Generator(p,u) if isTiled(u) => tile_values(p); case _ => Nil }
 
-  def usc ( p: Pattern ): Pattern
-    = p match {
-        case VarPat(v)
-          => VarPat("_"+v)
-        case _ => apply(p,usc)
-      }
-
-  def uscv ( p: Pattern ): Pattern
-    = p match {
-        case TuplePat(List(VarPat(_),p))
-          => usc(p)
-        case TuplePat(List(TuplePat(ps),p))
-          if ps.forall(_.isInstanceOf[VarPat])
-          => usc(p)
-        case TuplePat(ps)
-          => tuple(ps.map(uscv))
-        case _ => p
-      }
-
-  def usciv ( p: Pattern ): Pattern
-    = p match {
-        case TuplePat(List(i@VarPat(_),p))
-          => TuplePat(List(i,usc(p)))
-        case TuplePat(List(i@TuplePat(ps),p))
-          if ps.forall(_.isInstanceOf[VarPat])
-          => TuplePat(List(i,usc(p)))
-        case TuplePat(ps)
-          => TuplePat(ps.map(usciv))
-        case _ => p
-      }
-
   def tile_type ( block: String ): String
     = block match {
         case block_tensor_pat(dn,sn)
           => s"tensor_${dn}_$sn"
         case block_bool_tensor_pat(dn,sn)
-          => "bool_tensor_${dn}_$sn"
+          => s"bool_tensor_${dn}_$sn"
       }
 
   def tile_type ( block: String, tp: Type ): String = {
@@ -727,26 +728,84 @@ object ComprehensionTranslator {
       }
   }
 
-  def tile_generators ( block: String, p: Pattern ): List[Qualifier]
-    = p match {
-        case TuplePat(List(VarPat(_),VarPat(v)))
-          => List(Generator(p,Lift(block,Var("_"+v))))
-        case TuplePat(List(TuplePat(List(VarPat(_),VarPat(_))),VarPat(v)))
-          => List(Generator(p,Lift(block,Var("_"+v))))
-        case TuplePat(ps)
-          => ps.flatMap(tile_generators(block,_))
-        case _ => Nil
+
+/*----------------------- Tiled comprehension that preserves tiling --------------------------------------*/
+
+  def correlated_indices ( qs: List[Qualifier], kvars: Set[String] ): Set[String]
+    = qs.foldLeft(kvars) {
+        case (ks,Predicate(MethodCall(Var(i),"==",List(Var(j)))))
+          if ks.contains(i) || ks.contains(j)
+          => ks.union(Set(i,j))
+        case (ks,_) => ks
+      }
+
+  def preserves_tiling ( key: Expr, qs: List[Qualifier] ): Boolean
+    = key match {
+        case Var(v)
+          if !hasGroupBy(qs)
+          => val indices = tile_indices(qs).toSet
+             val cis = correlated_indices(qs,Set(v))
+             indices.contains(v) &&
+                (indices == cis || indices.subsetOf(cis))
+        case Tuple(ks)
+          if !hasGroupBy(qs)
+             && ks.forall{ case Var(_) => true; case _ => false }
+          => var kvars = ks.flatMap{ case Var(v) => List(v); case _ => Nil }.toSet
+             val indices = tile_indices(qs).toSet
+             val cis = correlated_indices(qs,kvars)
+             indices.nonEmpty &&
+                kvars.forall(indices.contains(_)) &&
+                (indices == cis || indices.subsetOf(cis))
+        case _ => false
       }
 
   def local_expr ( e: Expr, vars: List[String] ): Boolean
     = freevars(e,vars).filter(v => typecheck_var(v).isEmpty).isEmpty
 
+  val block_pat: Regex = """block_(bool_)?tensor_(\d+)_(\d+)""".r
+
+  def prefix ( prefix: String, v: String ) = "_"+prefix+"_"+v
+
+  def rdd_qualifiers ( qs: List[Qualifier], vars: List[String] ): List[Qualifier]
+    = qs.foldLeft[(List[Qualifier],List[String])] ((Nil,vars)) {
+          case ((r,s),Generator(TuplePat(List(p,VarPat(v))),Lift(block_pat(_,dn,sn),e)))
+            => val is = patvars(p)
+               (r:+Generator(tuple(List(tuple(is.map(i => VarPat(prefix("coord",i)))),
+                                        VarPat(prefix("tile",v)))),
+                             Lift("rdd",block_tensor_tiles(dn.toInt,sn.toInt,e))),
+                s++patvars(p))
+          case ((r,s),q@Generator(p,Lift("rdd",_)))
+            => (r:+q,s++patvars(p))
+          case ((r,s),q@LetBinding(p,e))
+            if local_expr(e,s)
+            => (r:+q,s++patvars(p))
+          case ((r,s),q@Predicate(MethodCall(Var(i),"==",List(Var(j)))))
+            if s.contains(i) && s.contains(j)
+            => (r:+Predicate(MethodCall(Var(prefix("coord",i)),
+                                        "==",List(Var(prefix("coord",j))))),s)
+          case ((r,s),q@Predicate(MethodCall(Var(i),"==",List(e))))
+            if s.contains(i) && freevars(e,Nil).intersect(s).isEmpty
+            => (r:+Predicate(MethodCall(Var(prefix("coord",i)),
+                     "==",List(MethodCall(e,"/",List(IntConst(block_dim_size)))))),s)
+          case ((r,s),q@Predicate(MethodCall(e,"==",List(Var(i)))))
+            if s.contains(i) && freevars(e,Nil).intersect(s).isEmpty
+            => (r:+Predicate(MethodCall(Var(prefix("coord",i)),
+                     "==",List(MethodCall(e,"/",List(IntConst(block_dim_size)))))),s)
+          case ((r,s),_) => (r,s)
+      }._1
+
   def tile_qualifiers ( qs: List[Qualifier], vars: List[String] ): List[Qualifier]
     = qs.foldLeft[(List[Qualifier],List[String])] ((Nil,vars)) {
-          case ((r,s),Generator(p,Lift(block,_)))
+          case ((r,s),Generator(TuplePat(List(p,VarPat(v))),Lift(block,_)))
             if isBlockTensor(block)
-            => (r++tile_generators(tile_type(block),p),
-                s++patvars(p))
+            => val is = patvars(p)       // use "lift" not Lift to unfold tensor views
+               (r++(Generator(tuple(List(tuple(is.map(i => VarPat(prefix("tile",i)))),VarPat(v))),
+                              lift(tile_type(block),Var(prefix("tile",v))))::
+                    is.map(i => LetBinding(VarPat(i),
+                                           MethodCall(MethodCall(Var(prefix("coord",i)),
+                                                                 "*",List(IntConst(block_dim_size))),
+                                                      "+",List(Var(prefix("tile",i))))))),
+                s++is:+v)
           case ((r,s),q@LetBinding(p,e))
             if local_expr(e,s)
             => (r:+q,s++patvars(p))
@@ -756,16 +815,74 @@ object ComprehensionTranslator {
           case ((r,s),_) => (r,s)
       }._1
 
-  def rdd_qualifiers ( qs: List[Qualifier], vars: List[String] ): List[Qualifier]
+  def preserve_tiles ( block: String, hs: Expr, qs: List[Qualifier],
+                       vars: List[String], tp: Type, dims: List[Expr] ): Expr
+    = hs match {
+        case Tuple(List(p,e))
+          => val is = freevars(p)
+             val tile_dims = is.map(v => IntConst(block_dim_size))
+             val tile_coords = tuple(is.map( v => Var(prefix("coord",v)) ))
+             val tile_indices = tuple(is.map {
+                                         case v => MethodCall(Var(v),"%",
+                                                              List(IntConst(block_dim_size)))
+                                      })
+             val tile = optimize(store(tile_type(block,tp),List(tp),tile_dims,
+                                       Comprehension(Tuple(List(tile_indices,e)),
+                                                     tile_qualifiers(qs,vars))))
+             val nq = rdd_qualifiers(qs,vars)
+             val Comprehension(nhs,nqs) = optimize(Comprehension(Tuple(List(tile_coords,tile)),nq))
+             tuple(dims:+translate_rdd(nhs,nqs,vars))
+      }
+
+
+/*----------------------- Tiled comprehension that does not preserve tiling -----------------------------*/
+
+  def rdd_qualifiers_shuffle ( qs: List[Qualifier], vars: List[String] ): List[Qualifier]
     = qs.foldLeft[(List[Qualifier],List[String])] ((Nil,vars)) {
-          case ((r,s),Generator(p,Lift(block_tensor_pat(dn,sn),e)))
-            => (r:+Generator(usciv(p),Lift("rdd",Nth(e,dn.toInt+sn.toInt+1))),
-                s++tile_indices(p))
-          case ((r,s),Generator(p,Lift(block_bool_tensor_pat(dn,sn),e)))
-            => (r:+Generator(usciv(p),Lift("rdd",Nth(e,dn.toInt+sn.toInt+1))),
-                s++tile_indices(p))
+          case ((r,s),Generator(TuplePat(List(p,VarPat(v))),Lift(block_pat(_,dn,sn),e)))
+            => val is = patvars(p)
+               (r++List(Generator(tuple(List(tuple(is.map(i => VarPat(prefix("coord",i)))),
+                                             VarPat(prefix("tile",v)))),
+                                  Lift("rdd",block_tensor_tiles(dn.toInt,sn.toInt,e))),
+                        LetBinding(VarPat(prefix("tiles",v)),   // will contain all needed tiles after group-by
+                                   tuple(List(tuple(is.map(i => Var(prefix("coord",i)))),
+                                              Var(prefix("tile",v)))))),
+                s++patvars(p))
           case ((r,s),q@Generator(p,Lift("rdd",_)))
             => (r:+q,s++patvars(p))
+          case ((r,s),q@LetBinding(p,e))
+            if local_expr(e,s)
+            => (r:+q,s++patvars(p))
+          case ((r,s),q@Predicate(MethodCall(Var(i),"==",List(Var(j)))))
+            if s.contains(i) && s.contains(j)
+            => (r:+Predicate(MethodCall(Var(prefix("coord",i)),
+                                        "==",List(Var(prefix("coord",j))))),s)
+          case ((r,s),q@Predicate(MethodCall(Var(i),"==",List(e))))
+            if s.contains(i) && freevars(e,Nil).intersect(s).isEmpty
+            => (r:+Predicate(MethodCall(Var(prefix("coord",i)),
+                     "==",List(MethodCall(e,"/",List(IntConst(block_dim_size)))))),s)
+          case ((r,s),q@Predicate(MethodCall(e,"==",List(Var(i)))))
+            if s.contains(i) && freevars(e,Nil).intersect(s).isEmpty
+            => (r:+Predicate(MethodCall(Var(prefix("coord",i)),
+                     "==",List(MethodCall(e,"/",List(IntConst(block_dim_size)))))),s)
+          case ((r,s),_) => (r,s)
+      }._1
+
+  def tile_qualifiers_shuffle ( qs: List[Qualifier], vars: List[String] ): List[Qualifier]
+    = qs.foldLeft[(List[Qualifier],List[String])] ((Nil,vars)) {
+          case ((r,s),Generator(TuplePat(List(p,VarPat(v))),Lift(block,_)))
+            if isBlockTensor(block)
+            => val is = patvars(p)       // use "lift" not Lift to unfold tensor views
+               (r++(Generator(tuple(List(tuple(is.map(i => VarPat(prefix("coord",i)))),
+                                         VarPat(prefix("tile",v)))),
+                              Var(prefix("tiles",v)))::      // get every grouped tile
+                    Generator(tuple(List(tuple(is.map(i => VarPat(prefix("tile",i)))),VarPat(v))),
+                              lift(tile_type(block),Var(prefix("tile",v))))::
+                    is.map(i => LetBinding(VarPat(i),
+                                           MethodCall(MethodCall(Var(prefix("coord",i)),
+                                                                 "*",List(IntConst(block_dim_size))),
+                                                      "+",List(Var(prefix("tile",i))))))),
+                s++is:+v)
           case ((r,s),q@LetBinding(p,e))
             if local_expr(e,s)
             => (r:+q,s++patvars(p))
@@ -778,104 +895,96 @@ object ComprehensionTranslator {
   def tiles_var ( p: Pattern ): String
     = "_"+tile_values(p).mkString("_")
 
-  def tile_qualifiers_shuffle ( qs: List[Qualifier], vars: List[String] ): List[Qualifier]
-    = qs.foldLeft[(List[Qualifier],List[String])] ((Nil,vars)) {
-          case ((r,s),Generator(p,Lift(block,_)))
-            if isBlockTensor(block)
-            => ((r:+Generator(usc(p),Var(tiles_var(p))))
-                ++tile_generators(tile_type(block),p),
-                s++patvars(p))
-          case ((r,s),q@LetBinding(p,e))
-            if local_expr(e,s)
-            => (r:+q,s++patvars(p))
-          case ((r,s),q@Predicate(e))
-            if local_expr(e,s)
-            => (r:+q,s)
-          case ((r,s),_) => (r,s)
-      }._1
-
-  def rdd_qualifiers_shuffle ( qs: List[Qualifier], vars: List[String] ): List[Qualifier]
-    = qs.foldLeft[(List[Qualifier],List[String])] ((Nil,vars)) {
-          case ((r,s),Generator(p,e@Lift(block,_)))
-            if isBlockTensor(block)
-            => (r++List(Generator(usciv(p),e),
-                        LetBinding(VarPat(tiles_var(p)),toExpr(usciv(p)))),
-                s++tile_indices(p))
-          case ((r,s),q@Generator(p,Lift("rdd",_)))
-            => (r:+q,s++patvars(p))
-          case ((r,s),q@LetBinding(p,e))
-            if local_expr(e,s)
-            => (r:+q,s++patvars(p))
-          case ((r,s),q@Predicate(e))
-            if local_expr(e,s)
-            => (r:+q,s)
-          case ((r,s),_) => (r,s)
-      }._1
-
   /* shuffle the tiles of a tiled comprehension */
   def shuffle_tiles ( block: String, hs: Expr, qs: List[Qualifier], group_by: Boolean,
-                      vars: List[String], tp: Type, dims: List[Expr], tile_dims: List[Expr] ): Expr
+                      vars: List[String], tp: Type, dims: List[Expr] ): Expr
     = hs match {
-        case Tuple(List(Tuple(ks),h))
-          => val N = IntConst(blockSize)
-             val range = Range(IntConst(0),IntConst(blockSize-1),IntConst(1))
+        case Tuple(List(p,h))
+          => val ks = p match { case Tuple(ks) => ks; case _ => List(p) }
+             val N = IntConst(block_dim_size)
+             val tile_dims = dims.map(v => IntConst(block_dim_size))
+             val range = Range(IntConst(0),IntConst(block_dim_size-1),IntConst(1))
              val fs = tile_indices(qs)
              val vs = ks.map{ _ => newvar }
              def gkeys ( op: String ): List[Expr]
                = (ks zip vs).map {
                       case (k,vk)
                         => val is = freevars(k,Nil).intersect(fs)
-                           val gk = is.map{ v => (v,MethodCall(MethodCall(Var("_"+v),"*",List(N)),
-                                                               "+",List(Var(v)))) }
+                           val gk = is.map{ v => (v,MethodCall(MethodCall(Var(prefix("coord",v)),
+                                                                          "*",List(N)),
+                                                               "+",List(Var(prefix("tile",v))))) }
                            MethodCall(gk.foldLeft[Expr](k){ case (r,(v,e)) => subst(v,e,r) },
                                       op,List(N))
                       }
-             val tiles = (ks zip vs zip gkeys("/")).map {
+             // generate all the unique block coordinates from the current block coordinates
+             //   used by the comprehension keys
+             val unique_coords
+                 = (ks zip vs zip gkeys("/")).map {
                             case ((Var(v),vk),_)
-                              => LetBinding(VarPat(vk),Var("_"+v))
+                              => LetBinding(VarPat(vk),Var(prefix("coord",v)))
                             case ((k,vk),gkey)
                               => val is = freevars(k,Nil).intersect(fs)
                                  Generator(VarPat(vk),
                                            Comprehension(Var(vk),
-                                                         is.map{ v => Generator(VarPat(v),range) }:+
+                                               is.map{ v => Generator(VarPat(prefix("tile",v)),range) }:+
                                                             GroupByQual(VarPat(vk),gkey)))
                          }
-             val rqs = rdd_qualifiers_shuffle(qs,vars)++tiles:+
-                               GroupByQual(TuplePat(vs.map(VarPat)),
-                                           Tuple(vs.map(Var)))
+//println("()() "+Pretty.print(unique_coords))
+             val rqs = rdd_qualifiers_shuffle(qs,vars)++unique_coords:+
+                               GroupByQual(tuple(vs.map(VarPat)),
+                                           tuple(vs.map(Var)))
              val tqs = if (group_by)
-                         List(GroupByQual(TuplePat(ks.map{ case Var(v) => VarPat(v); case _ => VarPat("") }),
+                         List(GroupByQual(TuplePat(ks.map{ case Var(v) => VarPat(v)
+                                                           case _ => VarPat("") }),
                                           Tuple(ks)))
                        else (vs zip gkeys("/")).map {
                                case (vk,gkey)
                                  => Predicate(MethodCall(Var(vk),"==",List(gkey)))
                             }
-             val guards = (ks zip vs zip tile_dims).flatMap {
+             val guards = (ks zip vs zip dims).flatMap {   // not used
                             case ((k,vk),d)
                               if !group_by
                               => val is = freevars(k,Nil).intersect(fs)
-                                 is.map{ v => Predicate(MethodCall(MethodCall(MethodCall(Var("_"+v),"*",List(N)),
-                                                                              "+",List(Var(v))),
-                                                                   "<",List(d))) }
+                                 is.map{ v => val vs = MethodCall(MethodCall(Var(prefix("coord",v)),
+                                                                             "*",List(N)),
+                                                                  "+",List(Var(v)))
+                                              Predicate(MethodCall(vs,"<",List(d))) }
                             case _ => Nil
                           }
              val tile = Store(tile_type(block,tp),List(tp),tile_dims,
                               Comprehension(Tuple(List(Tuple(if (group_by) ks else gkeys("%")),h)),
-                                            tile_qualifiers_shuffle(qs,vars)++guards++tqs))
-             val rdd = translate_rdd(Tuple(List(Tuple(vs.map(Var)),tile)),rqs,vars)
+                                            tile_qualifiers_shuffle(qs,vars)++tqs))
+//println("==== "+Pretty.print(Comprehension(Tuple(List(tuple(vs.map(Var)),tile)),rqs)))
+             val rdd = translate_rdd(Tuple(List(tuple(vs.map(Var)),tile)),rqs,vars)
              translate(Tuple(dims:+rdd),vars)
     }
 
-  /* a group-by on tiled arrays */
-  def groupBy_tiles ( block: String, hs: Expr, qs: List[Qualifier], vars: List[String],
-                      tp: Type, dims: List[Expr], tile_dims: List[Expr] ): Expr
+
+/* -------------------- a group-by on block tensors -----------------------------------------*/
+
+  def hasGroupByTiling ( qs: List[Qualifier], key: Expr ): Boolean
+    = qs.exists {
+        case GroupByQual(kp,Var(i))
+          => key == toExpr(kp) && tile_indices(qs).contains(i)
+        case GroupByQual(kp,Tuple(vs))
+          => key == toExpr(kp) &&
+               vs.forall{ case Var(v) => tile_indices(qs).contains(v)
+                          case _ => false }
+        case _ => false
+      }
+
+  def groupBy_tiles ( block: String, hs: Expr, qs: List[Qualifier],
+                      vars: List[String], tp: Type, dims: List[Expr] ): Expr
     = hs match {
         case Tuple(List(kp,head))
           => qs.span{ case GroupByQual(gp,_) => toExpr(gp) != kp; case _ => true } match {
               case (r,GroupByQual(p,k)::s)
                 => val tileType = tile_type(block,tp)
                    val ndims = dims.length
-                   val groupByVars = patvars(p)
+                   val groupByVars = p match {
+                                       case VarPat(_) if ndims > 1
+                                         => freevars(k)
+                                       case _ => patvars(p) }
                    // non-groupby variables used in head
                    val usedVars = freevars(Comprehension(hs,s),groupByVars)
                                               .intersect(comprVars(r)).distinct
@@ -895,24 +1004,25 @@ object ComprehensionTranslator {
                                     case (_,_) => "++"
                                   }
                    val msTypes = rt.map{ case (v,u) => typecheck(u) }
-                   def nvar ( s: String ) = 1.to(ndims).map(i => Var(s+i)).toList
-                   def nvarp ( s: String ) = 1.to(ndims).map(i => VarPat(s+i)).toList
+                   def nvar ( s: String ) = tuple(1.to(ndims).map(i => Var(s+i)).toList)
+                   def nvarp ( s: String ) = tuple(1.to(ndims).map(i => VarPat(s+i)).toList)
                    def combine ( x: String, y: String, m: String, tp: Type ): Expr = {
-                     val tileType = tile_type(block,tp)
-                     val cb = Store(tileType,List(tp),tile_dims,
-                             Comprehension(Tuple(List(tuple(nvar("i")),
-                                                      mcall(m,Var("v"),Var("w")))),
-                                           List(Generator(TuplePat(List(tuple(nvarp("i")),
-                                                                        VarPat("v"))),
+                     val tileType =  tile_type(block,tp)  // tensor type is based on monoid type
+                     val cdims = if (ndims == 1)
+                                   List(Nth(Var(x),1))
+                                 else 1.to(ndims).map(i => Nth(Var(x),i)).toList
+                     val cb = Store(tileType,List(tp),cdims,
+                             Comprehension(Tuple(List(nvar("i"),mcall(m,Var("v"),Var("w")))),
+                                           List(Generator(TuplePat(List(nvarp("i"),VarPat("v"))),
                                                           Lift(tileType,Var(x))),
-                                                Generator(TuplePat(List(tuple(nvarp("j")),
-                                                                        VarPat("w"))),
+                                                Generator(TuplePat(List(nvarp("j"),VarPat("w"))),
                                                           Lift(tileType,Var(y))))
                                            ++1.to(ndims).map(i => Predicate(MethodCall(Var("j"+i),
                                                                          "==",List(Var("i"+i)))))))
-                     val Some(TypeMapS(_,List(tv),_,_,st,_,_,_)) = Lifting.getTypeMap(tileType)
-                     val ctp = substType(st,Some(Map((tv,tp))))
-                     typecheck(cb,Map(x->ctp,y->ctp))
+                     val ctp = TupleType((1 to ndims).map(i => intType).toList:+ArrayType(1,tp))
+                     val env = Map(x->ctp,y->ctp)
+println("@@@ "+Pretty.print(cb))
+                     typecheck(cb.value,env)
                      cb
                    }
                    val md = h match {
@@ -928,32 +1038,38 @@ object ComprehensionTranslator {
                                                       .map{ case ((m,tp),(x,y))
                                                               => combine(x,y,m,tp) } ))
                                    }
-                            }
+                   }
                    val rqs = rdd_qualifiers(qs,vars)
+                   val tile_dims = groupByVars.map(v => IntConst(block_dim_size))
+                   val tile_keys = tuple(groupByVars.map( v => VarPat(prefix("tile",v)) ))
                    val tiles = (rt zip msTypes).map {
                                  case ((_,u),tp)
-                                   => val tileType =  tile_type(block,tp)
-                                      Store(tileType,List(tp),tile_dims,
-                                            Comprehension(Tuple(List(toExpr(p),u)),
-                                                          (tile_qualifiers(r,vars):+GroupByQual(p,k))
-                                                          ++s))
+                                   => (Store(tile_type(block,tp),
+                                                     List(tp),tile_dims,
+                                            Comprehension(Tuple(List(toExpr(tile_keys),u)),
+                                                   (tile_qualifiers(r,vars)
+                                                    :+GroupByQual(tile_keys,
+                                                                  toExpr(tile_keys)))++s)))
                                }
-                   val rdd =  MethodCall(translate_rdd(Tuple(List(k,tuple(tiles))),rqs,vars),
-                                         "reduceByKey",List(md))
+                   val tile_coords = tuple(groupByVars.map( v => Var(prefix("coord",v)) ))
+                   val nc = Comprehension(Tuple(List(tile_coords,tuple(tiles))),rqs)
+                   val rdd = MethodCall(Store("rdd",Nil,Nil,nc),
+                                        "reduceByKey",List(md))
+println("groupBy_tiles:\n"+Pretty.print(Comprehension(hs,qs))+"\n"+Pretty.print(rdd))
                    val env = rt.map{ case (n,e) => (e,newvar) }
                    def liftExpr ( x: Expr ): Expr
-                     = env.foldLeft(x) { case (r,(from,to)) => AST.subst(from,Var(to+"_"),r) }
+                     = env.foldLeft(x) { case (r,(from,to)) => subst(from,Var(to+"_"),r) }
                    val liftedTile
                      = liftExpr(h) match {
                          case Var(v)
                            => Var(v.dropRight(1))
                          case nh
                          => Store(tileType,List(tp),tile_dims,
-                                  Comprehension(Tuple(List(tuple(nvar("i0_")),nh)),
+                                  Comprehension(Tuple(List(nvar("i0_"),nh)),
                                env.map(_._2).zip(msTypes).zipWithIndex.flatMap {
                                   case ((v,tp),i)
                                     => val tileType =  tile_type(block,tp)
-                                       Generator(TuplePat(List(tuple(nvarp("i"+i+"_")),
+                                       Generator(TuplePat(List(nvarp("i"+i+"_"),
                                                                VarPat(v+"_"))),
                                                  Lift(tileType,Var(v)))::
                                        (if (i > 0)
@@ -966,17 +1082,22 @@ object ComprehensionTranslator {
                                            List(Generator(TuplePat(List(p,tuple(env.map(x => VarPat(x._2))))),
                                                           rdd)),vars)
                    translate(Tuple(dims:+res),vars)
-            case _ => throw new Error("")
+            case _ => throw new Error("Expected a group-by comprehension: "
+                                      +Comprehension(hs,qs))
           }
     }
 
-  def findJoinGBKeys ( xs: Set[String], ys: Set[String], qs: List[Qualifier] ): Option[List[Qualifier]]
-    = matchQ(qs,{ case Predicate(MethodCall(e1,"==",List(e2)))
-                    => ((subsetOrEq(e1,xs) && subsetOrEq(e2,ys))
-                        || (subsetOrEq(e2,xs) && subsetOrEq(e1,ys)))
+
+/* -------------------- GroupBy Join using the SUMMA algorithm -----------------------------------------*/
+
+  def findJoinGBKeys ( xs: Set[String], ys: Set[String], qs: List[Qualifier] ): Option[List[Qualifier]] = {
+    val qvars = qual_vars(qs)
+    matchQ(qs,{ case Predicate(MethodCall(e1,"==",List(e2)))
+                    => ((contains(e1,xs,qvars) && contains(e2,ys,qvars))
+                        || (contains(e2,xs,qvars) && contains(e1,ys,qvars)))
                   case GroupByQual(p,Tuple(List(gx,gy)))
-                    if ((subsetOrEq(gx,xs) && subsetOrEq(gy,ys))
-                        || (subsetOrEq(gy,xs) && subsetOrEq(gx,ys)))
+                    if ((contains(gx,xs,qvars) && contains(gy,ys,qvars))
+                        || (contains(gy,xs,qvars) && contains(gx,ys,qvars)))
                     => true
                   case _ => false },
                 { case (p@Predicate(MethodCall(e1,"==",List(e2))))::s
@@ -988,6 +1109,7 @@ object ComprehensionTranslator {
                     => Some(List(g))
                   case _::_ => None
                 })
+  }
 
   def findGroupByJoin ( qs: List[Qualifier] ): Option[List[Qualifier]]
     = if (qs.map{ case Generator(_,u) if isTiled(u) => 1; case _ => 0 }.sum != 2) None
@@ -1002,6 +1124,74 @@ object ComprehensionTranslator {
                                   case _ => None })
                   case _ => None })
 
+  def translate_groupby_join ( block: String, hs: Expr, qs: List[Qualifier], vars: List[String],
+                               tp: Type, dims: List[Expr] ): Option[Expr]
+    = if (!groupByJoin) None
+      else findGroupByJoin(qs) match {
+         case Some((g1@Generator(p1,d1))::(g2@Generator(p2,d2))
+                   ::(cs:+(g@GroupByQual(p,k@Tuple(List(gx,gy))))))
+           => val N = IntConst(block_dim_size)
+              val qvars = qual_vars(qs)
+              val jt1 = cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
+                                  => if (contains(e1,patvars(p1).toSet,qvars)) e1 else e2
+                                case _ => d1 }
+              val jt2 = cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
+                                  => if (contains(e1,patvars(p2).toSet,qvars)) e1 else e2
+                                case _ => d1 }
+              val (ngx,ngy) = if (contains(gx,patvars(p1).toSet,qvars)) (gx,gy) else (gy,gx)
+              val (r,_::s) = qs.span(_ != g)
+              val groupByVars = patvars(p)
+              val usedVars = freevars(Comprehension(hs,s),groupByVars)
+                                    .intersect(comprVars(r)).distinct
+              val rt = findReducedTerms(yieldReductions(Comprehension(hs,s),usedVars),
+                                        usedVars)
+              val c = Comprehension(Tuple(List(toExpr(p),tuple(rt.map(_._2)))),
+                                    List(Generator(TuplePat(List(VarPat("k1"),
+                                                        tuple(tile_values(p1)
+                                                               .map(v => VarPat(prefix("tile",v)))))),
+                                                   Var("__v1")),
+                                         Generator(TuplePat(List(VarPat("k2"),
+                                                        tuple(tile_values(p2)
+                                                               .map(v => VarPat(prefix("tile",v)))))),
+                                                   Var("__v2")),
+                                         Predicate(MethodCall(Var("k1"),"==",List(Var("k2")))))++
+                                    tile_qualifiers(r,vars):+g)
+              val tile_dims = 1.to(dims.length).map(i => N).toList
+              val tile = Store(tile_type(block,tp),List(tp),tile_dims,c)
+              def num_of_tiles ( size: Expr )
+                = MethodCall(MethodCall(MethodCall(size,"+",List(IntConst(block_dim_size-1))),
+                             "/",List(N)),"-",List(IntConst(1)))
+              val kv = newvar
+              val left_size::right_size::_ = dims
+              val left = translate_rdd(Tuple(List(Tuple(List(ngx,Var(kv))),
+                                                  Tuple(List(tuple(jt1),
+                                                             tuple(tile_values(p1).map(Var)))))),
+                                       List(Generator(p1,d1),
+                                            Generator(VarPat(kv),
+                                                      Range(IntConst(0),
+                                                            num_of_tiles(right_size),
+                                                            IntConst(1)))),vars)
+              val right = translate_rdd(Tuple(List(Tuple(List(Var(kv),ngy)),
+                                                   Tuple(List(tuple(jt2),
+                                                              tuple(tile_values(p2).map(Var)))))),
+                                        List(Generator(p2,d2),
+                                             Generator(VarPat(kv),
+                                                       Range(IntConst(0),
+                                                             num_of_tiles(left_size),
+                                                             IntConst(1)))),vars)
+              val nq = Generator(TuplePat(List(tuple(groupByVars.map{ v => VarPat(prefix("coord",v)) }),
+                                               TuplePat(List(VarPat("__v1"),VarPat("__v2"))))),
+                                 Lift("rdd",MethodCall(left,"cogroup",List(right))))
+              val rdd = translate_rdd(Tuple(List(toExpr(p),tile)),
+                                      rdd_qualifiers(qs.flatMap( q => if ((g::g2::cs).contains(q)) Nil
+                                                                      else if (q==g1) List(nq) else List(q) ),
+                                                     vars),vars)
+              Some(tuple(dims:+rdd))
+         case _ => None
+    }
+
+
+/* -------------------- translate block tensor comprehensions -----------------------------------------*/
 
   /* matches the equi-join ...,p1 <- e1,...,p2 <- e2,...,e3 == e4,...   */
   def findTileJoin ( qs: List[Qualifier] ): Option[List[Qualifier]]
@@ -1024,115 +1214,69 @@ object ComprehensionTranslator {
                                   case _ => None })
                   case _ => None })
 
-  var QLcache: Option[List[Qualifier]] = None
+  def filter_tile_predicates ( qs: List[Qualifier], indices: List[String] ): List[Qualifier]
+    = qs.filter{ case Predicate(MethodCall(Var(i),"==",List(Var(j))))
+                   => indices.contains(i) && indices.contains(j)
+                 case Predicate(e) => false
+                 case _ => true }
+
+  var QLcache: Option[Expr] = None
+
+  def div ( e: Expr, N: Expr ): Expr
+    = e match {
+        case Tuple(es)
+          => Tuple(es.map(e => MethodCall(e,"/",List(N))))
+        case _ => MethodCall(e,"/",List(N))
+      }
+
+  def mod ( e: Expr, N: Expr ): Expr
+    = e match {
+        case Tuple(es)
+          => Tuple(es.map(e => MethodCall(e,"%",List(N))))
+        case _ => MethodCall(e,"%",List(N))
+      }
 
   def translate_tiled ( block: String, hs: Expr, qs: List[Qualifier], vars: List[String],
-                        tp: Type, dims: List[Expr] ): Expr = {
-    val N = Math.pow(blockSize,1.0/(dims.length)).toInt
-    val tile_dims = 1.to(dims.length).map(i => IntConst(N)).toList
-    hs match {
-      case Tuple(List(p,_))   // a tiled comprehension that preserves tiling
-        if !hasGroupBy(qs)
-           && { val indices = tile_indices(qs)      // TODO: all other indices must be ==
-                indices.nonEmpty && freevars(p).forall(indices.contains(_)) }
-        => val tile = Store(tile_type(block,tp),List(tp),tile_dims,
-                            Comprehension(hs,tile_qualifiers(qs,vars)))
-           tuple(dims:+translate_rdd(Tuple(List(p,tile)),rdd_qualifiers(qs,vars),vars))
-        case Tuple(List(Tuple(ks),_))   // a tiled comprehension that doesn't preserve tiling
-          if !hasGroupBy(qs) && tile_indices(qs).nonEmpty
-          => shuffle_tiles(block,hs,qs,false,vars,tp,dims,tile_dims)
-        case _
-          if groupByJoin && { QLcache = findGroupByJoin(qs); QLcache.nonEmpty }
-          => QLcache match {          // group-by join
-               case Some((g1@Generator(p1,d1))::(g2@Generator(p2,d2))
-                             ::(cs:+(g@GroupByQual(p,k@Tuple(List(gx,gy))))))
-                 => val jt1 = cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
-                                              => if (subsetOrEq(e1,patvars(p1).toSet)) e1 else e2
-                                            case _ => d1 }
-                    val jt2 = cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
-                                              => if (subsetOrEq(e1,patvars(p2).toSet)) e1 else e2
-                                            case _ => d1 }
-                    val (ngx,ngy) = if (subsetOrEq(gx,patvars(p1).toSet)) (gx,gy) else (gy,gx)
-                    val (r,_::s) = qs.span(_ != g)
-                    val groupByVars = patvars(p)
-                    val usedVars = freevars(Comprehension(hs,s),groupByVars)
-                                          .intersect(comprVars(r)).distinct
-                    val rt = findReducedTerms(yieldReductions(Comprehension(hs,s),usedVars),
-                                              usedVars)
-                    val c = Comprehension(Tuple(List(toExpr(p),tuple(rt.map(_._2)))),
-                                          List(Generator(TuplePat(List(VarPat("k1"),
-                                                              tuple(tile_values(p1).map(v => VarPat("_"+v))))),
-                                                         Var("__v1")),
-                                               Generator(TuplePat(List(VarPat("k2"),
-                                                              tuple(tile_values(p2).map(v => VarPat("_"+v))))),
-                                                         Var("__v2")),
-                                               Predicate(MethodCall(Var("k1"),"==",List(Var("k2")))))++
-                                          tile_qualifiers(r,vars):+g)
-                    val tile = Store(tile_type(block,tp),List(tp),tile_dims,c)
-                    def num_of_tiles ( size: Expr )
-                      = MethodCall(MethodCall(MethodCall(size,"+",List(IntConst(N-1))),
-                                   "/",List(IntConst(N))),"-",List(IntConst(1)))
-                    val kv = newvar
-                    val left_size::right_size::_ = dims
-                    val left = translate_rdd(Tuple(List(Tuple(List(ngx,Var(kv))),
-                                                        Tuple(List(tuple(jt1),
-                                                                   tuple(tile_values(p1).map(Var)))))),
-                                             List(Generator(p1,d1),
-                                                  Generator(VarPat(kv),
-                                                            Range(IntConst(0),
-                                                                  num_of_tiles(right_size),
-                                                                  IntConst(1)))),vars)
-                    val right = translate_rdd(Tuple(List(Tuple(List(Var(kv),ngy)),
-                                                         Tuple(List(tuple(jt2),
-                                                                    tuple(tile_values(p2).map(Var)))))),
-                                              List(Generator(p2,d2),
-                                                   Generator(VarPat(kv),
-                                                             Range(IntConst(0),
-                                                                   num_of_tiles(left_size),
-                                                                   IntConst(1)))),vars)
-                    val nq = Generator(TuplePat(List(p,TuplePat(List(VarPat("__v1"),VarPat("__v2"))))),
-                                       Lift("rdd",MethodCall(left,"cogroup",List(right))))
-                    val rdd = translate_rdd(Tuple(List(toExpr(p),tile)),
-                                            rdd_qualifiers(qs.flatMap( q => if ((g::g2::cs).contains(q)) Nil
-                                                                            else if (q==g1) List(nq) else List(q) ),
-                                                           vars),vars)
-                    tuple(dims:+rdd)
-               case _ => throw new Error("Unexpected error in groupByJoin")
-             }
-       case Tuple(List(kp,_))   // group-by tiled comprehension with group-by-key == comprehension key
-         if hasGroupByKey(qs,kp)
-         => qs.span{ case GroupByQual(p,_) => toExpr(p) != kp; case _ => true } match {
-                     case (r,GroupByQual(p,k)::s)
-                       => // a tiled comprehension with a group-by
-                          groupBy_tiles(block,hs,qs,vars,tp,dims,tile_dims)
-                     case _ => throw new Error("Unexpected error in tiled groupBy")
-                   }
-       case Tuple(List(kp,u)) // group-by tiled comprehension with group-by-key != comprehension key
-         if hasGroupBy(qs)
-         => qs.span{ case GroupByQual(p,_) => false; case _ => true } match {
-                     case (r,gb@GroupByQual(p,k)::s)
+                        tp: Type, dims: List[Expr] ): Expr
+    = hs match {
+      case Tuple(List(p,h))   // a tiled comprehension that preserves tiling
+        if preserves_tiling(p,qs)
+        => preserve_tiles(block,hs,qs,vars,tp,dims)
+      case Tuple(List(_,_))   // a tiled comprehension that doesn't preserve tiling
+        if !hasGroupBy(qs) && tile_indices(qs).nonEmpty
+        => shuffle_tiles(block,hs,qs,false,vars,tp,dims)
+      case _
+        if { QLcache = translate_groupby_join(block,hs,qs,vars,tp,dims); QLcache.nonEmpty }
+        => QLcache.get
+      case Tuple(List(kp,_))   // group-by tiled comprehension with group-by-key == comprehension key
+        if hasGroupByTiling(qs,kp)
+        => groupBy_tiles(block,hs,qs,vars,tp,dims)
+      case Tuple(List(kp,u)) // group-by tiled comprehension with group-by-key != comprehension key
+        if hasGroupBy(qs)
+        => qs.span{ case GroupByQual(p,_) => false; case _ => true } match {
+                    case (r,gb@GroupByQual(p,k)::s)
                        => val nhs = Tuple(List(toExpr(p),u))
                           val sgb = translate(Store("block_map",List(typecheck(kp),typecheck(u)),Nil,
                                                     Comprehension(hs,qs)),vars)
                           val nv = newvar
                           val nk = newvar
-                          translate(Store(block,List(tp),dims,
+                          val res = Store(block,List(tp),dims,
                                           Comprehension(Tuple(List(Var(nk),Var(nv))),
-                                                        List(Generator(TuplePat(List(VarPat(nk),VarPat(nv))),sgb)))),
-                                    vars)
+                                                        List(Generator(TuplePat(List(VarPat(nk),VarPat(nv))),
+                                                                       sgb))))
+println("!!! "+Pretty.print(res))
+                          translate(res,vars)
                      case _ => throw new Error("Unexpected error in tiled groupBy")
                    }
-       case Tuple(List(kp,_)) // group-by tiled comprehension with group-by-key != comprehension key
-         if hasGroupBy(qs)
-         => throw new Error("Cannot translate group-by tiled comprehension with group-by-key != comprehension key")
         case _
           => findTileJoin(qs) match {
                 // join between tile collections
                 case Some((Generator(p1,d1))::(Generator(p2,d2))::cs)
-                  => val jt1 = tuple(cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
-                                               => if (subsetOrEq(e1,patvars(p1).toSet)) e1 else e2 })
+                  => val qvars = qual_vars(qs)
+                     val jt1 = tuple(cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
+                                               => if (contains(e1,patvars(p1).toSet,qvars)) e1 else e2 })
                      val jt2 = tuple(cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
-                                               => if (subsetOrEq(e1,patvars(p2).toSet)) e1 else e2 })
+                                               => if (contains(e1,patvars(p2).toSet,qvars)) e1 else e2 })
                      val left = flatMap(Lambda(p1,Seq(List(Tuple(List(jt1,toExpr(p1)))))),
                                         get_rdd(d1))
                      val right = flatMap(Lambda(p2,Seq(List(Tuple(List(jt2,toExpr(p2)))))),
@@ -1146,7 +1290,7 @@ object ComprehensionTranslator {
                      val rdd = translate_rdd(hs,qs.flatMap {
                           case Generator(p,_) if p==p1 => List(z)
                           case Generator(p,_) if p==p2 => Nil
-                          case x => List(x) // if (cs.contains(x)) Nil else List(x)  don't remove join condition
+                          case x => List(x)   // don't remove join condition
                          },vars)
                      tuple(dims:+rdd)
               case _
@@ -1179,7 +1323,8 @@ object ComprehensionTranslator {
                                 }._1
                    }
           }
-    }}
+    }
+
 
 /*----------------------------------------------------------------------------------------------------*/
 
@@ -1220,6 +1365,22 @@ object ComprehensionTranslator {
            && hasGroupBy(qqs)
         => tensor_groupby_neqkey(array,tp,dims,head,qqs)
       case reduce(op,x@Comprehension(h,qs))
+        if is_tiled_comprehension(qs)
+        // total aggregation on tiled comprehensions
+        => val tile_value = reduce(op,Comprehension(h,tile_qualifiers(qs,vars)))
+           val nq = rdd_qualifiers(qs,vars)
+           val Comprehension(nhs,nqs) = optimize(Comprehension(tile_value,nq))
+           MethodCall(translate_rdd(nhs,nqs,vars),
+                      "reduce",
+                      List(Lambda(TuplePat(List(VarPat("x"),VarPat("y"))),
+                                  MethodCall(Var("x"),op,List(Var("y"))))))
+      case reduce(op,Comprehension(h,qs))
+        if is_rdd_comprehension(qs)
+        // total RDD aggregation
+        => MethodCall(translate_rdd(h,qs,vars),"reduce",
+                      List(Lambda(TuplePat(List(VarPat("x"),VarPat("y"))),
+                                  MethodCall(Var("x"),op,List(Var("y"))))))
+      case reduce(op,x@Comprehension(h,qs))
         // total aggregation
         => val nv = newvar
            val nr = qs:+AssignQual(Var(nv),mcall(op,Var(nv),h))
@@ -1227,14 +1388,6 @@ object ComprehensionTranslator {
            val zero = zeroValue(op,etp)
            translate(Block(List(VarDecl(nv,etp,Seq(List(zero))),
                                 Comprehension(ignore,nr),Var(nv))),vars)
-/*
-      case Store(array,tps@List(tp),args,c@Comprehension(_,qs))
-        if isTensor(array) && is_rdd_comprehension(qs)
-        => val rtp = TupleType(List(tuple(args.map( i => intType )),tp))
-           val rdd = translate(Store("rdd",List(rtp),Nil,c))
-           rdd.tpe = typecheck(c)
-           translate(store(array,tps,args,MethodCall(rdd,"collect",null)))
-*/
       case Store(f,tps,args,u)
         // if no special rule applies, return storage of u: inv(u)
         => val su = optimize(store(f,tps,args,u))
@@ -1276,6 +1429,8 @@ object ComprehensionTranslator {
           if List("+=","append","update").contains(op)
           => true
         case Assign(MapAccess(_,_),_)   // Map is not thread-safe
+          => true
+        case Assign(Var(_),_)
           => true
         case _ => accumulate[Boolean](e,has_side_effects,_||_,false)
       }

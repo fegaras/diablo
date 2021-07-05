@@ -43,15 +43,18 @@ object Normalizer {
       case Project(u,_)
         => isSimple(u)
       case Index(u,is)
-        => isSimple(u) && is.map(isSimple).reduce(_&&_)
+        => isSimple(u) && is.forall(isSimple)
       case Tuple(cs)
-        => cs.isEmpty || cs.map(isSimple).reduce(_&&_)
+        => cs.isEmpty || cs.forall(isSimple)
       case Record(cs)
-        => cs.isEmpty || cs.map{ case (_,u) => isSimple(u) }.reduce(_&&_)
+        => cs.isEmpty || cs.map(_._2).forall(isSimple)
       case Seq(cs)
-        => cs.isEmpty || cs.map(isSimple).reduce(_&&_)
+        => cs.isEmpty || cs.forall(isSimple)
       case Merge(x,y)
         => isSimple(x) && isSimple(y)
+      case MethodCall(x,op,xs)  // arithmetic operations are simple
+        if List("+","*","/","%").contains(op)
+        => isSimple(x) && xs.forall(isSimple)
       case _ => false
     }
 
@@ -161,7 +164,7 @@ object Normalizer {
              normalize(head,r,bindEnv(p,normalize(substE(u,env)))++freeEnv(p,env),opts)
            else LetBinding(p,normalize(substE(u,env)))::normalize(head,r,env,opts)
       case LetBinding(p,u)::r
-        => if (notGrouped(p,head,r))
+        => if (false && notGrouped(p,head,r))
              normalize(head,r,bindEnv(p,normalize(substE(u,env)))++freeEnv(p,env),opts)
            else LetBinding(p,normalize(substE(u,env)))::normalize(head,r,env,opts)
       case Predicate(BoolConst(false))::r

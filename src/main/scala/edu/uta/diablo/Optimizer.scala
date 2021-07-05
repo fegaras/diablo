@@ -15,10 +15,11 @@
  */
 package edu.uta.diablo
 
+
 object Optimizer {
   import AST._
   import Normalizer.{normalizeAll,comprVars}
-  import ComprehensionTranslator.{isBlockTensor,isTensor}
+  import ComprehensionTranslator.{isBlockTensor,isTensor,qual_vars}
 
   /* general span for comprehensions; if a qualifier matches, split there and continue with cont */
   def matchQ ( qs: List[Qualifier], filter: Qualifier => Boolean,
@@ -71,6 +72,13 @@ object Optimizer {
         case MethodCall(c,op,List(u))
           if (inverses.contains(op) && constantKey(c))
           => inverse(u,src,MethodCall(dst,inverses(op),List(c)))
+        case MethodCall(x,op,List(y))
+          if (inverses.contains(op) && freevars(x).contains(src)
+              && !freevars(y).contains(src))
+          => inverse(x,src,MethodCall(dst,inverses(op),List(y)))
+        case MethodCall(y,"+",List(x))   // needs more cases
+          if (freevars(x).contains(src) && !freevars(y).contains(src))
+          => inverse(x,src,MethodCall(dst,"-",List(y)))
         case _ => None
       }
 
@@ -96,7 +104,7 @@ object Optimizer {
                 { case (g@Generator(TuplePat(List(p,_)),_))::s
                     => matchQ(s,{ case Generator(_,Range(_,_,_)) => true; case _ => false },
                                 { case (ig@Generator(VarPat(index),Range(_,_,_)))::r
-                                    => matchQ(s,{ case Predicate(MethodCall(Var(v),"==",List(ie)))
+                                    => matchQ(r,{ case Predicate(MethodCall(Var(v),"==",List(ie)))
                                                     => patvars(p).contains(v) &&
                                                        inverse(ie,index,Var(v)).nonEmpty
                                                   case _ => false },
@@ -105,6 +113,34 @@ object Optimizer {
                                                 case _ => None })
                                   case _ => None })
                   case _ => None })
+
+  def findRangeGen3 ( qs: List[Qualifier] ): Option[List[Qualifier]] = {
+    val qvars = qual_vars(qs)
+    matchQ(qs,{ case Generator(_,Range(_,_,_)) => true; case _ => false },
+                { case (g@Generator(VarPat(i),_))::s
+                    => matchQ(s,{ case Generator(_,Range(_,_,_)) => true; case _ => false },
+                                { case (ig@Generator(VarPat(j),_))::r
+                                    => matchQ(r,{ case Predicate(MethodCall(ie,"==",List(je)))
+                                                    if freevars(ie).contains(i)
+                                                       && freevars(je).contains(j)
+                                                       && freevars(ie,List(i)).toSet.intersect(qvars).isEmpty
+                                                       && freevars(je,List(j)).toSet.intersect(qvars).isEmpty
+                                                       && inverse(je,j,ie).nonEmpty
+                                                    => true
+                                                  case Predicate(MethodCall(je,"==",List(ie)))
+                                                    if freevars(ie).contains(i)
+                                                       && freevars(je).contains(j)
+                                                       && freevars(ie,List(i)).toSet.intersect(qvars).isEmpty
+                                                       && freevars(je,List(j)).toSet.intersect(qvars).isEmpty
+                                                       && inverse(je,j,ie).nonEmpty
+                                                    => true
+                                                  case _ => false },
+                                              { case c::_
+                                                  => Some(List(g,ig,c))
+                                                case _ => None })
+                                  case _ => None })
+                  case _ => None })
+         }
 
   /* finds a sequence of predicates in qs that imply x=y */
   def findEqPred ( x: String, y: String, qs: List[Qualifier] ): Option[List[Qualifier]]
@@ -270,6 +306,20 @@ object Optimizer {
                                  LetBinding(VarPat(i),inverse(ie,i,Var(v)).get))++
                               (if (ir==u) Nil else List(Predicate(Call("inRange",List(Var(v),m1,m2,m3)))))
                    val nqs = qs.diff(List(ig,c)).flatMap( x => if (x==g) gs else List(x))
+                   optimize(Comprehension(h,nqs))
+             case _ => apply(e,optimize)
+           }
+      case Comprehension(h,qs)
+        if { QLcache = findRangeGen3(qs); QLcache.nonEmpty }
+        => // if two range generators are correlated, eliminate the second range generator 
+           QLcache match {
+             case Some(List( ig@Generator(_,_),
+                             jg@Generator(VarPat(j),Range(n1,n2,n3)),
+                             c@Predicate(MethodCall(ie,"==",List(je))) ))
+                => val (ip,jp) = if (freevars(je).contains(j)) (ie,je) else (je,ie)
+                   val bs = List(LetBinding(VarPat(j),inverse(jp,j,ip).get),
+                                 Predicate(Call("inRange",List(Var(j),n1,n2,n3))))
+                   val nqs = qs.diff(List(c)).flatMap( x => if (x==jg) bs else List(x))
                    optimize(Comprehension(h,nqs))
              case _ => apply(e,optimize)
            }

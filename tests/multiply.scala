@@ -31,7 +31,7 @@ object Multiply extends Serializable {
     val repeats = args(0).toInt
     val n = args(1).toInt   // each matrix has n*n elements
     val m = n
-    parami(blockSize,1000000)
+    parami(block_dim_size,1000)  // size of each dimension
     val N = 1000
     val validate_output = false
 
@@ -134,7 +134,6 @@ object Multiply extends Serializable {
 
     // matrix multiplication of tiled matrices using Diablo array comprehensions
     def testMultiplyDiabloDAC (): Double = {
-      param(groupByJoin,true)
       val t = System.currentTimeMillis()
       try {
         val C = q("""
@@ -147,7 +146,6 @@ object Multiply extends Serializable {
 
     // matrix multiplication of tiled matrices using Diablo array comprehensions - no in-tile parallelism
     def testMultiplyDiabloDACs (): Double = {
-      param(groupByJoin,false)
       param(parallel,false)
       val t = System.currentTimeMillis()
       try {
@@ -160,23 +158,8 @@ object Multiply extends Serializable {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    // matrix multiplication of tiled matrices using Diablo array comprehensions - no groupBy-join
-    def testMultiplyDiabloDACn (): Double = {
-      param(groupByJoin,false)
-      val t = System.currentTimeMillis()
-      try {
-        val C = q("""
-                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
-                  """)
-        validate(C)
-      } catch { case x: Throwable => println(x); return -1.0 }
-      param(groupByJoin,true)
-      (System.currentTimeMillis()-t)/1000.0
-    }
-
-    // matrix multiplication of sparse tiled matrices using Diablo array comprehensions - no groupBy-join
+    // matrix multiplication of sparse tiled matrices using Diablo array comprehensions
     def testMultiplyDiabloDACsparse (): Double = {
-      param(groupByJoin,false)
       val t = System.currentTimeMillis()
       try {
         val C = q("""
@@ -184,7 +167,6 @@ object Multiply extends Serializable {
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
-      param(groupByJoin,true)
       (System.currentTimeMillis()-t)/1000.0
     }
 
@@ -420,8 +402,7 @@ object Multiply extends Serializable {
     test("MLlib Multiply",testMultiplyMLlib)
     test("DIABLO groupByJoin Multiply",testMultiplyDiabloDAC)
     //test("DIABLO groupByJoin Multiply sequential",testMultiplyDiabloDACs)
-    test("DIABLO groupBy Multiply",testMultiplyDiabloDACn)
-    test("DIABLO groupBy Multiply sparse",testMultiplyDiabloDACsparse)
+    test("DIABLO Multiply sparse",testMultiplyDiabloDACsparse)
     test("DIABLO loop Multiply",testMultiplyDiabloLoop)
     test("Hand-written groupByJoin Multiply",testMultiplyCodeGBJ)
     test("Hand-written groupBy Multiply",testMultiplyCode)

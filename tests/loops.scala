@@ -8,10 +8,8 @@ object Test {
     val conf = new SparkConf().setAppName("Test")
     spark_context = new SparkContext(conf)
 
-    parami(blockSize,1000)
-    val N = 100
-
-    type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
+    parami(blockSize,10000)
+    val N = 200
 
     q("""
         var M = tensor*(100,100)[ ((i,j),i*100.0+j) | i <- 0..99, j <- 0..99 ];

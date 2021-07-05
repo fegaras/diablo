@@ -26,7 +26,8 @@ package object diablo {
   var trace = true
   var groupByJoin = false
   var parallel = true
-  var blockSize = 1000000
+  var blockSize = 100000000
+  var block_dim_size = 1000
 
   var spark_context: SparkContext = _
 
@@ -158,6 +159,7 @@ package object diablo {
     val Literal(Constant(bv:Int)) = b.tree
     x.tree.toString.split('.').last match {
        case "blockSize" => blockSize = bv
+       case "block_dim_size" => block_dim_size = bv
        case p => throw new Error("Wrong param: "+p)
     }
     c.Expr[Unit](q"()")
