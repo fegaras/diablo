@@ -41,7 +41,7 @@ object TypeMappings {
     typemap block_map[K,V] (): map[K,V] {
        def view ( b: rdd[(Int,$mapClass[K,V])] )
          = [ (k,v) |
-             (i,m) <- b,
+             (i,m) <- lift(rdd,b),
              (k,v) <- lift(map,m) ]
        def store ( L: list[(K,V)] )
          = rdd[ (i,map(w)) |
@@ -157,111 +157,6 @@ object TypeMappings {
       """
   }
 
-  /* generate a typemap for the first sparse tensor with dn dense and sn>0 sparse dimensions */
-  def first_sparse_tensor ( dn: Int, sn: Int, boolean_values: Boolean = false ): String = {
-    assert(sn > 0)
-    val dims = "( "+(1.to(dn).map(k => s"d$k: Int")
-                     ++1.to(sn).map(k => s"s$k: Int")).mkString(", ")+" )"
-    val ldims = "("+1.to(dn+sn).map(i => "Int").mkString(",")+")"
-    val dsize = 1.to(dn).map("d"+_).mkString("*")
-    val drange = 1.to(dn).map(i => s"i$i <- 0..(d$i-1)").mkString(", ")
-    val srange = 1.to(sn).map(i => s"j$i <- 0..(s$i-1)").mkString(", ")
-    val dvars = 1.to(dn).map("i"+_).mkString(",")
-    val dvars2 = 1.to(dn).map("ii"+_).mkString(",")
-    val svars = 1.to(sn).map("j"+_).mkString(",")
-    val deq = 1.to(dn).map(i => s"ii$i == i$i").mkString(", ")
-    val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d$i+i$i)" }
-    val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s$i+j$i)" }
-    val set_sparse = 1.to(sn).map(i => s"sparse.append(j$i)").mkString("; ")
-    if (dn == 0 && boolean_values) // a boolean sparse tensor
-      s"""
-       typemap first_bool_tensor_0_$sn $dims: array$sn[Boolean] {
-          def view ( sparse: vector[Int] )
-            = [ (($svars),binarySearch($skey,0,sparse.length,sparse)) |
-                $srange ]
-          def store ( L: list[($ldims,Boolean)] )
-            = { var sparse: $arrayBuffer[Int];
-                [ sparse.append($skey) |
-                  (($svars),v) <- L, v ];
-                sort(0,sparse);
-                sparse.toArray }
-       }
-      """
-    else if (dn == 0) // a sparse tensor
-      s"""
-       typemap first_tensor_0_$sn[T] $dims: array$sn[T] {
-          def view ( sparse: vector[Int], values: vector[T] )
-            = { var count: Int = 0;
-                var zero: T = zero(values);
-                [ ( ($svars),
-                    if (count < sparse.length && sparse[count] == $skey)
-                       { count += 1; values[count-1] }
-                    else zero ) |
-                $srange ] }
-          def store ( L: list[($ldims,T)] )
-            = { var sparse: $arrayBuffer[Int];
-                var values: $arrayBuffer[T];
-                var zero: T;
-                [ { sparse.append($skey); values.append(v) } |
-                  (($svars),v) <- L,
-                  v != zero ];
-                sort(0,sparse,values);
-                (sparse.toArray,values.toArray) }
-       }
-      """
-    else if (boolean_values) // a boolean tensor with dn dense and sn sparse dimensions
-      s"""
-       typemap first_bool_tensor_${dn}_$sn $dims: array${dn+sn}[Boolean] {
-          def view ( dense: vector[Int], sparse: vector[Int] )
-            = { var count: Int = 0;
-                [ ( ($dvars,$svars),
-                    if (count < dense[loc+1] && sparse[count] == $skey)
-                       { count += 1; true }
-                    else false ) |
-                $drange, let loc = $dkey, count = dense[loc], $srange ] }
-          def store ( L: list[($ldims,Boolean)] )
-            = { var dense: vector[Int] = array($dsize+1);
-                var sparse: $arrayBuffer[Int];
-                [ { dense[$dkey] = sparse.length;
-                    sort(dense[$dkey],sparse);
-                    [ sparse.append($skey) |
-                      (($dvars2,$svars),v) <- L,
-                      $deq, v ] } |
-                  $drange ];
-                dense[$dsize] = sparse.length;
-                sort(dense[$dsize],sparse);
-                (dense,sparse.toArray) }
-       }
-       """
-    else  // a general tensor with dn dense and sn sparse dimensions
-      s"""
-       typemap first_tensor_${dn}_$sn[T] $dims: array${dn+sn}[T] {
-          def view ( dense: vector[Int], sparse: vector[Int], values: vector[T] )
-            = { var count: Int = 0;
-                var zero: T = zero(values);
-                [ ( ($dvars,$svars),
-                    if (count < dense[loc+1] && sparse[count] == $skey)
-                       { count += 1; values[count-1] }
-                    else zero ) |
-                $drange, let loc = $dkey, count = dense[loc], $srange ] }
-          def store ( L: list[($ldims,T)] )
-            = { var dense: vector[Int] = array($dsize+1);
-                var sparse: $arrayBuffer[Int];
-                var values: $arrayBuffer[T];
-                var zero: T;
-                [ { dense[$dkey] = values.length;
-                    sort(dense[$dkey],sparse,values);
-                    [ { sparse.append($skey); values.append(v) } |
-                      (($dvars2,$svars),v) <- L,
-                      $deq, v != zero ] } |
-                  $drange ];
-                dense[$dsize] = values.length;
-                sort(dense[$dsize],sparse,values);
-                (dense,sparse.toArray,values.toArray) }
-       }
-      """
-  }
-
   /* generate code that calculates the tile sizes from the tensor dimensions */
   def tile_sizes ( dn: Int, sn: Int ): String = {
     val prod = 1.to(dn+sn).map(k => s"d$k").mkString("*")
@@ -284,59 +179,6 @@ object TypeMappings {
       }
 
   /* generate a typemap for a distributed block tensor with dn dense and sn sparse dimensions */
-  def block_tensor2 ( dn: Int, sn: Int, boolean_values: Boolean = false ): String = {
-    assert(sn+dn > 0)
-    def rep ( f: Int => String, sep: String = "," ): String = 1.to(dn+sn).map(f).mkString(sep)
-    val ldims = rep(i => "Int")
-    val ndims = rep(i => s"_N$i")
-    val dims = rep(i => s"d$i: Int")+", sparsity: Double"
-    val vars = rep("i"+_)
-    val vars2 = rep("ii"+_)
-    val div_vars = rep(k => s"let ii$k = i$k/_N$k")
-    val mod_vars = rep(k => s"i$k%_N$k")
-    val idx = rep(k => s"ii$k*_N$k+i$k")
-    val ranges = rep(k => s"ii$k*_N$k+i$k < d$k")
-    val sizes = tile_sizes(dn,sn)
-    if (boolean_values) {
-      s"""
-       typemap block_bool_tensor_${dn}_$sn ($dims): array${dn+sn}[Boolean] {
-          def view ( x: (($ldims),rdd[(($ldims),bool_tensor_${dn}_$sn)]) )
-            = [ (($idx),v) |
-                let (($ndims),b) = x,
-                (($vars2),a) <- lift(rdd,b),
-                (($vars),v) <- lift(bool_tensor_${dn}_$sn,a),
-                $ranges ]
-          def store ( L: list[(($ldims),Boolean)] )
-            = { $sizes
-                (($ndims),rdd[ (($vars2),bool_tensor_${dn}_$sn(($ndims),w)) |
-                               (($vars),v) <- L, v,
-                               $div_vars,
-                               let w = (($mod_vars),v),
-                               group by ($vars2) ]);
-              }
-       }
-    """
-    } else s"""
-       typemap block_tensor_${dn}_$sn[T] ($dims): array${dn+sn}[T] {
-          def view ( x: (($ldims),rdd[(($ldims),tensor_${dn}_$sn[T])]) )
-            = [ (($idx),v) |
-                let (($ndims),b) = x,
-                (($vars2),a) <- lift(rdd,b),
-                (($vars),v) <- lift(tensor_${dn}_$sn,a),
-                $ranges ]
-          def store ( L: list[(($ldims),T)] )
-            = { $sizes
-                (($ndims),rdd[ (($vars2),tensor_${dn}_$sn($ndims,w)) |
-                               (($vars),v) <- L,
-                               $div_vars,
-                               let w = (($mod_vars),v),
-                               group by ($vars2) ]);
-              }
-    }
-    """
-  }
-
-  /* generate a typemap for a distributed block tensor with dn dense and sn sparse dimensions */
   def block_tensor ( dn: Int, sn: Int, boolean_values: Boolean = false ): String = {
     assert(sn+dn > 0)
     def rep ( f: Int => String, sep: String = "," ): String = 1.to(dn+sn).map(f).mkString(sep)
@@ -350,7 +192,6 @@ object TypeMappings {
     val mod_vars = rep(k => s"i$k%$N")
     val idx = rep(k => s"ii$k*$N+i$k")
     val ranges = rep(k => s"ii$k*$N+i$k < d$k")
-    //val sizes = tile_sizes(dn,sn)
     if (boolean_values) {
       s"""
        typemap block_bool_tensor_${dn}_$sn ($dims): array${dn+sn}[Boolean] {

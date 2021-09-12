@@ -304,6 +304,11 @@ abstract class CodeGeneration {
           => val pc = codeGen(p,env)
              val xc = codeStmt(x,env)
              q"if($pc) $xc"
+        case IfE(p,x,y)
+          => val pc = codeGen(p,env)
+             val xc = codeStmt(x,env)
+             val yc = codeStmt(y,env)
+             q"if($pc) $xc else $yc"
         case flatMap(Lambda(p@VarPat(v),b),Range(n,m,k))
           // a while-loop is more efficient than a foreach
           => val nv = TermName(v)
@@ -616,11 +621,12 @@ abstract class CodeGeneration {
            val bc = codeGen(b,add(p,tpt,env))
            val pp = q"val $vc: $tpt"
            q"($pp) => $bc"
-      case Lambda(p,b)
+      case Lambda(TuplePat(ps),b)
         => val tpt = tq""  // empty type
-           val pc = code(p)
-           val bc = codeGen(b,add(p,tpt,env))
-           q"{ case $pc => $bc }"
+           val pc = ps.map{ case VarPat(v) => val vc = TermName(v); q"val $vc: $tpt"
+                            case p => code(p) }
+           val bc = codeGen(b,ps.foldLeft[Environment](env){ (r,p) => add(p,tpt,r) })
+           q"{ (..$pc) => $bc }"
       case Block(Nil)
         => q"()"
       case Block(es:+Seq(x::_))

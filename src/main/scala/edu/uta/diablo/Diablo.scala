@@ -37,6 +37,48 @@ package object diablo {
   def inRange ( i: Long, n1: Long, n2: Long, n3: Long ): Boolean
     = i>=n1 && i<= n2 && (i-n1)%n3 == 0
 
+  def unique_values ( f: Int => Int ): mutable.HashSet[Int] = {
+    val s = mutable.HashSet[Int]()
+    var i = 0
+    while (i < block_dim_size) {
+      s += f(i)
+      i += 1
+    }
+    s
+  }
+
+  def unique_values ( f: (Int,Int) => Int ): mutable.HashSet[Int] = {
+    var s = mutable.HashSet[Int]()
+    var i = 0
+    while (i < block_dim_size) {
+      var j = 0
+      while (j < block_dim_size) {
+        s += f(i,j)
+        j += 1
+      }
+      i += 1
+    }
+    s
+  }
+
+  def unique_values ( f: (Int,Int,Int) => Int ): mutable.HashSet[Int] = {
+    var s = mutable.HashSet[Int]()
+    var i = 0
+    while (i < block_dim_size) {
+      var j = 0
+      while (j < block_dim_size) {
+        var k = 0
+        while (k < block_dim_size) {
+          s += f(i,j,k)
+          k += 1
+        }
+        j += 1
+      }
+      i += 1
+    }
+    s
+  }
+
   def binarySearch[@specialized T] ( key: Int, from: Int, to: Int,
                                      rows: Array[Int], values: Array[T], zero: T ): T = {
     var low = from

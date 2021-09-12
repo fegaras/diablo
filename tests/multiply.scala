@@ -400,8 +400,8 @@ object Multiply extends Serializable {
 
     //test("DIABLO IJV Multiply",testMultiplyIJV)
     test("MLlib Multiply",testMultiplyMLlib)
-    test("DIABLO groupByJoin Multiply",testMultiplyDiabloDAC)
-    //test("DIABLO groupByJoin Multiply sequential",testMultiplyDiabloDACs)
+    test("DIABLO Multiply",testMultiplyDiabloDAC)
+    //test("DIABLO Multiply Sequential",testMultiplyDiabloDACs)
     test("DIABLO Multiply sparse",testMultiplyDiabloDACsparse)
     test("DIABLO loop Multiply",testMultiplyDiabloLoop)
     test("Hand-written groupByJoin Multiply",testMultiplyCodeGBJ)

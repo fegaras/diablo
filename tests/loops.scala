@@ -8,7 +8,7 @@ object Test {
     val conf = new SparkConf().setAppName("Test")
     spark_context = new SparkContext(conf)
 
-    parami(blockSize,10000)
+    parami(blockSize,100)
     val N = 200
 
     q("""

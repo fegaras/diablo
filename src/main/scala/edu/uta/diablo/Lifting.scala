@@ -15,7 +15,7 @@
  */
 package edu.uta.diablo
 
-import TypeMappings.{tensor,block_tensor,first_sparse_tensor}
+import TypeMappings.{tensor,block_tensor}
 import scala.util.matching.Regex
 
 object Lifting {
@@ -61,18 +61,11 @@ object Lifting {
   val bbtpat: Regex = """block_bool_tensor_(\d+)_(\d+)""".r
 
   /** get a type map if exists, or create a type map from a tensor */
-  def getTypeMap ( name: String, first: Boolean = false ): Option[TypeMapS] = {
-     val fn = if (first) "first_"+name else name
-     if (typeMaps.contains(fn))
-        Some(typeMaps(fn))
+  def getTypeMap ( name: String ): Option[TypeMapS] = {
+     if (typeMaps.contains(name))
+        Some(typeMaps(name))
       else {
         val tm = name match {
-          case btpat(dn,sn)
-            if first
-            => first_sparse_tensor(dn.toInt,sn.toInt,true)
-          case tpat(dn,sn)
-            if first
-            => first_sparse_tensor(dn.toInt,sn.toInt)
           case btpat(dn,sn)
             => tensor(dn.toInt,sn.toInt,true)
           case tpat(dn,sn)
@@ -84,9 +77,9 @@ object Lifting {
           case _ => ""
         }
         if (tm != "") {
-          if (trace) println(s"Loading $fn:"+tm)
+          if (trace) println(s"Loading $name:"+tm)
           typecheck(Parser.parse(tm))
-          Some(typeMaps(fn))
+          Some(typeMaps(name))
         } else None
     }
   }
@@ -224,8 +217,8 @@ object Lifting {
         case _ => apply(e,lift_expr(_,env))
       }
 
-  def lift ( mapping: String, storage: Expr, first: Boolean = false ): Expr = {
-    val Some(TypeMapS(_,tps,_,_,st,_,map,_)) = getTypeMap(mapping,first).map(fresh)
+  def lift ( mapping: String, storage: Expr ): Expr = {
+    val Some(TypeMapS(_,tps,_,_,st,_,map,_)) = getTypeMap(mapping).map(fresh)
     if (storage.tpe == null)
       Apply(map,storage)
     else {
