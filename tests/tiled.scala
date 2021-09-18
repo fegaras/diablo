@@ -69,7 +69,6 @@ object Test {
         V2 = [ (i,+/m) | ((i,j),m) <- M1, group by i ];
         V2 = [ (i,+/m) | ((i,j),m) <- M2, group by i ];
         V2 = [ (i,+/m) | ((i,j),m) <- M3, group by i ];
-
         V2 = [ (i,(+/m)/m.length) | ((i,j),m) <- M3, group by i ];
 
         tensor*()(N)[ (i,((+/m)/m.length,m,m.length,m.length)) | ((i,j),m) <- M2, group by i ];
@@ -112,7 +111,6 @@ object Test {
         tensor*(N)[ (i,tensor(N) w) | ((i,j),m) <- M2, let w = (j,m), group by i ];
 
         tensor*(N,N)[ ((i,j),m+1) | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
-
 
 /* run-time error
         +/[ m | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];

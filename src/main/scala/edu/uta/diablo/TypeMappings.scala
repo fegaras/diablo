@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package edu.uta.diablo
+
 import Lifting.{typeMaps,getTypeMap}
 import scala.util.matching.Regex
 
@@ -157,43 +158,23 @@ object TypeMappings {
       """
   }
 
-  /* generate code that calculates the tile sizes from the tensor dimensions */
-  def tile_sizes ( dn: Int, sn: Int ): String = {
-    val prod = 1.to(dn+sn).map(k => s"d$k").mkString("*")
-    val h = if (sn == 0)
-              s"var _h: Double = pow($prod/${blockSize*1.0},${1.0/dn}); "
-            else s"var _h: Double = pow($prod*sparsity/${blockSize*1.0},${1.0/(dn+sn)}); "
-    h+(1.to(dn).map(k => s"var _N$k: Int = ceil(d$k/_h).toInt; ")
-       ++1.to(sn).map(k => s"var _N${dn+k}: Int = ceil(d${dn+k}*pow(sparsity,1.0/$sn)/_h).toInt; ")).mkString("\n")
-  }
-
-  val block_pat: Regex = """block_(bool_)?tensor_(\d+)_(\d+)""".r
-
-  def tile_sizes ( block: String ): Expr
-    = block match {
-        case block_pat(_,ds,ss)
-          => val dn = ds.toInt
-             val sn = ss.toInt
-             val dims = 1.to(dn+sn).map(i => s"d$i").mkString(",")+",sparsity"
-             Parser.parse_expr("("+dims+") => { "+tile_sizes(dn,sn)+" _result; }")
-      }
-
   /* generate a typemap for a distributed block tensor with dn dense and sn sparse dimensions */
   def block_tensor ( dn: Int, sn: Int, boolean_values: Boolean = false ): String = {
     assert(sn+dn > 0)
     def rep ( f: Int => String, sep: String = "," ): String = 1.to(dn+sn).map(f).mkString(sep)
     val N = block_dim_size
     val ldims = rep(i => "Int")
-    val ndims = rep(k => s"if ((ii$k+1)*$N > d$k) d$k%$N else $N")
+    // the last tile size is dim % block_dim_size
+    val ndims = rep(k => s"if ((ii$k+1)*$N > d$k) (d$k % $N) else $N")
     val dims = rep(k => s"d$k: Int")
     val vars = rep("i"+_)
     val vars2 = rep("ii"+_)
-    val div_vars = rep(k => s"let ii$k = i$k/$N")
-    val mod_vars = rep(k => s"i$k%$N")
-    val idx = rep(k => s"ii$k*$N+i$k")
-    val ranges = rep(k => s"ii$k*$N+i$k < d$k")
+    val div_vars = rep(k => s"let ii$k = i$k / $N")
+    val mod_vars = rep(k => s"i$k % $N")
+    val idx = rep(k => s"ii$k * $N + i$k")
+    val ranges = rep(k => s"ii$k * $N + i$k < d$k")
     if (boolean_values) {
-      s"""
+      s"""   // needs boolean tensor tiles
        typemap block_bool_tensor_${dn}_$sn ($dims): array${dn+sn}[Boolean] {
           def view ( x: rdd[(($ldims),bool_tensor_${dn}_$sn)] )
             = [ (($idx),v) |
@@ -201,7 +182,7 @@ object TypeMappings {
                 (($vars),v) <- lift(bool_tensor_${dn}_$sn,a),
                 $ranges ]
           def store ( L: list[(($ldims),Boolean)] )
-            = rdd[ (($vars2),bool_tensor_${dn}_$sn(($ndims),w)) |
+            = rdd[ (($vars2),bool_tensor_${dn}_$sn($ndims,w)) |
                    (($vars),v) <- L, v,
                    $div_vars,
                    let w = (($mod_vars),v),

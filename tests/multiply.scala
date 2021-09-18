@@ -28,10 +28,11 @@ object Multiply extends Serializable {
   }
 
   def main ( args: Array[String] ) {
-    val repeats = args(0).toInt
-    val n = args(1).toInt   // each matrix has n*n elements
-    val m = n
-    parami(block_dim_size,1000)  // size of each dimension
+    val repeats = args(0).toInt   // how many times to repeat each experiment
+    // each matrix has n*m elements
+    val n = args(1).toInt
+    val m = if (args.length > 2) args(2).toInt else n
+    parami(block_dim_size,1000)  // size of each dimension in a block
     val N = 1000
     val validate_output = false
 
@@ -65,21 +66,22 @@ object Multiply extends Serializable {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    def randomTile (): DenseMatrix = {
+    def randomTile ( nd: Int, md: Int ): DenseMatrix = {
       val max = 10
       val rand = new Random()
-      new DenseMatrix(N,N,Array.tabulate(N*N){ i => rand.nextDouble()*max })
+      new DenseMatrix(nd,md,Array.tabulate(nd*md){ i => rand.nextDouble()*max })
     }
 
     def randomMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
       val l = Random.shuffle((0 until (rows+N-1)/N).toList)
       val r = Random.shuffle((0 until (cols+N-1)/N).toList)
       spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
-        .map{ case (i,j) => ((i,j),randomTile()) }
+                   .map{ case (i,j) => ((i,j),randomTile(if ((i+1)*N > rows) rows%N else N,
+                                                         if ((j+1)*N > cols) cols%N else N)) }
     }
 
     val Am = randomMatrix(n,m).cache()
-    val Bm = randomMatrix(n,m).cache()
+    val Bm = randomMatrix(m,n).cache()
 
     val A = new BlockMatrix(Am,N,N)
     val B = new BlockMatrix(Bm,N,N)
@@ -87,34 +89,36 @@ object Multiply extends Serializable {
     type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
 
     // dense block tensors
-    val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
-    val BB = (n,m,Bm.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
-    var CC = AA
+    val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
+    val BB = (m,n,Bm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
+    var CC = (n,n,AA._3)
 
     // sparse block tensors with no zeros
     val As = q("tensor*(n)(m)[ ((i,j),a) | ((i,j),a) <- AA ]")
-    val Bs = q("tensor*(n)(m)[ ((i,j),b) | ((i,j),b) <- BB ]")
+    val Bs = q("tensor*(m)(n)[ ((i,j),b) | ((i,j),b) <- BB ]")
 
     val rand = new Random()
     def random () = rand.nextDouble()*10
 
+    // sparse block tensors with 1% zeros
     val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
-    val Bz = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
+    val Bz = q("tensor*(m)(n)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
 
-    def validate ( M: tiled_matrix ) {
+    def validate ( M: tiled_matrix ) = {
       if (!validate_output)
         M._3.count()
       else {
         val C = A.multiply(B).toLocalMatrix()
         val CC = M._3.collect
         println("Validating ...")
-        for { ((ii,jj),(_,_,a)) <- CC
-              i <- 0 until N
-              j <- 0 until N }
-           if (ii*N+i < M._1 && jj*N+j < M._2
-               && Math.abs(a(i*N+j)-C(ii*N+i,jj*N+j)) > 0.01)
+        for { ((ii,jj),(nd,md,a)) <- CC
+              i <- 0 until nd
+              j <- 0 until md } {
+           val ci = ii*N+nd
+           if (Math.abs(a(i*md+j)-C(ii*N+i,jj*N+j)) > 0.01)
              println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f"
-                     .format(ii,jj,i,j,a(i*N+j),C(ii*N+i,jj*N+j)))
+                     .format(ii,jj,i,j,a(i*md+j),C(ii*N+i,jj*N+j)))
+        }
       }
     }
 
@@ -137,7 +141,7 @@ object Multiply extends Serializable {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
+                  tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -150,7 +154,7 @@ object Multiply extends Serializable {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
+                  tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -163,7 +167,7 @@ object Multiply extends Serializable {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n,m)[ ((i,j),+/c) | ((i,k),a) <- Az, ((kk,j),b) <- Bz, k == kk, let c = a*b, group by (i,j) ]
+                  tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- Az, ((kk,j),b) <- Bz, k == kk, let c = a*b, group by (i,j) ]
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -178,7 +182,7 @@ object Multiply extends Serializable {
                   for i = 0, n-1 do
                      for j = 0, n-1 do {
                          CC[i,j] = 0.0;
-                         for k = 0, n-1 do
+                         for k = 0, m-1 do
                              CC[i,j] += AA[i,k]*BB[k,j];
                      };
                   CC;
@@ -192,35 +196,34 @@ object Multiply extends Serializable {
     def testMultiplyCode (): Double = {
       val t: Long = System.currentTimeMillis()
       try {
-        val C = (n,m,AA._3.map{ case ((i,k),(_,_,a)) => (k,(i,a)) }
-                       .join( BB._3.map{ case ((kk,j),(_,_,b)) => (kk,(j,b)) } )
-                       .map{ case (_,((i,a),(j,b)))
-                               => val V = Array.ofDim[Double](N*N)
-                                  for { i <- (0 until N).par } {
+        val C = (n,m,AA._3.map{ case ((i,k),a) => (k,(i,a)) }
+                       .join( BB._3.map{ case ((kk,j),b) => (kk,(j,b)) } )
+                       .map{ case (_,((i,(na,ma,a)),(j,(nb,mb,b))))
+                               => val V = Array.ofDim[Double](na*mb)
+                                  for { i <- (0 until na).par } {
                                      var k = 0
-                                     while (k<N) {
+                                     while (k<ma) {
                                        var j = 0
-                                       while (j<N) {
-                                         V(i*N+j) += a(i*N+k)*b(k*N+j)
+                                       while (j<mb) {
+                                         V(i*mb+j) += a(i*ma+k)*b(k*mb+j)
                                          j += 1
                                        }
                                        k += 1
                                      }
                                   }
-                                  ((i,j),V)
+                                  ((i,j),(na,mb,V))
                            }
-                       .reduceByKey{ case (x,y)
-                                       => val V = Array.ofDim[Double](N*N)
-                                          for { i <- (0 until N).par } {
+                       .reduceByKey{ case ((nx,mx,x),(_,_,y))
+                                       => val V = Array.ofDim[Double](nx*mx)
+                                          for { i <- (0 until nx).par } {
                                              var j = 0
-                                             while (j<N) {
-                                               V(i*N+j) = x(i*N+j)+y(i*N+j)
+                                             while (j<mx) {
+                                               V(i*mx+j) = x(i*mx+j)+y(i*mx+j)
                                                j += 1
                                              }
                                           }
-                                          V
-                                   }
-                       .map{ case (k,v) => (k,(N,N,v)) })
+                                          (nx,mx,V)
+                                   })
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
@@ -230,16 +233,16 @@ object Multiply extends Serializable {
     def testMultiplyMLlibCode (): Double = {
       val t: Long = System.currentTimeMillis()
       try {
-        val C = (n,m,Am.map{ case ((i,k),a) => (k,(i,a)) }
+        val C = (n,n,Am.map{ case ((i,k),a) => (k,(i,a)) }
                        .join( Bm.map{ case ((kk,j),b) => (kk,(j,b)) } )
                        .map{ case (_,((i,a),(j,b)))
                                => ((i,j),a.multiply(b.asInstanceOf[DenseMatrix])) }
                        .reduceByKey{ case (x,y)
-                                       => val V = Array.ofDim[Double](N*N)
-                                          for { i <- (0 until N).par
-                                                j <- 0 until N }
-                                             V(i*N+j) = x(i,j)+y(i,j)
-                                          new DenseMatrix(N,N,V) })
+                                       => val V = Array.ofDim[Double](x.numRows*x.numCols)
+                                          for { i <- (0 until x.numRows).par
+                                                j <- 0 until x.numCols }
+                                             V(i*x.numCols+j) = x(i,j)+y(i,j)
+                                          new DenseMatrix(x.numRows,x.numCols,V) })
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
@@ -248,22 +251,23 @@ object Multiply extends Serializable {
     // matrix multiplication of tiled Breeze matrices - hand-written
     def testMultiplyBreezeCode (): Double = {
       import breeze.linalg._
-      def randomTile (): DenseMatrix[Double] = {
+      def randomTile ( nd: Int, md: Int ): DenseMatrix[Double] = {
         val max = 10
         val rand = new Random()
-        new DenseMatrix(N,N,Array.tabulate(N*N){ i => rand.nextDouble()*max })
+        new DenseMatrix(nd,md,Array.tabulate(nd*md){ i => rand.nextDouble()*max })
       }
       def randomMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),DenseMatrix[Double])] = {
         val l = Random.shuffle((0 until (rows+N-1)/N).toList)
         val r = Random.shuffle((0 until (cols+N-1)/N).toList)
         spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
-          .map{ case (i,j) => ((i,j),randomTile()) }
+            .map{ case (i,j) => ((i,j),randomTile(if ((i+1)*N > rows) rows%N else N,
+                                                  if ((j+1)*N > cols) cols%N else N)) }
       }
       val Am = randomMatrix(n,m).cache()
-      val Bm = randomMatrix(n,m).cache()
+      val Bm = randomMatrix(m,n).cache()
       val t: Long = System.currentTimeMillis()
       try {
-        val C = (n,m,Am.map{ case ((i,k),a) => (k,(i,a)) }
+        val C = (n,n,Am.map{ case ((i,k),a) => (k,(i,a)) }
                        .join( Bm.map{ case ((kk,j),b) => (kk,(j,b)) } )
                        .map{ case (_,((i,a),(j,b)))
                                => ((i,j),a*b) }
@@ -277,24 +281,27 @@ object Multiply extends Serializable {
     def testMultiplyCodeGBJ (): Double = {
       val t = System.currentTimeMillis()
       try {
-        val C = (n,m,AA._3.flatMap{ case ((i,k),(_,_,a)) => (0 until n/N).map(j => ((i,j),(k,a))) }
-                          .cogroup( BB._3.flatMap{ case ((k,j),(_,_,b)) => (0 until n/N).map(i => ((i,j),(k,b))) } )
+        val C = (n,n,AA._3.flatMap{ case ((i,k),a) => (0 to n/N).map(j => ((i,j),(k,a))) }
+                          .cogroup( BB._3.flatMap{ case ((k,j),b) => (0 to m/N).map(i => ((i,j),(k,b))) } )
                           .mapValues{ case (as,bs)
                                      => val c = Array.ofDim[Double](N*N)
-                                        for { (k1,a) <- as
-                                              (k2,b) <- bs if k2 == k1
-                                              i <- (0 until N).par } {
+                                        var ns = 0; var ms = 0
+                                        for { (k1,(na,ma,a)) <- as
+                                              (k2,(nb,mb,b)) <- bs if k2 == k1
+                                              i <- (0 until na).par } {
                                            var k = 0
-                                           while (k<N) {
+                                           ns = na
+                                           ms = mb
+                                           while (k<ma) {
                                              var j = 0
-                                             while (j<N) {
-                                               c(i*N+j) += a(i*N+k)*b(k*N+j)
+                                             while (j<mb) {
+                                               c(i*ms+j) += a(i*ma+k)*b(k*mb+j)
                                                j += 1
                                              }
                                              k += 1
                                            }
                                         }
-                                        (N,N,c)
+                                        (ns,ms,Array.tabulate(ns*ms){ i => c(i) })
                                     })
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -318,17 +325,17 @@ object Multiply extends Serializable {
       def zero: DenseMatrix = new DenseMatrix(N,N,Array.ofDim[Double](N*N))
       def merge ( b1: DenseMatrix, b2: DenseMatrix ): DenseMatrix = {
         val c = b1.values
-        for { i <- (0 until N).par
-              j <- 0 until N
-            } c(i*N+j) += b2(i,j)
-        new DenseMatrix(N,N,c)
+        for { i <- (0 until b1.numRows).par
+              j <- 0 until b1.numCols
+            } c(i*b1.numCols+j) += b2(i,j)
+        new DenseMatrix(b1.numRows,b1.numCols,c)
       }
-      def reduce ( buf: DenseMatrix, a: DenseMatrix ): DenseMatrix = {
-        val c = buf.values
-        for { i <- (0 until N).par
-              j <- 0 until N
-            } c(i*N+j) += a(i,j)
-        new DenseMatrix(N,N,c)
+      def reduce ( a: DenseMatrix, b: DenseMatrix ): DenseMatrix = {
+        val c = a.values
+        for { i <- (0 until a.numRows).par
+              j <- 0 until a.numCols
+            } c(i*a.numCols+j) += a(i,j)
+        new DenseMatrix(a.numRows,a.numCols,c)
       }
       def finish ( buf: DenseMatrix ): DenseMatrix = buf
       def bufferEncoder: Encoder[DenseMatrix] = ExpressionEncoder()
@@ -351,12 +358,14 @@ object Multiply extends Serializable {
     }
 
     def tile_sum ( a: Seq[DenseMatrix] ): DenseMatrix = {
-      val s = Array.ofDim[Double](N*N)
+      val nd = a.head.numRows
+      val md = a.head.numCols
+      val s = Array.ofDim[Double](nd*md)
       for { x <- a
-            i <- (0 until N).par
-            j <- 0 until N }
-        s(i*N+j) += x(i,j)
-      new DenseMatrix(N,N,s)
+            i <- (0 until nd).par
+            j <- 0 until md }
+        s(i*md+j) += x(i,j)
+      new DenseMatrix(nd,md,s)
     }
     spark.udf.register("tile_sum", udf(tile_sum(_)))
 
@@ -375,7 +384,7 @@ object Multiply extends Serializable {
     }
 
     println("@@@@ IJV matrix size: %.2f GB".format(sizeof(((1,1),0.0D)).toDouble*n*m/(1024.0*1024.0*1024.0)))
-    val tile_size = sizeof(((1,1),randomTile())).toDouble
+    val tile_size = sizeof(((1,1),randomTile(N,N))).toDouble
     println("@@@@ tile matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
     println("@@@@ sparse partition sizes: "+Az._3.map{ case (_,(_,_,(_,a,_))) => a.length }.collect.toList)
 
@@ -394,7 +403,7 @@ object Multiply extends Serializable {
         }
       }
       if (i > 0) s = s/i
-      print("*** %s cores=%d n=%d N=%d ".format(name,cores,n,N))
+      print("*** %s cores=%d n=%d m=%d N=%d ".format(name,cores,n,m,N))
       println("tries=%d %.3f secs".format(i,s))
     }
 

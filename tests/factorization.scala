@@ -34,7 +34,7 @@ object Factorization extends Serializable {
     val n = args(1).toInt
     val m = args(2).toInt
     val d = args(3).toInt  // number of attributes
-    parami(blockSize,1000000)
+    parami(block_dim_size,1000)  // size of each dimension in a block
     val N = 1000
 
     val conf = new SparkConf().setAppName("tiles")
@@ -43,17 +43,18 @@ object Factorization extends Serializable {
     conf.set("spark.eventLog.enabled","false")
     LogManager.getRootLogger().setLevel(Level.ERROR)
 
-    def randomTile (): DenseMatrix = {
-      val max = 5
+    def randomTile ( nd: Int, md: Int ): DenseMatrix = {
+      val max = 10
       val rand = new Random()
-      new DenseMatrix(N,N,Array.tabulate(N*N){ i => rand.nextDouble()*max })
+      new DenseMatrix(nd,md,Array.tabulate(nd*md){ i => rand.nextDouble()*max })
     }
 
     def randomMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
       val l = Random.shuffle((0 until (rows+N-1)/N).toList)
       val r = Random.shuffle((0 until (cols+N-1)/N).toList)
       spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
-        .map{ case (i,j) => ((i,j),randomTile()) }
+                   .map{ case (i,j) => ((i,j),randomTile(if ((i+1)*N > rows) rows%N else N,
+                                                         if ((j+1)*N > cols) cols%N else N)) }
     }
 
     val Rm = randomMatrix(n,m)
@@ -64,12 +65,12 @@ object Factorization extends Serializable {
     val Pinit = new BlockMatrix(Pm,N,N)
     val Qinit = new BlockMatrix(Qm,N,N)
 
-    val RR = (n,m,Rm.map{ case ((i,j),a) => ((i,j),(N,N,a.toArray)) })
-    val PPinit = (n,d,Pm.map{ case ((i,j),a) => ((i,j),(N,N,a.toArray)) })
-    val QQinit = (m,d,Qm.map{ case ((i,j),a) => ((i,j),(N,N,a.toArray)) })
+    val RR = (n,m,Rm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.toArray)) })
+    val PPinit = (n,d,Pm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.toArray)) })
+    val QQinit = (m,d,Qm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.toArray)) })
 
     def map ( m: BlockMatrix, f: Double => Double ): BlockMatrix
-      = new BlockMatrix(m.blocks.map{ case (i,a) => (i,new DenseMatrix(N,N,a.toArray.map(f))) },
+      = new BlockMatrix(m.blocks.map{ case (i,a) => (i,new DenseMatrix(a.numRows,a.numCols,a.toArray.map(f))) },
                         m.rowsPerBlock,m.colsPerBlock)
 
     def testFactorizationMLlib (): Double = {

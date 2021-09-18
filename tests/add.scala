@@ -24,10 +24,11 @@ object Add {
   }
 
   def main ( args: Array[String] ) {
-    val repeats = args(0).toInt
-    val n = args(1).toInt   // each matrix has n*n elements
-    val m = n
-    parami(block_dim_size,1000)  // size of each dimension
+    val repeats = args(0).toInt   // how many times to repeat each experiment
+    // each matrix has n*m elements
+    val n = args(1).toInt
+    val m = if (args.length > 2) args(2).toInt else n
+    parami(block_dim_size,1000)  // size of each dimension in a block
     val N = 1000
     val validate_output = false
 
@@ -37,17 +38,18 @@ object Add {
     conf.set("spark.eventLog.enabled","false")
     LogManager.getRootLogger().setLevel(Level.WARN)
 
-    def randomTile (): DenseMatrix = {
+    def randomTile ( nd: Int, md: Int ): DenseMatrix = {
       val max = 10
       val rand = new Random()
-      new DenseMatrix(N,N,Array.tabulate(N*N){ i => rand.nextDouble()*max })
+      new DenseMatrix(nd,md,Array.tabulate(nd*md){ i => rand.nextDouble()*max })
     }
 
     def randomMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
       val l = Random.shuffle((0 until (rows+N-1)/N).toList)
       val r = Random.shuffle((0 until (cols+N-1)/N).toList)
       spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
-                   .map{ case (i,j) => ((i,j),randomTile()) }
+                   .map{ case (i,j) => ((i,j),randomTile(if ((i+1)*N > rows) rows%N else N,
+                                                         if ((j+1)*N > cols) cols%N else N)) }
     }
 
     val Am = randomMatrix(n,m).cache()
@@ -59,8 +61,8 @@ object Add {
     type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
 
     // dense block tensors
-    val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
-    val BB = (n,m,Bm.map{ case ((i,j),a) => ((i,j),(N,N,a.transpose.toArray)) })
+    val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
+    val BB = (n,m,Bm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
     var CC = AA
 
     // sparse block tensors with no zeros
@@ -70,6 +72,7 @@ object Add {
     val rand = new Random()
     def random () = rand.nextDouble()*10
 
+    // sparse block tensors with 1% zeros
     val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
     val Bz = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
 
@@ -80,13 +83,14 @@ object Add {
         val C = A.add(B).toLocalMatrix()
         val CC = M._3.collect
         println("Validating ...")
-        for { ((ii,jj),(_,_,a)) <- CC
-              i <- 0 until N
-              j <- 0 until N }
-           if (ii*N+i < M._1 && jj*N+j < M._2
-               && Math.abs(a(i*N+j)-C(ii*N+i,jj*N+j)) > 0.01)
+        for { ((ii,jj),(nd,md,a)) <- CC
+              i <- 0 until nd
+              j <- 0 until md } {
+           val ci = ii*N+nd
+           if (Math.abs(a(i*md+j)-C(ii*N+i,jj*N+j)) > 0.01)
              println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f"
-                     .format(ii,jj,i,j,a(i*N+j),C(ii*N+i,jj*N+j)))
+                     .format(ii,jj,i,j,a(i*md+j),C(ii*N+i,jj*N+j)))
+        }
       }
     }
 
@@ -157,12 +161,12 @@ object Add {
       val t = System.currentTimeMillis()
       try {
         val C = (n,m,AA._3.join(BB._3)
-                       .mapValues{ case ((_,_,a),(_,_,b))
-                                     => val c = Array.ofDim[Double](N*N)
-                                        for { i <- (0 until N).par
-                                              j <- 0 until N
-                                            } c(i*N+j) = a(i*N+j)+b(i*N+j)
-                                        (N,N,c)
+                       .mapValues{ case ((nd,md,a),(_,_,b))
+                                     => val c = Array.ofDim[Double](nd*md)
+                                        for { i <- (0 until nd).par
+                                              j <- 0 until md
+                                            } c(i*md+j) = a(i*md+j)+b(i*md+j)
+                                        (nd,md,c)
                                  })
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -179,11 +183,11 @@ object Add {
     BDF.createOrReplaceTempView("B")
 
     def add_tiles ( a: DenseMatrix, b: DenseMatrix ): DenseMatrix = {
-      val c = Array.ofDim[Double](N*N)
-      for { i <- (0 until N).par
-            j <- 0 until N
-          } c(i*N+j) = a(i,j)+b(i,j)
-      new DenseMatrix(N,N,c)
+      val c = Array.ofDim[Double](a.numRows*a.numCols)
+      for { i <- (0 until a.numRows).par
+            j <- 0 until a.numCols
+          } c(i*a.numCols+j) = a(i,j)+b(i,j)
+      new DenseMatrix(a.numRows,a.numCols,c)
     }
     spark.udf.register("add_tiles", udf(add_tiles(_,_)))
 
@@ -201,7 +205,7 @@ object Add {
     }
 
     println("@@@@ IJV matrix size: %.2f GB".format(sizeof(((1,1),0.0D)).toDouble*n*m/(1024.0*1024.0*1024.0)))
-    val tile_size = sizeof(((1,1),randomTile())).toDouble
+    val tile_size = sizeof(((1,1),randomTile(N,N))).toDouble
     println("@@@@ tile matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
     println("@@@@ sparse partition sizes: "+Az._3.map{ case (_,(_,_,(_,a,_))) => a.length }.collect.toList)
 
@@ -220,7 +224,7 @@ object Add {
         }
       }
       if (i > 0) s = s/i
-      print("*** %s cores=%d n=%d N=%d ".format(name,cores,n,N))
+      print("*** %s cores=%d n=%d m=%d N=%d ".format(name,cores,n,m,N))
       println("tries=%d %.3f secs".format(i,s))
     }
 

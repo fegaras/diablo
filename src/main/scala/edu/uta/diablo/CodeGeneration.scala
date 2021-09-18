@@ -398,6 +398,16 @@ abstract class CodeGeneration {
            val nv = TermName(c.freshName("x"))
            val bc = codeGen(b,add(p,tp,env))
            q"$xc.map(($nv:$tp) => $nv match { case $pc => $bc })"
+      case flatMap(Lambda(p,Let(q,y,Seq(List(b)))),x)
+        if irrefutable(p)
+        => val pc = code(p)
+           val (tp,xc) = typedCode(x,env)
+           val nv = TermName(c.freshName("x"))
+           val qc = code(q)
+           val yc = codeGen(y,add(p,tp,env))
+           val tc = getType(yc,add(p,tp,env))
+           val bc = codeGen(b,add(q,tc,add(p,tp,env)))
+           q"$xc.map(($nv:$tp) => $nv match { case $pc => { val $qc: $tc = $yc; $bc } })"
       case flatMap(Lambda(p,b),x)
         => val pc = code(p)
            val (tp,xc) = typedCode(x,env)
