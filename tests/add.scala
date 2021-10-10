@@ -65,14 +65,10 @@ object Add {
     val BB = (n,m,Bm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
     var CC = AA
 
-    // sparse block tensors with no zeros
-    val As = q("tensor*(n)(m)[ ((i,j),a) | ((i,j),a) <- AA ]")
-    val Bs = q("tensor*(n)(m)[ ((i,j),b) | ((i,j),b) <- BB ]")
-
     val rand = new Random()
     def random () = rand.nextDouble()*10
 
-    // sparse block tensors with 1% zeros
+    // sparse block tensors with 99% zeros
     val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
     val Bz = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
 
@@ -122,6 +118,18 @@ object Add {
       try {
         val C = q("""
                   tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <- Az, ((ii,jj),b) <- Bz, ii == i, jj == j ];
+                  """)
+        C._3.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix addition of sparse-dense tiled matrices using Diablo array comprehensions
+    def testAddDiabloDACsparseDense (): Double = {
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <- Az, ((ii,jj),b) <- BB, ii == i, jj == j ];
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -230,7 +238,8 @@ object Add {
 
     test("MLlib Add",testAddMLlib)
     test("DIABLO Add",testAddDiabloDAC)
-    test("DIABLO Add sparse",testAddDiabloDACsparse)
+    test("DIABLO Add sparse-sparse",testAddDiabloDACsparse)
+    test("DIABLO Add sparse-dense",testAddDiabloDACsparseDense)
     test("DIABLO loop Add",testAddDiabloDACloop)
     test("Hand-written Add",testAddCode)
     test("SQL Add",testAddSQL)

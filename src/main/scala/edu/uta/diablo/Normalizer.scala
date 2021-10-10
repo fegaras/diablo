@@ -182,6 +182,16 @@ object Normalizer {
       case q::r => q::normalize(head,r,env,opts)
     }
 
+  def isRepeated ( v: String, e: Expr ): Boolean
+    = e match {
+        case flatMap(Lambda(p,b),u)
+          if patvars(p).contains(v)
+          => isRepeated(v,u)
+        case flatMap(Lambda(p,b),u)
+          => occurrences(v,b) >= 1 || isRepeated(v,b) || isRepeated(v,u)
+        case _ => accumulate[Boolean](e,isRepeated(v,_),_||_,false)
+      }
+
   /** normalize an expression */
   def normalize ( e: Expr ): Expr =
     e match {
@@ -193,15 +203,11 @@ object Normalizer {
                      else Let(p,nu,nb))
       case Apply(Lambda(p,b),u)
         => Let(p,u,b)
-      case Let(VarPat(v),u,b)
-        if isSimple(u) || occurrences(v,b) <= 1
+      case Let(VarPat(v),u,b)   // if v appears in a flatMap body, don't subst
+        if isSimple(u) || (occurrences(v,b) <= 1 && !isRepeated(v,b))
         => normalize(subst(Var(v),u,b))
       case Let(TuplePat(ps),Tuple(us),b)
-        if (ps zip us).forall {
-                    case (VarPat(v),u) => isSimple(u) || occurrences(v,b) <= 1
-                    case _ => false
-           }
-        => (ps zip us).foldLeft(b){ case (r,(p,u)) => subst(toExpr(p),u,r) }
+        => normalize((ps zip us).foldLeft(b){ case (r,(p,u)) => Let(p,u,r) })
       case Comprehension(h,List())
         => Seq(List(normalize(h)))
       case Comprehension(h,Predicate(p)::qs)
@@ -303,6 +309,20 @@ object Normalizer {
         => if (b) BoolConst(true) else normalize(x)
       case MethodCall(x,"||",List(BoolConst(b)))
         => if (b) BoolConst(true) else normalize(x)
+      case MethodCall(x,"+",List(IntConst(0)))
+        => normalize(x)
+      case MethodCall(x,"*",List(IntConst(1)))
+        => normalize(x)
+      case MethodCall(IntConst(0),"+",List(x))
+        => normalize(x)
+      case MethodCall(IntConst(0),"*",List(x))
+        => IntConst(0)
+      case MethodCall(IntConst(1),"*",List(x))
+        => normalize(x)
+      case MethodCall(x,"/",List(IntConst(1)))
+        => normalize(x)
+      case MethodCall(IntConst(0),"/",List(x))
+        => IntConst(0)
       case Nth(Tuple(es),n)
         => normalize(es(n-1))
       case Project(Record(es),a)

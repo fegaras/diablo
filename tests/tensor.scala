@@ -66,9 +66,9 @@ object Test {
         V2 = [ (i,+/m) | ((i,j),m) <- M3, group by i ];
 
         V2 = [ (i,(+/m)/m.length) | ((i,j),m) <- M3, group by i ];
+
         tensor()(N)[ (i,(+/m)<10) | ((i,j),m) <- M2, group by i ];
         tensor()(N)[ (i,((+/m)/m.length,m,m.length,m.length)) | ((i,j),m) <- M2, group by i ];
-
         tensor()(N)[ (i,(+/m)<10) | ((i,j),m) <- M1, group by i ];
         tensor()(N)[ (i,(+/m)<10) | ((i,j),m) <- M2, group by i ];
         tensor()(N)[ (i,(+/m)<10) | ((i,j),m) <- M3, group by i ];

@@ -332,6 +332,7 @@ object Optimizer {
                   optimize(Comprehension(h,nqs))
              case _ => apply(e,optimize)
            }
+
       case Comprehension(h,qs)
         if { QLcache = findBoundRange(qs); QLcache.nonEmpty }
         => // eliminate bound range generators

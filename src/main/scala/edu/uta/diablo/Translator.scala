@@ -392,9 +392,9 @@ object Translator {
                         ((vs zip is).map{ case (v,i) => Generator(VarPat(v),translate(i,env,vars,fncs)) }:+
                          GroupByQual(VarPat(k),tuple(vs.map(Var))))
                calls:+Assign(Var(a),
-                             ((//Call("increment",List(Var(a),StringConst(op),
+                             Call("increment_array",List(Var(a),StringConst(op),
                                        elem(Comprehension(Tuple(List(Var(k),reduce(op,Var(v)))),
-                                                     quals++qs)))))
+                                                          quals++qs)))))
           case (d@Var(a),MethodCall(x,op,List(e)))
             if d == x
             => val v = newvar
@@ -415,7 +415,7 @@ object Translator {
                         ((vs zip is).map{ case (v,i) => Generator(VarPat(v),translate(i,env,vars,fncs)) }:+
                          GroupByQual(VarPat(k),tuple(vs.map(Var))))
                calls:+Assign(Var(a),
-                             ((//Call("increment",List(Var(a),StringConst(op),
+                             Call("increment_array",List(Var(a),StringConst(op),
                                        elem(Comprehension(Tuple(List(Var(k),reduce(op,Var(v)))),
                                                      quals++qs)))))
           case (d@Var(a),Call(op,List(x,e)))
@@ -435,7 +435,7 @@ object Translator {
                val qs = Generator(VarPat(v),translate(ne,env,vars,fncs))::
                         (vs zip is).map{ case (v,i) => Generator(VarPat(v),translate(i,env,vars,fncs)) }
                calls:+Assign(Var(a),
-                             ((//Call("update",List(Var(a),
+                             Call("update_array",List(Var(a),
                                        elem(Comprehension(Tuple(List(tuple(vs.map(Var)),Var(v))),
                                                      quals++qs)))))
           case (d,MethodCall(x,op,List(e)))

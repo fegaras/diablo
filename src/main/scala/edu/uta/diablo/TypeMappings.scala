@@ -48,7 +48,7 @@ object TypeMappings {
          = rdd[ (i,map(w)) |
                 (k,v) <- L,
                 let w = (k,v),
-                group by i: (k.hashCode % $blockSize) ]
+                group by i: (k.hashCode % $block_dim_size) ]
     }
     """
 
@@ -59,6 +59,7 @@ object TypeMappings {
                      ++1.to(sn).map(k => s"s$k: Int")).mkString(", ")+" )"
     val ldims = "("+1.to(dn+sn).map(i => "Int").mkString(",")+")"
     val dsize = 1.to(dn).map("d"+_).mkString("*")
+    val ssize = 1.to(sn).map("s"+_).mkString("*")
     val drange = 1.to(dn).map(i => s"i$i <- 0..(d$i-1)").mkString(", ")
     val srange = 1.to(sn).map(i => s"j$i <- 0..(s$i-1)").mkString(", ")
     val dvars = 1.to(dn).map("i"+_).mkString(",")
@@ -67,7 +68,6 @@ object TypeMappings {
     val deq = 1.to(dn).map(i => s"ii$i == i$i").mkString(", ")
     val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d$i+i$i)" }
     val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s$i+j$i)" }
-    val set_sparse = 1.to(sn).map(i => s"sparse.append(j$i)").mkString("; ")
     if (sn == 0)   // a dense tensor
       s"""
        typemap tensor_${dn}_0[T] $dims: array$dn[T] {
@@ -75,10 +75,11 @@ object TypeMappings {
             = [ (($dvars),values[$dkey]) |
                 $drange ]
           def store ( L: list[($ldims,T)] )
-            = { var values: vector[T] = array($dsize);
-                [ values[$dkey] = v |
+            = { var zero: T;
+                var buffer: vector[T] = array_buffer_dense($dsize,zero);
+                [ buffer[$dkey] = v |
                   (($dvars),v) <- L ];
-                values }
+                buffer }
        }
       """
     else if (dn == 0 && boolean_values) // a boolean sparse tensor
@@ -88,31 +89,29 @@ object TypeMappings {
             = [ (($svars),binarySearch($skey,0,sparse.length,sparse)) |
                 $srange ]
           def store ( L: list[($ldims,Boolean)] )
-            = { var sparse: $arrayBuffer[Int];
-                [ sparse.append($skey) |
-                  (($svars),v) <- L, v ];
-                sort(0,sparse);
-                sparse.toArray }
+            = { var buffer: vector[Boolean] = array_buffer_sparse_bool($ssize);
+                [ { buffer[$skey] = v } |
+                  (($svars),v) <- L ];
+                array2tensor_bool($ssize,buffer)
+              }
        }
       """
-    else if (dn == 0) // a sparse tensor ***
+    else if (dn == 0) // a sparse tensor
       s"""
        typemap tensor_0_$sn[T] $dims: array$sn[T] {
           def view ( sparse: vector[Int], values: vector[T] )
             = [ (($svars),binarySearch($skey,0,values.length,sparse,values)) |
                 $srange ]
           def store ( L: list[($ldims,T)] )
-            = { var sparse: $arrayBuffer[Int];
-                var values: $arrayBuffer[T];
-                var zero: T;
-                [ { sparse.append($skey); values.append(v) } |
-                  (($svars),v) <- L,
-                  v != zero ];
-                sort(0,sparse,values);
-                (sparse.toArray,values.toArray) }
+            = { var zero: T;
+                var buffer: vector[T] = array_buffer_sparse($ssize,zero);
+                [ { buffer[$skey] = v } |
+                  (($svars),v) <- L ];
+                array2tensor($ssize,zero,buffer)
+              }
        }
       """
-    else if (boolean_values) // a boolean tensor with dn dense and sn sparse dimensions  ***
+    else if (boolean_values) // a boolean tensor with dn dense and sn sparse dimensions
       s"""
        typemap bool_tensor_${dn}_$sn $dims: array${dn+sn}[Boolean] {
           def view ( dense: vector[Int], sparse: vector[Int] )
@@ -120,20 +119,14 @@ object TypeMappings {
                 $drange, $srange,
                 let loc = $dkey ]
           def store ( L: list[($ldims,Boolean)] )
-            = { var dense: vector[Int] = array($dsize+1);
-                var sparse: $arrayBuffer[Int];
-                [ { dense[$dkey] = sparse.length;
-                    sort(dense[$dkey],sparse);
-                    [ sparse.append($skey) |
-                      (($dvars2,$svars),v) <- L,
-                      $deq, v ] } |
-                  $drange ];
-                dense[$dsize] = sparse.length;
-                sort(dense[$dsize],sparse);
-                (dense,sparse.toArray) }
+            = { var buffer: vector[Boolean] = array_buffer_bool($dsize,$ssize);
+                [ { buffer[$dkey*$ssize+$skey] = v } |
+                  (($dvars,$svars),v) <- L ];
+                array2tensor_bool($dsize,$ssize,buffer)
+              }
        }
       """
-    else  // a general tensor with dn dense and sn sparse dimensions   ****
+    else  // a general tensor with dn dense and sn sparse dimensions
       s"""
        typemap tensor_${dn}_$sn[T] $dims: array${dn+sn}[T] {
           def view ( dense: vector[Int], sparse: vector[Int], values: vector[T] )
@@ -141,24 +134,17 @@ object TypeMappings {
                 $drange, $srange,
                 let loc = $dkey ]
           def store ( L: list[($ldims,T)] )
-            = { var dense: vector[Int] = array($dsize+1);
-                var sparse: $arrayBuffer[Int];
-                var values: $arrayBuffer[T];
-                var zero: T;
-                [ { dense[$dkey] = values.length;
-                    sort(dense[$dkey],sparse,values);
-                    [ { sparse.append($skey); values.append(v) } |
-                      (($dvars2,$svars),v) <- L,
-                      $deq, v != zero ] } |
-                  $drange ];
-                dense[$dsize] = values.length;
-                sort(dense[$dsize],sparse,values);
-                (dense,sparse.toArray,values.toArray) }
+            = { var zero: T;
+                var buffer: vector[T] = array_buffer($dsize,$ssize,zero);
+                [ { buffer[$dkey*$ssize+$skey] = v } |
+                  (($dvars,$svars),v) <- L ];
+                array2tensor($dsize,$ssize,zero,buffer)
+              }
        }
       """
   }
 
-  /* generate a typemap for a distributed block tensor with dn dense and sn sparse dimensions */
+ /* generate a typemap for a distributed block tensor with dn dense and sn sparse dimensions */
   def block_tensor ( dn: Int, sn: Int, boolean_values: Boolean = false ): String = {
     assert(sn+dn > 0)
     def rep ( f: Int => String, sep: String = "," ): String = 1.to(dn+sn).map(f).mkString(sep)

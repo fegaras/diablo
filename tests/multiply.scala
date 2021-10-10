@@ -15,7 +15,7 @@ import scala.util.Random
 import Math._
 
 
-object Multiply extends Serializable {
+object Multiply {
   /* The size of any serializable object */
   def sizeof ( x: Serializable ): Int = {
     import java.io.{ByteArrayOutputStream,ObjectOutputStream}
@@ -35,6 +35,7 @@ object Multiply extends Serializable {
     parami(block_dim_size,1000)  // size of each dimension in a block
     val N = 1000
     val validate_output = false
+    parami(number_of_partitions,2)
 
     val conf = new SparkConf().setAppName("tiles")
     spark_context = new SparkContext(conf)
@@ -93,14 +94,10 @@ object Multiply extends Serializable {
     val BB = (m,n,Bm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
     var CC = (n,n,AA._3)
 
-    // sparse block tensors with no zeros
-    val As = q("tensor*(n)(m)[ ((i,j),a) | ((i,j),a) <- AA ]")
-    val Bs = q("tensor*(m)(n)[ ((i,j),b) | ((i,j),b) <- BB ]")
-
     val rand = new Random()
     def random () = rand.nextDouble()*10
 
-    // sparse block tensors with 1% zeros
+    // sparse block tensors with 99% zeros
     val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
     val Bz = q("tensor*(m)(n)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
 
@@ -168,6 +165,18 @@ object Multiply extends Serializable {
       try {
         val C = q("""
                   tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- Az, ((kk,j),b) <- Bz, k == kk, let c = a*b, group by (i,j) ]
+                  """)
+        C._3.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix multiplication of sparse-dense tiled matrices using Diablo array comprehensions
+    def testMultiplyDiabloDACsparseDense (): Double = {
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- Az, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -411,7 +420,8 @@ object Multiply extends Serializable {
     test("MLlib Multiply",testMultiplyMLlib)
     test("DIABLO Multiply",testMultiplyDiabloDAC)
     //test("DIABLO Multiply Sequential",testMultiplyDiabloDACs)
-    test("DIABLO Multiply sparse",testMultiplyDiabloDACsparse)
+    test("DIABLO Multiply sparse-dense",testMultiplyDiabloDACsparseDense)
+    test("DIABLO Multiply sparse-sparse",testMultiplyDiabloDACsparse)
     test("DIABLO loop Multiply",testMultiplyDiabloLoop)
     test("Hand-written groupByJoin Multiply",testMultiplyCodeGBJ)
     test("Hand-written groupBy Multiply",testMultiplyCode)

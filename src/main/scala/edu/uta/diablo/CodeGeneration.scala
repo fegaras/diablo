@@ -57,7 +57,13 @@ abstract class CodeGeneration {
            => returned_type(r)
          case _ => tp
       }
-  
+
+  def isUnitType ( tp: c.Tree ): Boolean
+    = tp match {
+         case tq"Unit" => true
+         case _ => false
+      }
+
   /** Convert a Type to a Tree. There must be a better way to do this */
   def type2tree ( tp: c.Type ): c.Tree = {
     val ntp = if (tp <:< c.typeOf[AnyVal]) tp.toString.split('(')(0) else tp
@@ -155,7 +161,7 @@ abstract class CodeGeneration {
              }
     val te = try c.Expr[Any](c.typecheck(q"{ import edu.uta.diablo._; $fc }")).actualType
              catch { case ex: TypecheckException
-                       => //println("%%% "+fc)
+                       => //println("%%% "+code+"\n"+env)
                           return Right(ex)
                    }
     Left(returned_type(type2tree(te)))
@@ -397,6 +403,8 @@ abstract class CodeGeneration {
            val (tp,xc) = typedCode(x,env)
            val nv = TermName(c.freshName("x"))
            val bc = codeGen(b,add(p,tp,env))
+           if (isUnitType(getType(bc,add(p,tp,env))))
+             return codeStmt(e,env)
            q"$xc.map(($nv:$tp) => $nv match { case $pc => $bc })"
       case flatMap(Lambda(p,Let(q,y,Seq(List(b)))),x)
         if irrefutable(p)
@@ -407,12 +415,16 @@ abstract class CodeGeneration {
            val yc = codeGen(y,add(p,tp,env))
            val tc = getType(yc,add(p,tp,env))
            val bc = codeGen(b,add(q,tc,add(p,tp,env)))
+           if (isUnitType(getType(bc,add(q,tc,add(p,tp,env)))))
+             return codeStmt(e,env)
            q"$xc.map(($nv:$tp) => $nv match { case $pc => { val $qc: $tc = $yc; $bc } })"
       case flatMap(Lambda(p,b),x)
         => val pc = code(p)
            val (tp,xc) = typedCode(x,env)
            val nv = TermName(c.freshName("x"))
            val bc = codeGen(b,add(p,tp,env))
+           if (isUnitType(element_type(getType(bc,add(p,tp,env)))))
+             return codeStmt(e,env)
            if (irrefutable(p))
               q"$xc.flatMap(($nv:$tp) => $nv match { case $pc => $bc })"
            else q"$xc.flatMap(($nv:$tp) => $nv match { case $pc => $bc; case _ => Nil })"
@@ -426,6 +438,30 @@ abstract class CodeGeneration {
                => val bc = codeGen(b,add(p,tq"($et,$et)",env))
                   q"$xc.reduceByKey(($nx:$et,$ny:$et) => ($nx,$ny) match { case $pc => $bc })"
              case _ => throw new Exception("Wrong reduceByKey: "+e)
+           }
+      case MethodCall(x,"reduceByKey",List(Lambda(p,b),n))
+        => val (tp,xc) = typedCode(x,env)
+           val pc = code(p)
+           val nx = TermName(c.freshName("x"))
+           val ny = TermName(c.freshName("y"))
+           val nc = codeGen(n,env)
+           tp match {
+             case tq"($kt,$et)"
+               => val bc = codeGen(b,add(p,tq"($et,$et)",env))
+                  q"$xc.reduceByKey(($nx:$et,$ny:$et) => ($nx,$ny) match { case $pc => $bc },$nc)"
+             case _ => throw new Exception("Wrong reduceByKey: "+e)
+           }
+      case Call("outerJoin",List(x,y,Lambda(p,b)))
+        => val (tp,xc) = typedCode(x,env)
+           val pc = code(p)
+           val yc = codeGen(y,env)
+           val nx = TermName(c.freshName("x"))
+           val ny = TermName(c.freshName("y"))
+           tp match {
+             case tq"($kt,$et)"
+               => val bc = codeGen(b,add(p,tq"($et,$et)",env))
+                  q"outerJoin($xc,$yc,($nx:$et,$ny:$et) => ($nx,$ny) match { case $pc => $bc })"
+             case _ => throw new Exception("Wrong outerJoin: "+e)
            }
       case groupBy(x)
         => val xc = codeGen(x,env)
@@ -501,7 +537,9 @@ abstract class CodeGeneration {
       case Project(x,a)
         => codeGen(MethodCall(x,a,null),env)
       case Assign(d,Seq(u::_))
-        => codeGen(Assign(d,u),env)
+        => val uc = codeGen(u,env)
+           val dc = codeGen(d,env)
+           q"$dc = $uc"
       case Assign(Tuple(xs),y)
         => val yc = codeGen(y,env)
            val v = TermName(c.freshName("x"))
@@ -515,7 +553,7 @@ abstract class CodeGeneration {
       case Assign(d,u)
         => val uc = codeGen(u,env)
            val dc = codeGen(d,env)
-           q"$dc = $uc"
+           q"$dc = $uc.head"
       case MethodCall(Var("_"),m,null)
         => val nv = TermName(c.freshName("x"))
            val fm = TermName(method_name(m))
@@ -582,7 +620,7 @@ abstract class CodeGeneration {
            val xc = codeGen(x,env)
            val yc = codeGen(y,env)
            q"if ($pc) $xc else $yc"
-      case Let(p,u,b)
+     case Let(p,u,b)
         => val pc = code(p)
            val uc = codeGen(u,env)
            val tc = getType(uc,env)
@@ -734,6 +772,8 @@ abstract class CodeGeneration {
         => q"$s"
       case BoolConst(n)
         => q"$n"
+      case Var("null")
+        => q"null"
       case Var(v)
         => Ident(TermName(v))
       case _ => throw new Exception("Unrecognized AST: "+e)

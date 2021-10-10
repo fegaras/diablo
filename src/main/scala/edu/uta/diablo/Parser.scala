@@ -359,14 +359,12 @@ object Parser extends StandardTokenParsers {
             case "matrix"~_~t~_ => ArrayType(2,t)
             case array_pat(n)~_~t~_ => ArrayType(n.toInt,t)
             case (n@block_tensor_pat(_,dn,sn))~_~t~_
-              => val N = Math.pow(blockSize,1.0/(dn.toInt+sn.toInt)).toInt
-                 StorageType(n,List(t),1.to(dn.toInt+sn.toInt).map(i => IntConst(N)).toList)
+              => StorageType(n,List(t),1.to(dn.toInt+sn.toInt).map(i => IntConst(block_dim_size)).toList)
             case n~_~t~_ => ParametricType(n,List(t)) }
         | ident ~ "*" ~ "[" ~ stype ~ "]" ^^
           { case (n@tensor_pat(dn,sn))~_~_~t~_
-              => val N = Math.pow(blockSize,1.0/(dn.toInt+sn.toInt)).toInt
-                 StorageType("block_"+n,List(t),
-                             1.to(dn.toInt+sn.toInt).map(i => IntConst(N)).toList)
+              => StorageType("block_"+n,List(t),
+                             1.to(dn.toInt+sn.toInt).map(i => IntConst(block_dim_size)).toList)
             case n~_~_~t~_ => ParametricType(n+"*",List(t)) }
         | ident ~ "*" ~ "[" ~ stype ~ "," ~ stype ~ "]" ^?
           { case "map"~_~_~k~_~v~_ => StorageType("block_map",List(k,v),Nil) }
@@ -375,8 +373,7 @@ object Parser extends StandardTokenParsers {
             case ns~_~ts~_ => ParametricType(ns.mkString("."),ts) }
         | ident ^^
           { case n@bool_tensor_pat(dn,sn)
-              => val N = Math.pow(blockSize,1.0/(dn.toInt+sn.toInt)).toInt
-                 StorageType(n,Nil,1.to(dn.toInt+sn.toInt).map(i => IntConst(N)).toList)
+              => StorageType(n,Nil,1.to(dn.toInt+sn.toInt).map(i => IntConst(block_dim_size)).toList)
             case s => BasicType(s) }
         )
 

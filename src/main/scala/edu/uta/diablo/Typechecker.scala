@@ -39,6 +39,8 @@ object Typechecker {
 
     val collection_names = List("array","map","List",rddClass)
 
+    val system_functions = List("binarySearch","zero","array2tensor","array2tensor_bool")
+
     var useStorageTypes: Boolean = false
 
     def tuple ( s: List[Expr] ): Expr
@@ -361,17 +363,6 @@ object Typechecker {
                  substType(st,ev)
                else substType(at,ev)
           case Call(f,args)
-            if getTypeMap(f).isDefined
-            => val Some(TypeMapS(_,tps,ps,at,st,lt,view,store)) = getTypeMap(f)
-               val ev = tmatch(tuple(ps.values.toList:+lt),tuple(args.map(typecheck(_,env))))
-               if (ev.isEmpty)
-                 throw new Error("Wrong type storage: "+e+"\n(expected: "
-                                 +tuple(ps.values.toList:+lt)+", found: "
-                                 +tuple(args.map(typecheck(_,env)))+")")
-               if (useStorageTypes)
-                 substType(st,ev)
-               else substType(at,ev)
-          case Call(f,args)
             if env.contains(f)
             => val tp = typecheck(Tuple(args),env)
                env(f) match {
@@ -385,7 +376,7 @@ object Typechecker {
             => // call the Scala typechecker to find function f
                val tas = args.map(typecheck(_,env)).map {
                                        case ArrayType(n,t)   // convert abstract arrays to storage tensors
-                                         if !List("binarySearch","zero").contains(f)
+                                         if !system_functions.contains(f)
                                          => TupleType(1.to(n).map(i => intType).toList:+ArrayType(1,t))
                                        case t => t
                                   }
@@ -438,6 +429,9 @@ object Typechecker {
                        else throw new Error("Function "+f+" cannot be applied to "+arg+" of type "+tp);
                   case _ => throw new Error("Expected a function "+f)
                }
+          case Lambda(p,b)   // fix: needs type inference
+            => val tp = TypeParameter(newvar)
+               FunctionType(tp,typecheck(b,bindPattern(p,tp,env)))
           case Tuple(cs)
             => TupleType(cs.map{ typecheck(_,env) })
           case Record(cs)

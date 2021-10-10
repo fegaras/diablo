@@ -8,8 +8,8 @@ object Test {
     val conf = new SparkConf().setAppName("Test")
     spark_context = new SparkContext(conf)
 
-    parami(blockSize,100)
-    val N = 200
+    parami(number_of_partitions,10)
+    parami(block_dim_size,10)
 
     q("""
         var M = tensor*(100,100)[ ((i,j),i*100.0+j) | i <- 0..99, j <- 0..99 ];

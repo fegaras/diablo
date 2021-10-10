@@ -60,7 +60,7 @@ object Lifting {
   val bpat: Regex = """block_tensor_(\d+)_(\d+)""".r
   val bbtpat: Regex = """block_bool_tensor_(\d+)_(\d+)""".r
 
-  /** get a type map if exists, or create a type map from a tensor */
+  // get a type map if exists, or create a type map from a tensor
   def getTypeMap ( name: String ): Option[TypeMapS] = {
      if (typeMaps.contains(name))
         Some(typeMaps(name))
@@ -129,6 +129,8 @@ object Lifting {
         case _ => src
       }
 
+  val array_buffer_pat: Regex = """array_buffer([_a-z]*)""".r
+
   def lift_expr ( e: Expr, env: Environment ): Expr
     = e match {
         case Let(p,u,b)
@@ -143,9 +145,10 @@ object Lifting {
                             Case(p,lift_expr(c,nenv),lift_expr(b,nenv)) })
         case Block(es)
           => Block(es.foldLeft((env,Nil:List[Expr])) {
-                  case ((r,s),VarDecl(v,at,u@Seq(List(Call("array",_)))))
-                    => (r + (v->at),
-                        s:+VarDecl(v,at,u))
+                  case ((r,s),x@VarDecl(v,at,Seq(List(Call("array",_)))))
+                    => (r + (v->at), s:+x)
+                  case ((r,s),x@VarDecl(v,at,Seq(List(Call(array_buffer_pat(_),_)))))
+                    => (r + (v->at), s:+x)
                   case ((r,s),x@VarDecl(v,at,Seq(Nil)))
                     => (r + (v->at), s:+x)
                   case ((r,s),VarDecl(v,at,u))
@@ -169,6 +172,18 @@ object Lifting {
                    => Store(f,ps.map(v => ev.getOrElse(v,TypeParameter(v))),nargs,nx)
                  case _ => throw new Error("Wrong type mapping: "+e)
                }
+        case Assign(d,Call("update_array",List(a,u)))
+          => val dl = lift_expr(d,env)
+             val ul = lift_expr(u,env)
+             val dt = typecheck(dl,env)
+             val ut = elemType(typecheck(ul,env))
+             Assign(dl,Call("update_array",List(a,lift_assign(ul,dt,ut,env))))
+        case Assign(d,Call("increment_array",List(a,op,u)))
+          => val dl = lift_expr(d,env)
+             val ul = lift_expr(u,env)
+             val dt = typecheck(dl,env)
+             val ut = elemType(typecheck(ul,env))
+             Assign(dl,Call("increment_array",List(a,op,lift_assign(ul,dt,ut,env))))
         case Assign(d,u)
           => val dl = lift_expr(d,env)
              val ul = lift_expr(u,env)

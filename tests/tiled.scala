@@ -11,8 +11,6 @@ object Test {
 
     def f ( i: Int, j: Int = 1 ): Double = (i*11)%3+j*1.1
 
-    param(groupByJoin,false)
-
     q("""
         var V1 = tensor*(N)[ (i,f(i)) | i <- 0..(N-1) ]              // dense block vector
         var V2 = tensor*()(N)[ (i,f(i)) | i <- 0..(N-1) ]            // sparse block vector
@@ -112,11 +110,10 @@ object Test {
 
         tensor*(N,N)[ ((i,j),m+1) | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
 
-/* run-time error
+/* run-time error:
         +/[ m | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
 */
-
-/* Can't compile yet: group-by key != comprehension key
+/* Can't compile: group-by key != comprehension key:
         tensor*(10)[ (i%10,+/m) | ((i,j),m) <- M1, group by i ];
         tensor*(10)[ (i%10,(+/m)/m.length) | ((i,j),m) <- M2, group by i ];
 
