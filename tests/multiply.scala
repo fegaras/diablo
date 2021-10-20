@@ -35,7 +35,7 @@ object Multiply {
     parami(block_dim_size,1000)  // size of each dimension in a block
     val N = 1000
     val validate_output = false
-    parami(number_of_partitions,2)
+    parami(number_of_partitions,10)
 
     val conf = new SparkConf().setAppName("tiles")
     spark_context = new SparkContext(conf)
@@ -92,7 +92,6 @@ object Multiply {
     // dense block tensors
     val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
     val BB = (m,n,Bm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
-    var CC = (n,n,AA._3)
 
     val rand = new Random()
     def random () = rand.nextDouble()*10
@@ -188,12 +187,12 @@ object Multiply {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
+                  var CC = tensor*(n,n)[ ((i,j),0.0) | i <- 0..n-1, j <- 0..n-1 ];
+
                   for i = 0, n-1 do
-                     for j = 0, n-1 do {
-                         CC[i,j] = 0.0;
-                         for k = 0, m-1 do
-                             CC[i,j] += AA[i,k]*BB[k,j];
-                     };
+                     for k = 0, m-1 do
+                        for j = 0, n-1 do
+                           CC[i,j] += AA[i,k]*BB[k,j];
                   CC;
                   """)
         validate(C)

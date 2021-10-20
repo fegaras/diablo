@@ -146,6 +146,18 @@ object ComprehensionTranslator {
         case _ => false
       }
 
+  def unlift_comprehensions ( e: Expr ): Expr
+    = e match {
+        case Lift(f,x)
+          => lift(f,x)
+        case Comprehension(h,qs)
+          => optimize(Comprehension(h,qs.map(q => apply(q,(u:Expr) => unlift_comprehensions(u)))))
+        case reduce(_,_)
+          => e
+        case _
+          => apply(e,unlift_comprehensions)
+      }
+
   /* default translator for list comprehensions with no group-by */
   def default_translator_nogb ( h: Expr, qs: List[Qualifier], vars: List[String] ): Expr
     = qs.foldRight[(Expr,List[String])]((Seq(List(translate(h,vars))),vars)) {
@@ -159,6 +171,8 @@ object ComprehensionTranslator {
            => (IfE(translate(p,s),r,Seq(Nil)),s)
          case (AssignQual(d,u),(r,s))
            => (Block(List(Assign(d,Seq(List(u))),r)),s)
+         case (VarDef(v,t,u),(r,s))
+           => (Block(List(VarDecl(v,t,Seq(List(u))),r)),s)
          case (_,(r,s)) => (r,s)
       }._1
 
@@ -178,7 +192,8 @@ object ComprehensionTranslator {
                     default_translator(h,Generator(TuplePat(List(p,VarPat(sv))),
                                                    groupBy(nr))::(unzips++s),vars)
                case _ 
-                 => default_translator_nogb(h,qs,vars)
+                 => val Comprehension(nh,nqs) = unlift_comprehensions(Comprehension(h,qs))
+                    default_translator_nogb(nh,nqs,vars)
              }
 
 /*---------------------------- Generate tensor operations ------------------------------------------*/
@@ -341,7 +356,8 @@ object ComprehensionTranslator {
                                                            rs++nts),
                                              convert(Var(buffer))))
                            }
-                   translate(tuple(dims:+b),vars)
+                   val nb = unlift_comprehensions(b)
+                   translate(tuple(dims:+nb),vars)
               case _ => default_translator(head,cqs,Nil)
             }
     }
@@ -581,19 +597,8 @@ object ComprehensionTranslator {
                   case _ => None })
 
   def translate_rdd ( hs: Expr, qs: List[Qualifier], vars: List[String] ): Expr
-    = findFilter(qs) match {
-        case Some(Generator(p,e)::ps)
-          if false   // disabled
-          => val pred = ps.flatMap{ case Predicate(p) => List(p); case _ => Nil }
-                          .reduce{ (x,y) => MethodCall(x,"&&",List(y)) }
-             val z = Generator(p,Lift("rdd",MethodCall(e,"filter",List(Lambda(p,pred)))))
-             translate_rdd(hs,qs.flatMap {
-                               case Generator(np,_) if np==p => List(z)
-                               case x => if (ps.contains(x)) Nil else List(x)
-                              },vars)
-        case _
-          => qs.span{ case GroupByQual(_,_) => false; case _ => true } match {
-              case (r,GroupByQual(p,k)::s)        // RDD group-by becomes reduceByKey
+    = qs.span{ case GroupByQual(_,_) => false; case _ => true } match {
+               case (r,GroupByQual(p,k)::s)        // RDD group-by becomes reduceByKey
                 => val groupByVars = patvars(p)
                    // non-groupby variables used in head
                    val usedVars = freevars(Comprehension(hs,s),groupByVars)
@@ -628,7 +633,7 @@ object ComprehensionTranslator {
                    val env = rt.map{ case (n,e) => (e,newvar) }
                    def lift ( x: Expr ): Expr
                      = env.foldLeft(x) { case (r,(from,to)) => subst(from,Var(to),r) }
-                   val Comprehension(nh,ns) = lift(Comprehension(hs,s))
+                   val Comprehension(nh,ns) = lift(yieldReductions(Comprehension(hs,s),usedVars))
                    val red = MethodCall(Store("rdd",Nil,Nil,       // type parameter?
                                               Comprehension(Tuple(List(k,tuple(gs))),r)),
                                         "reduceByKey",List(m))
@@ -687,8 +692,7 @@ object ComprehensionTranslator {
                              case (_,(r,s)) => (r,s)
                           }._1
                    }
-                 }
-                }
+              }
           }
     }
 
@@ -1044,6 +1048,14 @@ object ComprehensionTranslator {
 
 /*-------------- Tiled comprehension without groupBy that does not preserve tiling -------------------------*/
 
+  def shuffles_tiles ( key: Expr, qs: List[Qualifier] ): Boolean
+    = !hasGroupBy(qs) && {
+         var key_vars = freevars(key).toSet
+         val indices = unique_indices(qs).toSet
+         val cis = correlated_indices(qs,key_vars)
+         key_vars.forall(indices.contains(_)) //&& indices == cis
+      }
+
   /* shuffle the tiles of a tiled comprehension */
   def shuffle_tiles ( block: String, hs: Expr, qs: List[Qualifier], group_by: Boolean,
                       vars: List[String], tp: Type, dims: List[Expr] ): Expr
@@ -1397,17 +1409,17 @@ object ComprehensionTranslator {
       case Tuple(List(p,h))   // a tiled comprehension that preserves tiling
         if preserves_tiling(p,qs)
         => preserve_tiles(block,hs,qs,vars,tp,dims)
-      case Tuple(List(_,_))   // a tiled comprehension that doesn't preserve tiling
-        if !hasGroupBy(qs) && tile_indices(qs).nonEmpty
+      case Tuple(List(p,_))   // a tiled comprehension that doesn't preserve tiling
+        if shuffles_tiles(p,qs)
         => shuffle_tiles(block,hs,qs,false,vars,tp,dims)
-      case _
+      case _    // groupBy join
         if { QLcache = translate_groupby_join(block,hs,qs,vars,tp,dims); QLcache.nonEmpty }
         => QLcache.get
       case Tuple(List(kp,_))   // group-by tiled comprehension with group-by-key == comprehension key
-        if hasGroupByTiling(qs,kp)
+        if hasGroupByTiling(qs,kp) && is_tiled_comprehension(qs)
         => groupBy_tiles(block,hs,qs,vars,tp,dims)
       case Tuple(List(kp,u)) // group-by tiled comprehension with group-by-key != comprehension key
-        if hasGroupBy(qs)
+        if hasGroupBy(qs) && is_tiled_comprehension(qs)
         // should raise an error instead
         => qs.span{ case GroupByQual(p,_) => false; case _ => true } match {
                     case (r,gb@GroupByQual(p,k)::s)
@@ -1425,8 +1437,17 @@ object ComprehensionTranslator {
                    }
         case _
           if is_rdd_comprehension(qs)
-          // A tiled comprehension that depends on RDDs but not on tiled arrays
-          => translate(optimize(store(block,List(tp),dims,Lift("rdd",translate_rdd(hs,qs,vars)))),vars)
+          // A tiled comprehension that depends on RDDs
+          => val ns = qs.map {
+                         case Generator(p,Lift(b,x))
+                           if isBlockTensor(b)
+                           => Generator(p,lift(b,x))
+                         case q => q
+                       }
+             val Comprehension(nh,nqs) = optimize(Comprehension(hs,ns))
+             translate(optimize(store(block,List(tp),dims,Lift("rdd",translate_rdd(nh,nqs,vars)))),vars)
+        case _
+          => store(block,List(tp),dims,translate(Comprehension(hs,qs),vars))
     }
 
 

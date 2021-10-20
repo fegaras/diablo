@@ -89,6 +89,7 @@ object Normalizer {
         case Generator(p,_) => patvars(p)
         case LetBinding(p,_) => patvars(p)
         case GroupByQual(p,_) => patvars(p)
+        case VarDef(v,_,_) => List(v)
         case _ => Nil
       }
 
@@ -127,8 +128,8 @@ object Normalizer {
                             => GroupByQual(substP(p,env),substE(k,enve))
                           case Predicate(u)
                             => Predicate(substE(u,enve))
-                          case VarDef(v,u)
-                            => VarDef(v,substE(u,enve))
+                          case VarDef(v,t,u)
+                            => VarDef(if (env.contains(v)) env(v) else v,t,substE(u,enve))
                           case AssignQual(d,v)
                             => AssignQual(substE(d,enve),substE(v,enve))
                        }
@@ -179,6 +180,8 @@ object Normalizer {
            GroupByQual(p,normalize(substE(u,env)))::normalize(head,r,nenv,Map())
       case AssignQual(d,u)::r
         => AssignQual(substE(d,env),substE(u,env))::normalize(head,r,env,opts)
+      case VarDef(v,t,u)::r
+        => VarDef(v,t,substE(u,env))::normalize(head,r,env,opts)
       case q::r => q::normalize(head,r,env,opts)
     }
 

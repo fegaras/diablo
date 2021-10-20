@@ -15,22 +15,18 @@ object Test {
               .map( line => { val a = line.split(",").toList
                               (a(0).toInt,a(1).toInt) } ).cache
 
-    var P = q("""
+    var X = q("""
       var N = 1100;  // # of graph nodes
       var b = 0.85;
 
-      // pagerank
-      var P = tensor*(N)[ (i,1.0/N) | i <- 0..N-1 ];
+      // count outgoing neighbors
+      var C = rdd[ (i,j.length) | (i,j) <- G, group by i ];
 
       // graph matrix is sparse
-      var E = tensor*(N)(N)[ ((i,j),true) | (i,j) <- G ];
+      var E = tensor*(N)(N)[ ((i,j),1.0/c) | (i,j) <- G, (ii,c) <- C, ii == i ];
 
-      // count outgoing neighbors
-      var C = tensor*(N)[ (i,0) | i <- 0..N-1 ];
-      for i = 0, N-1 do
-          for j = 0, N-1 do
-             if (E[i,j])
-                C[i] += 1;
+      // pagerank
+      var P = tensor*(N)[ (i,1.0/N) | i <- 0..N-1 ];
 
       var k = 0;
       while (k < 10) {
@@ -40,8 +36,7 @@ object Test {
             P[i] = (1-b)/N;
         for i = 0, N-1 do
             for j = 0, N-1 do
-                if (E[j,i])
-                   P[i] += b*Q[j]/C[j];
+                P[i] += b*E[j,i]*Q[j];
       };
 
       // convert pageranks to a plain RDD
@@ -50,7 +45,7 @@ object Test {
      """)
 
      // print top-30 pageranks
-     P.sortBy(x => x._2,false,1).take(30).foreach(println)
+     X.sortBy(x => x._2,false,1).take(30).foreach(println)
 
   }
 }

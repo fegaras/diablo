@@ -174,6 +174,8 @@ object Parser extends StandardTokenParsers {
             case _~_~p~None => GroupByQual(p,toExpr(p)) }
         | "let" ~ pat ~ "=" ~ expr ^^
           { case _~p~_~e => LetBinding(p,e) }
+        | "var" ~ ident ~ ":" ~ stype ~ "=" ~ expr ^^
+          { case _~v~_~t~_~e => VarDef(v,t,e) }
         | pat ~ "<-" ~ expr ^^
           { case p~_~e => Generator(p,e) }
         | dest ~ "=" ~ expr ^^

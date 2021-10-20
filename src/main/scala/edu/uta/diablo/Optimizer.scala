@@ -178,10 +178,17 @@ object Optimizer {
   def findBoundRange ( qs: List[Qualifier] ): Option[List[Qualifier]]
     = matchQ(qs,{ case Generator(VarPat(_),Range(_,_,_)) => true; case _ => false },
                 { case (g1@Generator(VarPat(v),Range(_,_,_)))::s
-                    => matchQ(s,{ case Predicate(MethodCall(Var(v1),"==",List(e)))
-                                    => v!=e && v==v1
+                    => matchQ(s,{ case p@Predicate(MethodCall(Var(v1),"==",List(e)))
+                                    => v != e && v == v1 &&
+                                         !freevars(Comprehension(e,s.dropWhile(_ != p))).contains(v1)
+                                  case p@Predicate(MethodCall(e,"==",List(Var(v1))))
+                                    => v != e && v == v1 &&
+                                         !freevars(Comprehension(e,s.dropWhile(_ != p))).contains(v1)
                                   case _ => false },
-                                { case g2::_ => Some(List(g1,g2))
+                                { case Predicate(MethodCall(e,"==",List(Var(v1))))::_
+                                    => Some(List(g1,Predicate(MethodCall(Var(v1),"==",List(e)))))
+                                  case g2::_
+                                    => Some(List(g1,g2))
                                   case _ => None })
                   case _ => None })
 

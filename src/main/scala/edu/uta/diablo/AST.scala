@@ -42,7 +42,7 @@ sealed abstract class Qualifier
     case class Predicate ( predicate: Expr ) extends Qualifier
     case class GroupByQual ( pattern: Pattern, key: Expr ) extends Qualifier
     case class AssignQual ( dest: Expr, value: Expr ) extends Qualifier
-    case class VarDef ( name: String, value: Expr ) extends Qualifier
+    case class VarDef ( name: String, atype: Type, value: Expr ) extends Qualifier
 
 case class Case ( pat: Pattern, condition: Expr, body: Expr )
 
@@ -151,8 +151,8 @@ object AST {
         => GroupByQual(p,f(k))
       case AssignQual(d,e)
         => AssignQual(f(d),f(e))
-      case VarDef(n,e)
-        => VarDef(n,f(e))
+      case VarDef(n,t,e)
+        => VarDef(n,t,f(e))
     }
 
   /** apply f to every expression in e */
@@ -291,7 +291,7 @@ object AST {
               case Predicate(u) => f(u)
               case GroupByQual(_,k) => f(k)
               case AssignQual(d,u) => acc(f(d),f(u))
-              case VarDef(_,u) => f(u)
+              case VarDef(_,_,u) => f(u)
            }.fold(f(h))(acc)
       case Merge(x,y)
         => acc(f(x),f(y))
@@ -351,8 +351,8 @@ object AST {
                 => (nhd,Predicate(subst(v,te,u))::nqs)
               case AssignQual(d,u)
                 => (nhd,AssignQual(subst(v,te,d),subst(v,te,u))::nqs)
-              case VarDef(w,u)
-                => (nhd,VarDef(w,subst(v,te,u))::(if (v == w) r:+Predicate(hd) else nqs))
+              case VarDef(w,t,u)
+                => (nhd,VarDef(w,t,subst(v,te,u))::(if (v == w) r:+Predicate(hd) else nqs))
            }
     }
 
@@ -420,7 +420,7 @@ object AST {
                 => occurrences(v,k) + (if (capture(v,p)) 0 else r)
               case (r,AssignQual(d,u))
                 => occurrences(v,d) + occurrences(v,u) + r
-              case (r,VarDef(w,u))
+              case (r,VarDef(w,t,u))
                 => occurrences(v,u) + (if (v == w) 0 else r)
            }
       case _ => accumulate[Int](e,occurrences(v,_),_+_,0)
@@ -458,7 +458,7 @@ object AST {
                 => (fl++freevars(k,el),el++patvars(p))
               case ((fl,el),AssignQual(d,u))
                 => (fl++freevars(d,el)++freevars(u,el),el)
-              case ((fl,el),VarDef(w,u))
+              case ((fl,el),VarDef(w,t,u))
                 => (fl++freevars(u,el),el:+w)
            }
            fs++freevars(h,es)

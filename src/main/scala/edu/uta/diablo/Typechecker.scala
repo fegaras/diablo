@@ -300,8 +300,11 @@ object Typechecker {
                       => typecheck(d,r)
                          typecheck(u,r)
                          (r,s)
-                    case ((r,s),VarDef(n,u))
+                    case ((r,s),VarDef(n,at,u))
                       => val tp = typecheck(u,r)
+                         if (!typeMatch(tp,at))
+                           throw new Error("Incompatible value in variable declaration: "
+                                           +e+"\n(expected "+at+" found "+tp+")")
                          ( bindPattern(VarPat(n),tp,r), n::s )
               }._1
               SeqType(typecheck(h,nenv))

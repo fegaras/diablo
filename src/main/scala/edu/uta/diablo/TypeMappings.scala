@@ -68,6 +68,106 @@ object TypeMappings {
     val deq = 1.to(dn).map(i => s"ii$i == i$i").mkString(", ")
     val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d$i+i$i)" }
     val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s$i+j$i)" }
+    val svarset = (1 to sn).map{ k => s"let j$k = "+("sparse[col]"::(sn.to(k+1,-1))
+                      .map(i => s"s$i").toList).mkString("/")+s"%s$k" }.mkString(", ")
+    if (sn == 0)   // a dense tensor
+      s"""
+       typemap tensor_${dn}_0[T] $dims: array$dn[T] {
+          def view ( values: vector[T] )
+            = [ (($dvars),values[$dkey]) |
+                $drange ]
+          def store ( L: list[($ldims,T)] )
+            = { var zero: T;
+                var buffer: vector[T] = array_buffer_dense($dsize,zero);
+                [ buffer[$dkey] = v |
+                  (($dvars),v) <- L ];
+                buffer }
+       }
+      """
+    else if (dn == 0 && boolean_values) // a boolean sparse tensor
+      s"""
+       typemap bool_tensor_0_$sn $dims: array$sn[Boolean] {
+          def view ( sparse: vector[Int] )
+            = [ (($svars),true) |
+                col <- 0..(sparse.length-1),
+                $svarset ]
+          def store ( L: list[($ldims,Boolean)] )
+            = { var buffer: vector[Boolean] = array_buffer_sparse_bool($ssize);
+                [ { buffer[$skey] = v } |
+                  (($svars),v) <- L ];
+                array2tensor_bool($ssize,buffer)
+              }
+       }
+      """
+    else if (dn == 0) // a sparse tensor
+      s"""
+       typemap tensor_0_$sn[T] $dims: array$sn[T] {
+          def view ( sparse: vector[Int], values: vector[T] )
+            = [ (($svars),values[col]) |
+                col <- 0..(sparse.length-1),
+                $svarset ]
+          def store ( L: list[($ldims,T)] )
+            = { var zero: T;
+                var buffer: vector[T] = array_buffer_sparse($ssize,zero);
+                [ { buffer[$skey] = v } |
+                  (($svars),v) <- L ];
+                array2tensor($ssize,zero,buffer)
+              }
+       }
+      """
+    else if (boolean_values) // a boolean tensor with dn dense and sn sparse dimensions
+      s"""
+       typemap bool_tensor_${dn}_$sn $dims: array${dn+sn}[Boolean] {
+          def view ( dense: vector[Int], sparse: vector[Int] )
+            = [ (($dvars,$svars),true) |
+                $drange,
+                let loc = $dkey,
+                col <- (dense[loc])..(dense[loc+1]-1),
+                $svarset ]
+          def store ( L: list[($ldims,Boolean)] )
+            = { var buffer: vector[Boolean] = array_buffer_bool($dsize,$ssize);
+                [ { buffer[$dkey*$ssize+$skey] = v } |
+                  (($dvars,$svars),v) <- L ];
+                array2tensor_bool($dsize,$ssize,buffer)
+              }
+       }
+      """
+    else  // a general tensor with dn dense and sn sparse dimensions
+      s"""
+       typemap tensor_${dn}_$sn[T] $dims: array${dn+sn}[T] {
+          def view ( dense: vector[Int], sparse: vector[Int], values: vector[T] )
+            = [ (($dvars,$svars),values[col]) |
+                $drange,
+                let loc = $dkey,
+                col <- (dense[loc])..(dense[loc+1]-1),
+                $svarset ]
+          def store ( L: list[($ldims,T)] )
+            = { var zero: T;
+                var buffer: vector[T] = array_buffer($dsize,$ssize,zero);
+                [ { buffer[$dkey*$ssize+$skey] = v } |
+                  (($dvars,$svars),v) <- L ];
+                array2tensor($dsize,$ssize,zero,buffer)
+              }
+       }
+      """
+  }
+
+  /* generate a typemap for a tensor with dn dense and sn sparse dimensions */
+  def tensor2 ( dn: Int, sn: Int, boolean_values: Boolean = false ): String = {
+    assert(sn+dn > 0)
+    val dims = "( "+(1.to(dn).map(k => s"d$k: Int")
+                     ++1.to(sn).map(k => s"s$k: Int")).mkString(", ")+" )"
+    val ldims = "("+1.to(dn+sn).map(i => "Int").mkString(",")+")"
+    val dsize = 1.to(dn).map("d"+_).mkString("*")
+    val ssize = 1.to(sn).map("s"+_).mkString("*")
+    val drange = 1.to(dn).map(i => s"i$i <- 0..(d$i-1)").mkString(", ")
+    val srange = 1.to(sn).map(i => s"j$i <- 0..(s$i-1)").mkString(", ")
+    val dvars = 1.to(dn).map("i"+_).mkString(",")
+    val dvars2 = 1.to(dn).map("ii"+_).mkString(",")
+    val svars = 1.to(sn).map("j"+_).mkString(",")
+    val deq = 1.to(dn).map(i => s"ii$i == i$i").mkString(", ")
+    val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d$i+i$i)" }
+    val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s$i+j$i)" }
     if (sn == 0)   // a dense tensor
       s"""
        typemap tensor_${dn}_0[T] $dims: array$dn[T] {

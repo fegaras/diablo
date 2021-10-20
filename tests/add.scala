@@ -31,6 +31,7 @@ object Add {
     parami(block_dim_size,1000)  // size of each dimension in a block
     val N = 1000
     val validate_output = false
+    parami(number_of_partitions,10)
 
     val conf = new SparkConf().setAppName("add")
     spark_context = new SparkContext(conf)
