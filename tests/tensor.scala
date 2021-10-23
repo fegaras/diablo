@@ -54,7 +54,15 @@ object Test {
         M2 = [ ((i,j),m+n) | ((i,j),m) <- M2, ((ii,jj),n) <- M3, ii==i, jj==j ];
         M3 = [ ((i,j),m+n) | ((i,j),m) <- M3, ((ii,jj),n) <- M3, ii==i, jj==j ];
 
-        M1 = [ ((i,j),m+n+k) | ((i,j),m) <- M2, ((ii,jj),n) <- M3,((iii,jjj),k) <- M1, ii==i, jj==j, iii==i, jjj==j ];
+        // use full scans for sparse matrices
+        M1 = [ ((i,j),m+n) | ((i,j),m) <= M1, ((ii,jj),n) <= M1, ii==i, jj==j ];
+        M2 = [ ((i,j),m+n) | ((i,j),m) <= M1, ((ii,jj),n) <= M1, ii==i, jj==j ];
+        M3 = [ ((i,j),m+n) | ((i,j),m) <= M1, ((ii,jj),n) <= M1, ii==i, jj==j ];
+        M1 = [ ((i,j),m+n) | ((i,j),m) <= M1, ((ii,jj),n) <= M2, ii==i, jj==j ];
+        M2 = [ ((i,j),m+n) | ((i,j),m) <= M2, ((ii,jj),n) <= M3, ii==i, jj==j ];
+        M3 = [ ((i,j),m+n) | ((i,j),m) <= M3, ((ii,jj),n) <= M3, ii==i, jj==j ];
+
+        M1 = [ ((i,j),m+n+k) | ((i,j),m) <= M2, ((ii,jj),n) <= M3,((iii,jjj),k) <= M1, ii==i, jj==j, iii==i, jjj==j ];
 
         tensor(N)(N)[ ((i,j),m+n < 3) | ((i,j),m) <- M2, ((ii,jj),n) <- M3, ii==i, jj==j ];
 

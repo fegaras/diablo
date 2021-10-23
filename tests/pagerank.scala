@@ -21,6 +21,7 @@ object Test {
 
       // count outgoing neighbors
       var C = rdd[ (i,j.length) | (i,j) <- G, group by i ];
+      //var C = tensor*(N)[ (i,j.length) | (i,j) <- G, group by i ];
 
       // graph matrix is sparse
       var E = tensor*(N)(N)[ ((i,j),1.0/c) | (i,j) <- G, (ii,c) <- C, ii == i ];

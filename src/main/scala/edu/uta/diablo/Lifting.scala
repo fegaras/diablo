@@ -15,7 +15,7 @@
  */
 package edu.uta.diablo
 
-import TypeMappings.{tensor,block_tensor}
+import TypeMappings.{tensor,full_tensor,block_tensor}
 import scala.util.matching.Regex
 
 object Lifting {
@@ -49,16 +49,17 @@ object Lifting {
     val nsp = tuple(params.keys.toList.map(VarPat):+sp)
     val nsb = tuple(params.keys.toList.map(Var):+lift_expr(sb,senv))
     val nst = tuple(params.values.toList:+st)
-    if (!typeMatch(typecheck(nsb,senv),nst))
+    if (sb != Tuple(Nil) && !typeMatch(typecheck(nsb,senv),nst))
       throw new Error("Wrong store function: "+store+" "+typecheck(nsb,senv)+" "+nst)
     typeMaps += typeName -> TypeMapS(typeName,typeParams,params,abstractType,nst,
                                      liftedType,Lambda(nvp,vb),Lambda(nsp,nsb))
   }
 
-  val btpat: Regex = """bool_tensor_(\d+)_(\d+)""".r
-  val tpat: Regex = """tensor_(\d+)_(\d+)""".r
-  val bpat: Regex = """block_tensor_(\d+)_(\d+)""".r
-  val bbtpat: Regex = """block_bool_tensor_(\d+)_(\d+)""".r
+  val pat: Regex = """(full_|)(block_|)(bool_|)tensor_(\d+)_(\d+)""".r
+  val btpat: Regex = """(full_|)bool_tensor_(\d+)_(\d+)""".r
+  val tpat: Regex = """(full_|)tensor_(\d+)_(\d+)""".r
+  val bpat: Regex = """(full_|)block_tensor_(\d+)_(\d+)""".r
+  val bbtpat: Regex = """(full_|)block_bool_tensor_(\d+)_(\d+)""".r
 
   // get a type map if exists, or create a type map from a tensor
   def getTypeMap ( name: String ): Option[TypeMapS] = {
@@ -66,14 +67,18 @@ object Lifting {
         Some(typeMaps(name))
       else {
         val tm = name match {
-          case btpat(dn,sn)
+          case btpat("",dn,sn)
             => tensor(dn.toInt,sn.toInt,true)
-          case tpat(dn,sn)
+          case tpat("",dn,sn)
             => tensor(dn.toInt,sn.toInt)
-          case bbtpat(dn,sn)
-            => block_tensor(dn.toInt,sn.toInt,true)
-          case bpat(dn,sn)
-            => block_tensor(dn.toInt,sn.toInt)
+          case btpat(_,dn,sn)
+            => full_tensor(dn.toInt,sn.toInt,true)
+          case tpat(_,dn,sn)
+            => full_tensor(dn.toInt,sn.toInt)
+          case bbtpat(full,dn,sn)
+            => block_tensor(dn.toInt,sn.toInt,true,full)
+          case bpat(full,dn,sn)
+            => block_tensor(dn.toInt,sn.toInt,false,full)
           case _ => ""
         }
         if (tm != "") {
@@ -193,6 +198,28 @@ object Lifting {
         case Comprehension(h,qs)
           => val (nenv,_,nqs)
                 = qs.foldLeft((env,Nil:List[String],Nil:List[Qualifier])) {
+                    case ((r,s,n),Generator(p,Call("_full",List(u))))
+                      => val lu = lift_expr(u,r)
+                         lu.tpe = null    // clear the type info of e
+                         typecheck(lu,r) match {
+                            case StorageType(f@pat(_,_,_,_,sn),tps,args)
+                              if sn.toInt > 0
+                              => val Some(TypeMapS(_,ps,_,_,t1,lt,map,_)) = getTypeMap("full_"+f).map(fresh)
+                                 val tp = substType(lt,Some((ps zip tps).toMap))
+                                 ( bindPattern(p,elemType(tp),r),
+                                   s ++ patvars(p),
+                                   n:+Generator(p,Lift("full_"+f,lu)) )
+                            case StorageType(f,tps,args)
+                              => val Some(TypeMapS(_,ps,_,_,t1,lt,map,_)) = getTypeMap(f).map(fresh)
+                                 val tp = substType(lt,Some((ps zip tps).toMap))
+                                 ( bindPattern(p,elemType(tp),r),
+                                   s ++ patvars(p),
+                                   n:+Generator(p,Lift(f,lu)) )
+                            case _
+                              => ( bindPattern(p,elemType(typecheck(lu,r)),r),
+                                   s ++ patvars(p),
+                                   n:+Generator(p,lu) )
+                         }
                     case ((r,s,n),Generator(p,u))
                       => val lu = lift_expr(u,r)
                          lu.tpe = null    // clear the type info of e

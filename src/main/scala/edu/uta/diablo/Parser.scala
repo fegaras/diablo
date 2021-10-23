@@ -178,6 +178,8 @@ object Parser extends StandardTokenParsers {
           { case _~v~_~t~_~e => VarDef(v,t,e) }
         | pat ~ "<-" ~ expr ^^
           { case p~_~e => Generator(p,e) }
+        | "(" ~ rep1sep( pat, "," ) ~ ")" ~ "<=" ~ expr ^^    // full spatial tensor access
+          { case _~ps~_~_~e => Generator(TuplePat(ps),Call("_full",List(e))) }
         | dest ~ "=" ~ expr ^^
           { case d~_~e => AssignQual(d,e) }
         | expr ^^ Predicate
@@ -348,7 +350,7 @@ object Parser extends StandardTokenParsers {
 
   val tensor_pat = """tensor_(\d+)_(\d+)""".r
   val bool_tensor_pat = """bool_tensor_(\d+)_(\d+)""".r
-  val block_tensor_pat = """(block_)?tensor_(\d+)_(\d+)""".r
+  val block_tensor_pat = """(block_|)tensor_(\d+)_(\d+)""".r
 
   def simpleType: Parser[Type]
       = ( "(" ~ rep1sep( stype, "," ) ~ ")" ^^

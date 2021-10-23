@@ -118,7 +118,7 @@ object Add {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <- Az, ((ii,jj),b) <- Bz, ii == i, jj == j ];
+                  tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <= Az, ((ii,jj),b) <= Bz, ii == i, jj == j ];
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -130,7 +130,7 @@ object Add {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <- Az, ((ii,jj),b) <- BB, ii == i, jj == j ];
+                  tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <= Az, ((ii,jj),b) <- BB, ii == i, jj == j ];
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }

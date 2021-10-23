@@ -97,34 +97,34 @@ object ComprehensionTranslator {
   def tuple ( s: List[Type] ): Type
     = s match { case List(x) => x; case _ => TupleType(s) }
 
-  val tensor_pat: Regex = """tensor_(\d+)_(\d+)""".r
-  val bool_tensor_pat: Regex = """bool_tensor_(\d+)_(\d+)""".r
+  val tensor_pat: Regex = """(full_|)tensor_(\d+)_(\d+)""".r
+  val bool_tensor_pat: Regex = """(full_|)bool_tensor_(\d+)_(\d+)""".r
 
   def isTensor ( name: String ): Boolean
-    = name match { case tensor_pat(_,_) => true
-                   case bool_tensor_pat(_,_) => true
+    = name match { case tensor_pat(_,_,_) => true
+                   case bool_tensor_pat(_,_,_) => true
                    case _ => false }
 
   def isTensor ( e: Expr ): Boolean
     = e match { case Lift(tensor,_) => isTensor(tensor); case _ => false }
 
   def isBoolTensor ( name: String ): Boolean
-    = name match { case bool_tensor_pat(_,_) => true; case _ => false }
+    = name match { case bool_tensor_pat(_,_,_) => true; case _ => false }
 
   def tensor_dims ( name: String ): (Int,Int)
     =  name match {
-         case tensor_pat(dn,sn) => (dn.toInt,sn.toInt)
-         case bool_tensor_pat(dn,sn) => (dn.toInt,sn.toInt)
+         case tensor_pat(_,dn,sn) => (dn.toInt,sn.toInt)
+         case bool_tensor_pat(_,dn,sn) => (dn.toInt,sn.toInt)
          case _ => (0,0)
        }
 
-  val block_tensor_pat: Regex = """block_tensor_(\d+)_(\d+)""".r
-  val block_bool_tensor_pat: Regex = """block_bool_tensor_(\d+)_(\d+)""".r
+  val block_tensor_pat: Regex = """(full_|)block_tensor_(\d+)_(\d+)""".r
+  val block_bool_tensor_pat: Regex = """(full_|)block_bool_tensor_(\d+)_(\d+)""".r
 
   def isBlockTensor ( name: String ): Boolean
     = name match {
-        case block_tensor_pat(_,_) => true
-        case block_bool_tensor_pat(_,_) => true
+        case block_tensor_pat(_,_,_) => true
+        case block_bool_tensor_pat(_,_,_) => true
         case _ => false
       }
 
@@ -140,8 +140,8 @@ object ComprehensionTranslator {
     = e match {
         case Lift(name,_)
           => name match {
-                case tensor_pat(_,sn) => sn.toInt > 0
-                case bool_tensor_pat(_,sn) => sn.toInt > 0
+                case tensor_pat(_,_,sn) => sn.toInt > 0
+                case bool_tensor_pat(_,_,sn) => sn.toInt > 0
                 case _ => false }
         case _ => false
       }
@@ -511,9 +511,9 @@ object ComprehensionTranslator {
   // for a lifted RDD storage, return the RDD collection
   def get_rdd ( e: Expr ): Expr
     = e match {
-        case Lift(block_tensor_pat(dn,sn),x)
+        case Lift(block_tensor_pat(full,dn,sn),x)
           => block_tensor_tiles(dn.toInt,sn.toInt,x)
-        case Lift(block_bool_tensor_pat(dn,sn),x)
+        case Lift(block_bool_tensor_pat(full,dn,sn),x)
           => block_tensor_tiles(dn.toInt,sn.toInt,x)
         case Lift("rdd",x) => x
         case _ => e
@@ -521,9 +521,9 @@ object ComprehensionTranslator {
 
   def block_arrays_to_rdds ( qs: List[Qualifier] ): List[Qualifier]
     = qs.flatMap {
-               case Generator(p,Lift(f@block_tensor_pat(dn,sn),x))
+               case Generator(p,Lift(f@block_tensor_pat(_,dn,sn),x))
                  => List(Generator(p,lift(f,x)))
-               case Generator(p,Lift(f@block_bool_tensor_pat(dn,sn),x))
+               case Generator(p,Lift(f@block_bool_tensor_pat(_,dn,sn),x))
                  => List(Generator(p,lift(f,x)))
                case q => List(q)
              }
@@ -749,23 +749,23 @@ object ComprehensionTranslator {
 
   def tile_type ( block: String ): String
     = block match {
-        case block_tensor_pat(dn,sn)
-          => s"tensor_${dn}_$sn"
-        case block_bool_tensor_pat(dn,sn)
-          => s"bool_tensor_${dn}_$sn"
+        case block_tensor_pat(full,dn,sn)
+          => s"${full}tensor_${dn}_$sn"
+        case block_bool_tensor_pat(full,dn,sn)
+          => s"${full}bool_tensor_${dn}_$sn"
       }
 
   def tile_type ( block: String, tp: Type ): String = {
     val isBool = tp == boolType
     block match {
-        case block_tensor_pat(dn,sn)
+        case block_tensor_pat(full,dn,sn)
           => if (isBool && sn.toInt > 0)
-               s"bool_tensor_${dn}_$sn"
-              else s"tensor_${dn}_$sn"
-        case block_bool_tensor_pat(dn,sn)
+               s"${full}bool_tensor_${dn}_$sn"
+              else s"${full}tensor_${dn}_$sn"
+        case block_bool_tensor_pat(full,dn,sn)
           => if (isBool && sn.toInt > 0)
-               s"bool_tensor_${dn}_$sn"
-              else s"tensor_${dn}_$sn"
+               s"${full}bool_tensor_${dn}_$sn"
+              else s"${full}tensor_${dn}_$sn"
       }
   }
 
@@ -815,7 +815,7 @@ object ComprehensionTranslator {
   def constant_index ( e: Expr ): Boolean
     = e match {
         case Var(_) => true
-        case Tuple(s) => s.forall(constant_index(_))
+        case Tuple(s) => s.forall(constant_index)
         case _ => constant_int(e)
       }
 
@@ -824,11 +824,11 @@ object ComprehensionTranslator {
          var key_vars = freevars(key).toSet
          val indices = unique_indices(qs).toSet
          val cis = correlated_indices(qs,key_vars)
-         key_vars.forall(indices.contains(_)) && indices == cis
+         key_vars.forall(indices.contains) && indices == cis
       }
 
   def local_expr ( e: Expr, vars: List[String] ): Boolean
-    = freevars(e,vars).filter(v => typecheck_var(v).isEmpty).isEmpty
+    = !freevars(e, vars).exists(v => typecheck_var(v).isEmpty)
 
   def rdd_qualifier_vars ( qs: List[Qualifier], vars: List[String] ): List[String]
     = qs.foldLeft[List[String]] (vars) {
@@ -845,9 +845,9 @@ object ComprehensionTranslator {
           case (s,_) => s
       }
 
-  def prefix ( prefix: String, v: String ) = "_"+prefix+"_"+v
+  def prefix ( prefix: String, v: String ): String = "_"+prefix+"_"+v
 
-  val block_pat: Regex = """block_(bool_)?tensor_(\d+)_(\d+)""".r
+  val block_pat: Regex = """(full_|)block_(bool_|)tensor_(\d+)_(\d+)""".r
 
   // from the comprehension qualifiers qs, generate the RDD qualifiers
   def rdd_qualifiers ( qs: List[Qualifier], vars: List[String], shuffle: Boolean = false ): List[Qualifier] = {
@@ -856,7 +856,7 @@ object ComprehensionTranslator {
     qs.flatMap (
         q => q match {
           case Generator(TuplePat(List(p,VarPat(v))),
-                         Lift(block_pat(_,dn,sn),e))
+                         Lift(block_pat(full,bool,dn,sn),e))
             => val is = patvars(p)
                Generator(tuple(List(tuple(is.map(i => VarPat(prefix("coord",i)))),
                                     VarPat(prefix("tile",v)))),
@@ -1010,10 +1010,7 @@ object ComprehensionTranslator {
              val tbinds = tile_dimensions(is,dims)
              val tile_dims = is.map( i => Var(prefix("size",i)) )
              val tile_coords = tuple(is.map( i => Var(prefix("coord",i)) ))
-             val tile_indices = tuple(is.map {
-                                         case i => MethodCall(Var(i),"%",
-                                                              List(IntConst(block_dim_size)))
-                                      })
+             val tile_indices = tuple(is.map { i => MethodCall(Var(i),"%",List(IntConst(block_dim_size))) })
              val stile = Comprehension(Tuple(List(tile_indices,e)),
                                        tile_qualifiers(qs,vars))
              val tile = block_array_assignment match {
@@ -1053,11 +1050,11 @@ object ComprehensionTranslator {
          var key_vars = freevars(key).toSet
          val indices = unique_indices(qs).toSet
          val cis = correlated_indices(qs,key_vars)
-         key_vars.forall(indices.contains(_)) //&& indices == cis
+         key_vars.forall(indices.contains) //&& indices == cis
       }
 
   /* shuffle the tiles of a tiled comprehension */
-  def shuffle_tiles ( block: String, hs: Expr, qs: List[Qualifier], group_by: Boolean,
+  def shuffle_tiles ( block: String, hs: Expr, qs: List[Qualifier],
                       vars: List[String], tp: Type, dims: List[Expr] ): Expr
     = hs match {
         case Tuple(List(p,h))
@@ -1093,16 +1090,12 @@ object ComprehensionTranslator {
              val rqs = (rdd_qualifiers(qs,vars,true)++unique_coords:+
                                GroupByQual(tuple(vs.map(VarPat)),
                                            tuple(vs.map(Var))))++tbinds
-             val tqs = if (group_by)
-                         List(GroupByQual(TuplePat(ks.map{ case Var(v) => VarPat(v)
-                                                           case _ => VarPat("") }),
-                                          Tuple(ks)))
-                       else (vs zip gkeys("/")).map {
-                               case (vk,gkey)
-                                 => Predicate(MethodCall(Var(vk),"==",List(gkey)))
-                            }
+             val tqs = (vs zip gkeys("/")).map {
+                           case (vk,gkey)
+                             => Predicate(MethodCall(Var(vk),"==",List(gkey)))
+                       }
              val tile = Store(tile_type(block,tp),List(tp),tile_dims,
-                              Comprehension(Tuple(List(Tuple(if (group_by) ks else gkeys("%")),h)),
+                              Comprehension(Tuple(List(Tuple(gkeys("%")),h)),
                                             tile_qualifiers(qs,vars,true)++tqs))
              val Comprehension(nhs,nqs) = optimize(Comprehension(Tuple(List(tuple(vs.map(Var)),tile)),rqs))
              val rdd = if (is_rdd_comprehension(qs))
@@ -1411,7 +1404,7 @@ object ComprehensionTranslator {
         => preserve_tiles(block,hs,qs,vars,tp,dims)
       case Tuple(List(p,_))   // a tiled comprehension that doesn't preserve tiling
         if shuffles_tiles(p,qs)
-        => shuffle_tiles(block,hs,qs,false,vars,tp,dims)
+        => shuffle_tiles(block,hs,qs,vars,tp,dims)
       case _    // groupBy join
         if { QLcache = translate_groupby_join(block,hs,qs,vars,tp,dims); QLcache.nonEmpty }
         => QLcache.get
@@ -1438,14 +1431,28 @@ object ComprehensionTranslator {
         case _
           if is_rdd_comprehension(qs)
           // A tiled comprehension that depends on RDDs
-          => val ns = qs.map {
-                         case Generator(p,Lift(b,x))
+          => val mp = qs.flatMap {
+                         case q@Generator(p,Lift(b,x))
                            if isBlockTensor(b)
-                           => Generator(p,lift(b,x))
+                           => List(q -> newvar)
+                         case q => Nil
+                      }.toMap
+             val ns = qs.map {
+                         case q@Generator(p,Lift(b,x))
+                           if isBlockTensor(b)
+                           => Generator(p,Lift("rdd",Var(mp(q))))
                          case q => q
                        }
              val Comprehension(nh,nqs) = optimize(Comprehension(hs,ns))
-             translate(optimize(store(block,List(tp),dims,Lift("rdd",translate_rdd(nh,nqs,vars)))),vars)
+             // pull out block tensors from the comprehension as RDDs
+             val ne = mp.foldLeft[Expr](store(block,List(tp),dims,
+                                              Lift("rdd",translate_rdd(nh,nqs,vars)))) {
+                           case (r,((q@Generator(p,_),v)))
+                             => Let(VarPat(v),
+                                    Store("rdd",List(tp),Nil,
+                                          Comprehension(toExpr(p),List(q))),r)
+                      }
+             translate(optimize(ne),vars)
         case _
           => store(block,List(tp),dims,translate(Comprehension(hs,qs),vars))
     }
@@ -1455,7 +1462,7 @@ object ComprehensionTranslator {
 
   val array_assigns = true
 
-  val array_buffer_pat = "array_buffer([_a-z]*)".r
+  val array_buffer_pat: Regex = "array_buffer([_a-z]*)".r
 
   def add_initial_array ( e: Expr, a: Expr ): Expr
     = e match {

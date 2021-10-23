@@ -6,7 +6,7 @@ It works on Apache Spark and on Scala's Parallel collections.
 
 ### Installation on Spark
 
-DIABLO depends on Scala 2.12 and Spark 3.0. To compile DIABLO, use ``sbt package`` or ``mvn install``.
+DIABLO depends on Scala 2.12.12 and Spark 3.1.2. To compile DIABLO, use ``sbt package`` or ``mvn install``.
 To test  on Spark:
 ```bash
 export SPARK_HOME= ... path to Spark home ...
@@ -66,6 +66,18 @@ q("""
  """)
 ```
 
+## Matrix addition using array comprehensions:
+  
+Full scans of sparse arrays in which both zero and non-zero elements are used are done with a full scan <= (slower)
+
+```scala
+q("""
+     var A = tensor*(n)(n)[ ((i,j),random()) | i <- 0..n-1, j <- 0..n-1 ]     // sparse matrix
+     var B = tensor*(n)(n)[ ((i,j),random()) | i <- 0..n-1, j <- 0..n-1 ]     // sparse matrix
+     tensor*(n,n)[ ((i,j),a+b) | ((i,j),a) <= A, ((ii,jj),b) <= B, ii == i, jj == j ];
+ """)
+```
+
 ## Matrix multiplication using loops:
 
 ```scala
@@ -84,7 +96,7 @@ q("""
     """)
 ```
 
-## Matrix factorization example:
+## Matrix factorization:
 
 ```scala
     q("""
@@ -122,4 +134,32 @@ q("""
       };
       (P,Q);
     """)
+```
+## Pagerank
+
+The input graph G is an RDD[(Long,Long)]
+
+```scala
+      var N = 1100;  // # of graph nodes
+      var b = 0.85;
+
+      // count outgoing neighbors
+      var C = tensor*(N)[ (i,j.length) | (i,j) <- G, group by i ];
+
+      // graph matrix is sparse
+      var E = tensor*(N)(N)[ ((i,j),1.0/c) | (i,j) <- G, (ii,c) <- C, ii == i ];
+
+      // pagerank
+      var P = tensor*(N)[ (i,1.0/N) | i <- 0..N-1 ];
+
+      var k = 0;
+      while (k < 10) {
+        k += 1;
+        var Q = P;
+        for i = 0, N-1 do
+            P[i] = (1-b)/N;
+        for i = 0, N-1 do
+            for j = 0, N-1 do
+                P[i] += b*E[j,i]*Q[j];
+      };
 ```

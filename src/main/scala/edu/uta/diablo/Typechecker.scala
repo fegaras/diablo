@@ -198,11 +198,11 @@ object Typechecker {
       }
     }
 
-    val tpat: Regex = """tensor_(\d+)_(\d+)""".r
-    val btpat: Regex = """block_tensor_(\d+)_(\d+)""".r
+    val tpat: Regex = """(full_|)tensor_(\d+)_(\d+)""".r
+    val btpat: Regex = """(full_|)block_tensor_(\d+)_(\d+)""".r
 
     def typecheck ( e: Expr, env: Environment ): Type
-      = if (e.tpe != null)// && !e.isInstanceOf[Var])
+      = if (e.tpe != null)
            e.tpe   // the cached type of e
         else try { val tpe = e match {
           case Var("null")
@@ -316,12 +316,12 @@ object Typechecker {
             => tps match {
                  case List(BasicType("Boolean"))
                    => f match {
-                        case tpat(dn,sn) if sn.toInt > 0
+                        case tpat(full,dn,sn) if sn.toInt > 0
                           => // change tensor_*_* to bool_tensor_*_*
-                             x.mapping = "bool_"+f                         // destructive
-                        case btpat(dn,sn) if sn.toInt > 0
+                             x.mapping = full+"bool_"+f                         // destructive
+                        case btpat(full,dn,sn) if sn.toInt > 0
                           => // change block_tensor_*_* to block_bool_tensor_*_*
-                             x.mapping = s"block_bool_tensor_${dn}_$sn"    // destructive
+                             x.mapping = s"${full}block_bool_tensor_${dn}_$sn"    // destructive
                         case _ => ;
                       }
                  case _ => ;
@@ -331,16 +331,16 @@ object Typechecker {
                typecheck(u,env)
                StorageType(x.mapping,tps,args)
           case x@Call(f,args@(_:+l))
-            if (f match { case tpat(_,_) => true; case btpat(_,_) => true; case _ => false })
+            if (f match { case tpat(_,_,_) => true; case btpat(_,_,_) => true; case _ => false })
             => typecheck(l,env) match {
                   case SeqType(TupleType(List(_, BasicType("Boolean"))))
                     => f match {
-                        case tpat(dn,sn) if sn.toInt > 0
+                        case tpat(full,dn,sn) if sn.toInt > 0
                           => // change tensor_*_* to bool_tensor_*_*
-                             x.name = "bool_"+f                         // destructive
-                        case btpat(dn,sn) if sn.toInt > 0
+                             x.name = full+"bool_"+f                         // destructive
+                        case btpat(full,dn,sn) if sn.toInt > 0
                           => // change block_tensor_*_* to block_bool_tensor_*_*
-                             x.name = s"block_bool_tensor_${dn}_$sn"    // destructive
+                             x.name = s"${full}block_bool_tensor_${dn}_$sn"    // destructive
                         case _ => ;
                       }
                   case _ => ;
@@ -354,6 +354,16 @@ object Typechecker {
                if (useStorageTypes)
                  substType(st,ev)
                else substType(at,ev)
+          case Call("_full",List(e))
+            => typecheck(e,env) match {
+                  case StorageType(f@tpat(_,dn,sn),tps,args)
+                    if sn.toInt > 0       // full sparse tensor scan
+                    => StorageType("full_"+f,tps,args)
+                  case StorageType(f@btpat(_,dn,sn),tps,args)
+                    if sn.toInt > 0       // full block sparse tensor scan
+                    => StorageType("full_"+f,tps,args)
+                  case tp => tp
+               }
           case Call(f,args)
             if getTypeMap(f).isDefined
             => val Some(TypeMapS(_,tps,ps,at,st,lt,view,store)) = getTypeMap(f)
