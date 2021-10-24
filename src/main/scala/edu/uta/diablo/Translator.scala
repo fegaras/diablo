@@ -34,6 +34,8 @@ object Translator {
   def block ( s: List[Expr] ): Expr
     = s match { case List(x) => x; case _ => Block(s) }
 
+  val monoids = List("+","*","min","max","&&","||")
+
   def translate ( e: Expr, env: Environment, vars: List[String], fncs: Defs ): Expr
     = e match {
         case Var(n)
@@ -383,7 +385,7 @@ object Translator {
                          env: Environment, vars: List[String], fncs: Defs ): List[Expr]
     = (d,s) match {
           case (d@Index(Var(a),is),MethodCall(x,op,List(e)))
-            if d == x
+            if d == x && monoids.contains(op)
             => val v = newvar
                val k = newvar
                val vs = is.map(x => newvar)
@@ -396,7 +398,7 @@ object Translator {
                                        elem(Comprehension(Tuple(List(Var(k),reduce(op,Var(v)))),
                                                           quals++qs)))))
           case (d@Var(a),MethodCall(x,op,List(e)))
-            if d == x
+            if d == x && monoids.contains(op)
             => val v = newvar
                val (calls,ne) = unfoldCalls(e,quals,env,vars,fncs)
                calls:+Assign(Var(a),
@@ -439,7 +441,7 @@ object Translator {
                                        elem(Comprehension(Tuple(List(tuple(vs.map(Var)),Var(v))),
                                                      quals++qs)))))
           case (d,MethodCall(x,op,List(e)))
-            if d == x
+            if d == x && monoids.contains(op)
             => val v = newvar
                val k = newvar
                val w = newvar
@@ -478,11 +480,27 @@ object Translator {
                       env,vars,fncs)
     }
 
+  def indexed_access ( v: String, e: Expr ): Boolean
+    = e match {
+        case Index(u,is)
+          => freevars(Tuple(is)).contains(v)
+        case _ => accumulate[Boolean](e,indexed_access(v,_),_||_,false)
+      }
+
+  def indexed_access ( v: String, s: Stmt ): Boolean
+    = accumulateStmt[Boolean](s,indexed_access(v,_),_||_,false)
+
   def translate ( s: Stmt, quals: List[Qualifier], retVars: List[String],
                   env: Environment, vars: List[String], fncs: Defs ): List[Expr]
     = s match {
           case AssignS(d,e)
             => translate_assign(d,e,quals,false,env,vars,fncs)
+          case ForS(v,e1,e2,e3,b)
+            if !indexed_access(v,b)    // convert a for-loop to a sequential while-loop
+            => translate(BlockS(List(VarDeclS(v,Some(intType),Some(e1)),
+                                     WhileS(MethodCall(Var(v),"<",List(e2)),
+                                            BlockS(List(b,AssignS(Var(v),MethodCall(Var(v),"+",List(e3)))))))),
+                         quals,retVars,env,vars,fncs)
           case ForS(v,e1,e2,e3,b)
             => val nv = newvar
                translate(b,
@@ -537,8 +555,6 @@ object Translator {
                  case _
                    => throw new Error("A return statement can only appear inside a function body: "+e)
                }
-//          case ExprS(e)
-//            => List(translate(Comprehension(e,quals),env,vars,fncs))
           case ExprS(e)
             => val v = newvar
                List(Comprehension(Var(v),quals:+Generator(VarPat(v),translate(e,env,vars,fncs))))
@@ -570,6 +586,81 @@ object Translator {
           case _ => throw new Error("Illegal statement: "+s)
     }
 
-  def translate ( s: Stmt ): Expr
-    = block(translate(s,Nil,Nil,Map(),Nil,Map()))
+  def arrays_read ( e: Expr ): List[Expr]
+    = e match {
+        case Index(Var(v),is)
+          => e::is.flatMap(arrays_read)
+        case Index(u,is)
+          => e::is.flatMap(arrays_read)++arrays_read(u)
+        case _ => accumulate[List[Expr]](e,arrays_read,_++_,Nil)
+      }
+
+  def arrays_read ( s: Stmt ): List[Expr]
+    = s match {
+        case AssignS(d@Var(_),e)
+          => arrays_read(e)
+        case AssignS(Index(_,is),e)
+          => is.flatMap(arrays_read)++arrays_read(e)
+        case _ => accumulateStmt[List[Expr]](s,arrays_read,_++_,Nil)
+      }
+
+  def destination_array ( e: Expr ): String
+    = e match {
+        case Index(Var(v),_)
+          => v
+        case Index(u,is)
+          => destination_array(u)
+        case _ => ""
+      }
+
+  def affine_index ( e: Expr, vars: List[String] ): Boolean
+    = e match {
+        case Var(v)
+          => vars.contains(v)
+        case IntConst(_) => true
+        case LongConst(_) => true
+        case MethodCall(x,"+",List(y))
+          => affine_index(x,vars) && affine_index(y,vars)
+        case MethodCall(IntConst(_),"*",List(y))
+          => affine_index(y,vars)
+        case MethodCall(x,"*",List(IntConst(_)))
+          => affine_index(x,vars)
+        case _ => false
+      }
+
+  def affine ( e: Expr, vars: List[String] ): Boolean
+    = e match {
+        case Index(d,is)
+          => affine(d,vars) && is.forall( i => affine_index(i,vars) )
+        case Var(_) => true
+        case _ => false
+      }
+
+  def validate ( s: Stmt, vars: List[String], read: List[Expr] ) {
+    s match {
+      case ForS(v,e1,e2,e3,b)
+        => validate(b,v::vars,arrays_read(b))
+      case ForeachS(p,e,b)
+        => validate(b,vars,arrays_read(b))
+      case WhileS(p,b)
+        => validate(b,vars,arrays_read(b))
+      case BlockS(ls)
+        => ls.foreach(s => validate(s,vars,read))
+      case IfS(p,t,f)
+        => validate(t,vars,read)
+           validate(f,vars,read)
+      case AssignS(d,e)
+        => if (!affine(d,vars))
+             throw new Error("Assignment destination "+d
+                   +" is not affine (a linear combination of loop indices)")
+           if (read.filter(_ != d).map(destination_array).contains(destination_array(d)))
+             throw new Error("Assignment destination "+d+" is read during the loop")
+      case _ => ;
+    }
+  }
+
+  def translate ( s: Stmt ): Expr = {
+     validate(s,Nil,Nil)
+     block(translate(s,Nil,Nil,Map(),Nil,Map()))
+  }
 }

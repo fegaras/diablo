@@ -312,6 +312,32 @@ object AST {
       case _ => zero
     }
 
+  /** fold over statements */
+  def accumulateStmt[T] ( s: Stmt, f: Expr => T, acc: (T,T) => T, zero: T ): T =
+     s match {
+      case BlockS(l)
+        => l.map(accumulateStmt(_,f,acc,zero)).fold(zero)(acc)
+      case ForS(v,a,b,c,body)
+        => acc(f(a),acc(f(b),acc(f(c),
+               accumulateStmt(body,f,acc,zero))))
+      case ForeachS(v,e,body)
+        => acc(f(e),accumulateStmt(body,f,acc,zero))
+      case WhileS(c,body)
+        => acc(f(c),accumulateStmt(body,f,acc,zero))
+      case IfS(p,t,e)
+        => acc(f(p),acc(accumulateStmt(t,f,acc,zero),
+                        accumulateStmt(e,f,acc,zero)))
+      case DefS(n,s,tp,b)
+        => accumulateStmt(b,f,acc,zero)
+      case AssignS(d,e)
+        => acc(f(d),f(e))
+      case ReturnS(e)
+        => f(e)
+      case ExprS(e)
+        => f(e)
+      case _ => zero
+    }
+
   /** return the list of all variables in the pattern p */
   def patvars ( p: Pattern ): List[String] = 
     p match {
