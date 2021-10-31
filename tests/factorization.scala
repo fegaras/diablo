@@ -57,17 +57,24 @@ object Factorization extends Serializable {
                                                          if ((j+1)*N > cols) cols%N else N)) }
     }
 
-    val Rm = randomMatrix(n,m)
-    val Pm = randomMatrix(n,d)
-    val Qm = randomMatrix(m,d)
+    val Rm = randomMatrix(n,m).cache()
+    val Pm = randomMatrix(n,d).cache()
+    val Qm = randomMatrix(d,m).cache()
 
     val R = new BlockMatrix(Rm,N,N)
     val Pinit = new BlockMatrix(Pm,N,N)
     val Qinit = new BlockMatrix(Qm,N,N)
 
-    val RR = (n,m,Rm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.toArray)) })
-    val PPinit = (n,d,Pm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.toArray)) })
-    val QQinit = (m,d,Qm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.toArray)) })
+    val RR = (n,m,Rm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
+    val PPinit = (n,d,Pm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
+    val QQinit = (d,m,Qm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
+
+    val rand = new Random()
+    def random () = rand.nextDouble()*10
+
+    val RSparse = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 5.0 ]")
+    val PinitSparse = q("tensor*(n)(d)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(d-1), random() > 5.0 ]")
+    val QinitSparse = q("tensor*(d)(m)[ ((i,j),random()) | i <- 0..(d-1), j <- 0..(m-1), random() > 5.0 ]")
 
     def map ( m: BlockMatrix, f: Double => Double ): BlockMatrix
       = new BlockMatrix(m.blocks.map{ case (i,a) => (i,new DenseMatrix(a.numRows,a.numCols,a.toArray.map(f))) },
@@ -79,9 +86,9 @@ object Factorization extends Serializable {
       var P = Pinit
       var Q = Qinit
       try {
-        E = R.subtract(P.multiply(Q.transpose))
-        P = P.add(map(map(E.multiply(Q),2*_).subtract(map(P,b*_)),a*_))
-        Q = Q.add(map(map(E.transpose.multiply(P),2*_).subtract(map(Q,b*_)),a*_))
+        E = R.subtract(P.multiply(Q))
+        P = P.add(map(map(E.multiply(Q.transpose),2*_).subtract(map(P,b*_)),a*_))
+        Q = Q.add(map(map(E.transpose.multiply(P),2*_).transpose.subtract(map(Q,b*_)),a*_))
       val x = E.blocks.count+P.blocks.count+Q.blocks.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
@@ -97,13 +104,106 @@ object Factorization extends Serializable {
           var E2 = tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
                                                kk == k, let v = p*q, group by (i,j) ];
           E = tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <- RR, ((ii,jj),v) <- E2,
-                                          ii == i, jj == j, r > 0.0 ];
-          P = tensor*(n,d)[ ((i,k),^/v)
+                                          ii == i, jj == j];
+          var P1 = tensor*(n,d)[ ((i,k),+/v)
                           | ((i,j),e) <- E, ((k,jj),q) <- Q, jj == j,
                             let v = 2*a*e*q, group by (i,k) ];
-          Q = tensor*(m,d)[ ((k,j),^/v)
+          var P2 = tensor*(n,d)[ ((i,k),p1+p-a*b*p)
+                          | ((i,k),p1) <- P1, ((ii,kk),p) <-P, ii==i,kk==k ];
+          P = P2;
+          var Q1 = tensor*(d,m)[ ((k,j),+/v)
                           | ((i,j),e) <- E, ((ii,k),p) <- P, ii == i,
-                            let v = 2*a*e*p, group by (k,j) ]
+                            let v = 2*a*e*p, group by (k,j) ];
+          var Q2 = tensor*(d,m)[ ((k,j),q1+q-a*b*q)
+                          | ((k,j),q1) <- Q1, ((kk,jj),q) <-Q, jj==j,kk==k ];
+          Q = Q2;
+          """)
+        val x = E._3.count+P._3.count+Q._3.count
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    def testFactorizationDiabloDense(): Double = {
+      val t = System.currentTimeMillis()
+      var E = RSparse
+      var P = PPinit
+      var Q = QQinit
+      try {
+        q("""
+          var E2 = tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
+                                   kk == k, let v = p*q, group by (i,j) ];
+          E = tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <= RSparse, ((ii,jj),v) <- E2,
+                                          ii == i, jj == j];
+          var P1 = tensor*(n,d)[ ((i,k),+/v)
+                          | ((i,j),e) <- E, ((k,jj),q) <- Q, jj == j,
+                            let v = 2*a*e*q, group by (i,k) ];
+          var P2 = tensor*(n,d)[ ((i,k),p1+p-a*b*p)
+                          | ((i,k),p1) <- P1, ((ii,kk),p) <-P, ii==i,kk==k ];
+          P = P2;
+          var Q1 = tensor*(d,m)[ ((k,j),+/v)
+                          | ((i,j),e) <- E, ((ii,k),p) <- P, ii == i,
+                            let v = 2*a*e*p, group by (k,j) ];
+          var Q2 = tensor*(d,m)[ ((k,j),q1+q-a*b*q)
+                          | ((k,j),q1) <- Q1, ((kk,jj),q) <-Q, jj==j,kk==k ];
+          Q = Q2;
+          """)
+        val x = E._3.count+P._3.count+Q._3.count
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    def testFactorizationDiabloSparse(): Double = {
+      val t = System.currentTimeMillis()
+      var E = RSparse
+      var P = PinitSparse
+      var Q = QinitSparse
+      try {
+        q("""
+          var E2 = tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
+                                               kk == k, let v = p*q, group by (i,j) ];
+          E = tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <= RSparse, ((ii,jj),v) <= E2,
+                                          ii == i, jj == j];
+          var P1 = tensor*(n,d)[ ((i,k),+/v)
+                          | ((i,j),e) <- E, ((k,jj),q) <- Q, jj == j,
+                            let v = 2*a*e*q, group by (i,k) ];
+          var P2 = tensor*(n,d)[ ((i,k),p1+p-a*b*p)
+                          | ((i,k),p1) <= P1, ((ii,kk),p) <= P, ii==i,kk==k ];
+          P = P2;
+          var Q1 = tensor*(d,m)[ ((k,j),+/v)
+                          | ((i,j),e) <- E, ((ii,k),p) <- P, ii == i,
+                            let v = 2*a*e*p, group by (k,j) ];
+          var Q2 = tensor*(d,m)[ ((k,j),q1+q-a*b*q)
+                          | ((k,j),q1) <= Q1, ((kk,jj),q) <= Q, jj==j,kk==k ];
+          Q = Q2;
+          """)
+        val x = E._3.count+P._3.count+Q._3.count
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    def testFactorizationDiabloSparseDense(): Double = {
+      val t = System.currentTimeMillis()
+      var E = RSparse
+      var P = PinitSparse
+      var Q = QQinit
+      try {
+        q("""
+          var E2 = tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
+                                               kk == k, let v = p*q, group by (i,j) ];
+          E = tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <= RSparse, ((ii,jj),v) <= E2,
+                                          ii == i, jj == j];
+          var P1 = tensor*(n,d)[ ((i,k),+/v)
+                          | ((i,j),e) <- E, ((k,jj),q) <- Q, jj == j,
+                            let v = 2*a*e*q, group by (i,k) ];
+          var P2 = tensor*(n,d)[ ((i,k),p1+p-a*b*p)
+                          | ((i,k),p1) <= P1, ((ii,kk),p) <= P, ii==i,kk==k ];
+          P = P2;
+          var Q1 = tensor*(d,m)[ ((k,j),+/v)
+                          | ((i,j),e) <- E, ((ii,k),p) <- P, ii == i,
+                            let v = 2*a*e*p, group by (k,j) ];
+          var Q2 = tensor*(d,m)[ ((k,j),q1+q-a*b*q)
+                          | ((k,j),q1) <= Q1, ((kk,jj),q) <= Q, jj==j,kk==k ];
+          Q = Q2;
           """)
         val x = E._3.count+P._3.count+Q._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -160,6 +260,9 @@ object Factorization extends Serializable {
     test("MLlib Factorization",testFactorizationMLlib)
     test("DIABLO Factorization",testFactorizationDiablo)
     test("DIABLO Factorization with loops",testFactorizationDiabloLoop)
+    test("DIABLO Factorization Dense-Dense",testFactorizationDiabloDense)
+    test("DIABLO Factorization Sparse-Sparse",testFactorizationDiabloSparse)
+    test("DIABLO Factorization Sparse-Dense",testFactorizationDiabloSparseDense)
 
     spark_context.stop()
   }
