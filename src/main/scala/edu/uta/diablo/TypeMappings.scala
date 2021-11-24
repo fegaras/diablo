@@ -27,6 +27,18 @@ object TypeMappings {
 
   /* initial type mappings */
   val inits = s"""
+
+    // for testing only; use tensor instead
+    typemap vec[T] ( d: Int ): vector[T] {
+      def view ( v: vector[T] )
+        = [ (i,v[i]) | i <- 0..(d-1) ]
+      def store ( L: list[(Int,T)] )
+        = { var a: vector[T] = array(d);
+            [ { a[i] = v }
+            | (i,v) <- L ]
+            a }
+    }
+
     // key-value map
     typemap map[K,V] (): list[(K,V)] {
        def view ( m: $mapClass[K,V] ) = m.toList
@@ -49,6 +61,21 @@ object TypeMappings {
                 (k,v) <- L,
                 let w = (k,v),
                 group by i: (k.hashCode % $block_dim_size) ]
+    }
+
+    typemap flatten[T] ( d: Int ): vector[vector[T]] {
+       def view ( dense: vector[Int], values: vector[T] )
+         = [ ( i, [ (j-dense[i],values[j]) | j <- dense[i]..(dense[i+1]-1) ] ) |
+             i <- 0..(d-1) ]
+       def store ( L: list[(Int,list[(Int,T)])] )
+         = { var dense: vector[Int] = array(d+1);
+             var values: $arrayBuffer[T];
+             [ { dense[i] = values.length;
+                 [ arraySet(values,dense[i]+j,v) |
+                   (j,v) <- a ] } |
+               i <- 0..(d-1), (ii,a) <- L, ii == i ];
+             dense[d] = values.length;
+             (dense,values.toArray) }
     }
     """
 
@@ -79,7 +106,7 @@ object TypeMappings {
           def store ( L: list[($ldims,T)] )
             = { var zero: T;
                 var buffer: vector[T] = array_buffer_dense($dsize,zero);
-                [ buffer[$dkey] = v |
+                [ { buffer[$dkey] = v } |
                   (($dvars),v) <- L ];
                 buffer }
        }
@@ -132,6 +159,31 @@ object TypeMappings {
               }
        }
       """
+/*
+    else  if (true) // a general tensor with dn dense and sn sparse dimensions   ****
+      s"""
+       typemap tensor_${dn}_$sn $dims: array${dn+sn}[Double] {
+          def view ( dense: vector[Int], sparse: vector[Int], values: vector[Double] )
+            = [ (($dvars,$svars),binarySearch($skey,dense[loc],dense[loc+1],sparse,values)) |
+                $drange, $srange,
+                let loc = $dkey ]
+          def store ( L: list[($ldims,Double)] )
+            = { var buffer: vector[$arrayBuffer[(Int,Double)]] = array($dsize);
+                [ { var a: $arrayBuffer[(Int,Double)]; buffer[i] = a } | i <- 0..($dsize-1) ];
+                [ buffer[$dkey].append(($skey,v)) |
+                  (($dvars,$svars),v) <- L, v != 0.0 ];
+                var dense: vector[Int] = array($dsize+1);
+                var sparse: $arrayBuffer[Int];
+                var values: $arrayBuffer[Double];
+                [ { [ { sparse.append(i); values.append(v) } |
+                      k <- 0..(buffer[$dkey].length-1), let (i,v) = buffer[$dkey].apply(k) ];
+                    sort(dense[$dkey],sparse,values);
+                    dense[$dkey+1] = values.length } |
+                  $drange ];
+                (dense,sparse.toArray,values.toArray) }
+       }
+      """
+*/
     else  // a general tensor with dn dense and sn sparse dimensions
       s"""
        typemap tensor_${dn}_$sn[T] $dims: array${dn+sn}[T] {

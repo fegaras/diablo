@@ -82,7 +82,7 @@ object Parser extends StandardTokenParsers {
 
   /* groups of infix operator precedence, from low to high */
   val operator_precedence: List[Parser[String]]
-      = List( "..", "||", "^", "&&"|"&", "<="|">="|"<"|">", "=="|"!=", "+"|"-", "*"|"/"|"%", ":" )
+      = List( "..", "||", "^", "&&"|"&", "<="|">="|"<"|">", "=="|"!=", "+"|"-", "*"|"/"|"%", ":", "=" )
 
   /* all infix operators not listed in operator_precedence have the same highest precedence */  
   val infixOpr: Parser[String]
@@ -98,6 +98,7 @@ object Parser extends StandardTokenParsers {
   def terms ( level: Int ): Parser[(Expr,Expr)=>Expr]
       = precedence(level) ^^
         { case ".." => (x:Expr,y:Expr) => Range(x,y,IntConst(1))
+          case "=" => (x:Expr,y:Expr) => Assign(x,Seq(List(y)))
           case op => (x:Expr,y:Expr) => MethodCall(x,op,List(y)) }
   def infix ( level: Int ): Parser[Expr]
       = if (level >= precedence.length) conses
@@ -193,14 +194,15 @@ object Parser extends StandardTokenParsers {
   def term: Parser[Expr]
       = ( compr
         | "tensor" ~ opt("*") ~ "(" ~ repsep( expr, "," ) ~ ")"
-              ~ opt( "(" ~ repsep( expr, "," ) ~ ")" ) ~ expr ^^
-          { case _~None~_~ds~_~Some(_~ss~_)~e
+              ~ "(" ~ repsep( expr, "," ) ~ ")" ~ term ^^
+          { case _~None~_~ds~_~_~ss~_~e
               => Call(s"tensor_${ds.length}_${ss.length}",ds++ss:+e)
-            case _~None~_~ds~_~None~e
+            case _~_~_~ds~_~_~ss~_~e
+              => Call(s"block_tensor_${ds.length}_${ss.length}",ds++ss:+e) }
+        | "tensor" ~ opt("*") ~ "(" ~ repsep( expr, "," ) ~ ")" ~ term ^^
+          { case _~None~_~ds~_~e
               => Call(s"tensor_${ds.length}_0",ds:+e)
-            case _~_~_~ds~_~Some(_~ss~_)~e
-              => Call(s"block_tensor_${ds.length}_${ss.length}",ds++ss:+e)
-            case _~_~_~ds~_~None~e
+            case _~_~_~ds~_~e
               => Call(s"block_tensor_${ds.length}_0",ds:+e) }
         | ident ~ "*" ~ expr ^?
           { case "map"~_~e => Call("block_map",List(e)) }
@@ -215,14 +217,14 @@ object Parser extends StandardTokenParsers {
         | "var" ~ ident ~ ":" ~ stype ~ opt("=" ~ expr) ^^
           { case _~v~_~t~None => VarDecl(v,t,Seq(Nil))
             case _~v~_~t~Some(_~e) => VarDecl(v,t,Seq(List(e))) }
-        | dest ~ "=" ~ expr ^^
-          { case d~_~e => Assign(d,Seq(List(e))) }
         | dest ~ incrOpr ~ expr ^^
           { case d~op~e => Assign(d,Seq(List(MethodCall(d,op.init,List(e))))) }
         | "if" ~ "(" ~ expr ~ ")" ~ expr ~ "else" ~ expr ^^
           { case _~_~p~_~t~_~e => IfE(p,t,e) }
         | "(" ~ repsep( pat, "," ) ~ ")" ~ "=>" ~ expr ^^
           { case _~ps~_~_~b => Lambda(TuplePat(ps),b) }
+        | "(" ~ expr ~ ")" ^^
+          { case _~e~_ => e }
         | "(" ~ repsep( expr, "," ) ~ ")" ^^
           { case _~es~_ => if (es.length==1) es.head else Tuple(es) }
         | "<" ~ rep1sep( ident ~ "=" ~ expr, "," ) ~ ">" ^^

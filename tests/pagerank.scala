@@ -9,7 +9,7 @@ object Test {
     spark_context = new SparkContext(conf)
 
     parami(number_of_partitions,10)
-    parami(block_dim_size,10)
+    parami(block_dim_size,100)
 
     val G = spark_context.textFile("graph.txt")
               .map( line => { val a = line.split(",").toList

@@ -186,6 +186,14 @@ package object diablo {
     else init.clone
   }
 
+  def arraySet[T] ( b: mutable.ArrayBuffer[T], i: Int, v: T ) {
+    var j = b.length
+    while (j <= i) {
+      b.append(v)
+      j += 1
+    }
+  }
+
   def range ( n1: Long, n2: Long, n3: Long ): List[Long]
     = n1.to(n2,n3).toList
 

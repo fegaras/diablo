@@ -524,11 +524,11 @@ object Typechecker {
                                  +e+"\n(expected "+at+" found "+tp+")")
                at
           case Assign(d,u)
-            => val ut = elemType(typecheck(u,env))    // u is lifted to a collection
+            => val ut = typecheck(u,env)    // u is lifted to a collection
                val dt = typecheck(d,env)
-               if (!typeMatch(dt,ut))
+               if (!typeMatch(dt,ut) && !typeMatch(dt,elemType(ut)))
                  throw new Error("Incompatible values in assignment: "+e+"\nAssign( "+dt+" , "+ut+" )")
-               else ut
+               else dt
           case Range(a,b,c)
             => val at = typecheck(a,env)
                val bt = typecheck(b,env)

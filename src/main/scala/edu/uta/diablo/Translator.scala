@@ -153,8 +153,6 @@ object Translator {
              Comprehension(Var(w),
                            List(Generator(VarPat(v),translate(arg,env,vars,fncs)),
                                 Generator(VarPat(w),Apply(translate(f,env,vars,fncs),Var(v)))))
-//        case Comprehension(h,qs)
-//          => Seq(List(e))
         case Comprehension(h,qs)
           => val nqs = qs.flatMap {
                          case Generator(p,u)

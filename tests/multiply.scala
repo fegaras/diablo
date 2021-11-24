@@ -182,6 +182,18 @@ object Multiply {
       (System.currentTimeMillis()-t)/1000.0
     }
 
+    // matrix multiplication of dense tiled matrices giving a sparse matrix using Diablo array comprehensions
+    def testMultiplyDiabloDACsparseOut (): Double = {
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n)(n)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
+                  """)
+        C._3.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
     // matrix multiplication of tiled matrices using loops
     def testMultiplyDiabloLoop (): Double = {
       val t = System.currentTimeMillis()
@@ -421,6 +433,7 @@ object Multiply {
     //test("DIABLO Multiply Sequential",testMultiplyDiabloDACs)
     test("DIABLO Multiply sparse-dense",testMultiplyDiabloDACsparseDense)
     test("DIABLO Multiply sparse-sparse",testMultiplyDiabloDACsparse)
+    test("DIABLO Multiply dense-dense giving sparse",testMultiplyDiabloDACsparseOut)
     test("DIABLO loop Multiply",testMultiplyDiabloLoop)
     test("Hand-written groupByJoin Multiply",testMultiplyCodeGBJ)
     test("Hand-written groupBy Multiply",testMultiplyCode)

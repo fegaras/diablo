@@ -1007,17 +1007,17 @@ object ComprehensionTranslator {
     = hs match {
         case Tuple(List(k,e))
           => val is = freevars(k)
+             val tensor = tile_type(block,tp)
+             val (dn,sn) = tensor_dims(tensor)
              val tbinds = tile_dimensions(is,dims)
              val tile_dims = is.map( i => Var(prefix("size",i)) )
-             val tile_coords = tuple(is.map( i => Var(prefix("coord",i)) ))
+             val tile_coords = is.map( i => Var(prefix("coord",i)) )
              val tile_indices = tuple(is.map { i => MethodCall(Var(i),"%",List(IntConst(block_dim_size))) })
              val stile = Comprehension(Tuple(List(tile_indices,e)),
                                        tile_qualifiers(qs,vars))
              val tile = block_array_assignment match {
                 case Some(array)
-                  => val tensor = tile_type(block,tp)
-                     val (dn,sn) = tensor_dims(tensor)
-                     add_initial_array(store(tensor,List(tp),tile_dims,stile),
+                  => add_initial_array(store(tensor,List(tp),tile_dims,stile),
                                        Nth(Var("_array"),dn+sn+1))
                 case _ => Store(tile_type(block,tp),List(tp),tile_dims,stile)
              }
@@ -1025,21 +1025,32 @@ object ComprehensionTranslator {
                                    case Some(array)
                                      => val array_coords = tuple(is.map( i => VarPat(prefix("array",i)) ))
                                         Generator(TuplePat(List(array_coords,VarPat("_array"))),
-                                                  Lift(block,array))::
-                                           is.map { i => Predicate(MethodCall(Var(prefix("array",i)),
-                                                                "==",List(Var(prefix("coord",i))))) }
+                                                  Lift("rdd",Nth(array,dn+sn+1)))::
+                                             is.map { i => Predicate(MethodCall(Var(prefix("array",i)),
+                                                                   "==",List(Var(prefix("coord",i))))) }
                                    case _ => Nil
                                  }
-             val Comprehension(nhs,nqs)
-                        = optimize(Comprehension(Tuple(List(tile_coords,tile)),
-                                                 rdd_qualifiers(qs,vars)++array_assigns++tbinds))
-             val rdd = if (is_rdd_comprehension(nqs))
-                         translate_rdd(nhs,nqs,vars)
-                       else MethodCall(Var("spark_context"),
-                                       "parallelize",
-                                       List(translate_rdd(nhs,nqs,vars),
-                                            IntConst(number_of_partitions)))
-             tuple(dims:+rdd)
+             if (is_rdd_comprehension(qs)) {
+               val Comprehension(nhs,nqs)
+                       = optimize(Comprehension(Tuple(List(tuple(tile_coords),tile)),
+                                                rdd_qualifiers(qs,vars)++array_assigns++tbinds))
+               if (trace) println("Comprehension that preserves tilling:\n"
+                                  +Pretty.print(Comprehension(nhs,nqs)))
+               tuple(dims:+translate_rdd(nhs,nqs,vars))
+             } else {
+               val p = tuple(is.map( i => VarPat(prefix("coord",i)) )
+                             ++ is.map( i => VarPat(prefix("size",i)) )
+                             ++ (block_array_assignment match {
+                                   case Some(array) => List(VarPat("_array"))
+                                   case _ => Nil }))
+               val nc = Comprehension(toExpr(p),
+                                      rdd_qualifiers(qs,vars)++array_assigns++tbinds)
+               tuple(dims:+flatMap(Lambda(p,Seq(List(tuple(List(tuple(tile_coords),tile))))),
+                                   MethodCall(Var("spark_context"),
+                                              "parallelize",
+                                              List(translate(optimize(nc),vars),
+                                                   IntConst(number_of_partitions)))))
+             }
       }
 
 
@@ -1617,6 +1628,9 @@ object ComprehensionTranslator {
     = e match {
         case MethodCall(_,op,_)
           if List("+=","append","update").contains(op)
+          => true
+        case Call(op,_)
+          if List("arraySet").contains(op)
           => true
         case Assign(MapAccess(_,_),_)   // Map is not thread-safe
           => true
