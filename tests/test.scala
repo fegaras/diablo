@@ -8,7 +8,7 @@ object Test {
     val conf = new SparkConf().setAppName("Test")
     val spark_context = new SparkContext(conf)
 
-    parami(tileSize,10) // each tile has size N*N
+    parami(block_dim_size,10) // each tile has size N*N
     val N = 10
 
     type Tiled = (Int,Int,RDD[((Int,Int),Array[Double])])

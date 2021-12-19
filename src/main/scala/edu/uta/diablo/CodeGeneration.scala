@@ -463,6 +463,17 @@ abstract class CodeGeneration {
                   q"outerJoin($xc,$yc,($nx:$et,$ny:$et) => ($nx,$ny) match { case $pc => $bc })"
              case _ => throw new Exception("Wrong outerJoin: "+e)
            }
+      case Call("merge_tensors",List(x,y,Lambda(TuplePat(List(px@VarPat(xv),py@VarPat(yv))),b),zero))
+        => val zc = codeGen(zero,env)
+           val tp = getType(zc,env)
+           val xc = codeGen(x,env)
+           val yc = codeGen(y,env)
+           val nx = TermName(xv)
+           val ny = TermName(yv)
+           val bc = codeGen(b,add(px,tp,add(py,tp,env)))
+           if (zero == Var("Nil"))
+               q"merge_tensors($xc,$yc,_++_,$zc)"
+           else q"merge_tensors($xc,$yc,($nx:$tp,$ny:$tp) => $bc,$zc)"
       case groupBy(x)
         => val xc = codeGen(x,env)
            q"$xc.groupBy(_._1).mapValues( _.map(_._2)).toList"

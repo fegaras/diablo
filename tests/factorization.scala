@@ -24,11 +24,6 @@ object Factorization extends Serializable {
   val a = 0.002
   val b = 0.02
 
-  implicit class Mult ( private val value: Double ) extends AnyVal {
-    def ^ ( that: Double ): Double
-      = value+(1-a*b)*that
-  }
-
   def main ( args: Array[String] ) {
     val repeats = args(0).toInt
     val n = args(1).toInt
@@ -120,7 +115,6 @@ object Factorization extends Serializable {
           Q = Q2;
           """)
         validate(P,Q)
-        val x = E._3.count+P._3.count+Q._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -149,7 +143,6 @@ object Factorization extends Serializable {
                           | ((k,j),q1) <- Q1, ((kk,jj),q) <-Q, jj==j,kk==k ];
           Q = Q2;
           """)
-        validate(P,Q)
         val x = E._3.count+P._3.count+Q._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
@@ -236,7 +229,6 @@ object Factorization extends Serializable {
           (P,Q);
           """)
         validate(P,Q)
-        val x = E._3.count+P._3.count+Q._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }

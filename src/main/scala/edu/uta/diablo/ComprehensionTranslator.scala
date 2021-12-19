@@ -1007,30 +1007,30 @@ object ComprehensionTranslator {
     = hs match {
         case Tuple(List(k,e))
           => val is = freevars(k)
+             val is_array_assign = block_array_assignment.nonEmpty
              val tensor = tile_type(block,tp)
              val (dn,sn) = tensor_dims(tensor)
              val tbinds = tile_dimensions(is,dims)
              val tile_dims = is.map( i => Var(prefix("size",i)) )
              val tile_coords = is.map( i => Var(prefix("coord",i)) )
-             val tile_indices = tuple(is.map { i => MethodCall(Var(i),"%",List(IntConst(block_dim_size))) })
+             val tile_indices = tuple(is.map{ i => MethodCall(Var(i),"%",
+                                                     List(IntConst(block_dim_size))) })
              val stile = Comprehension(Tuple(List(tile_indices,e)),
                                        tile_qualifiers(qs,vars))
-             val tile = block_array_assignment match {
-                case Some(array)
-                  => add_initial_array(store(tensor,List(tp),tile_dims,stile),
-                                       Nth(Var("_array"),dn+sn+1))
-                case _ => Store(tile_type(block,tp),List(tp),tile_dims,stile)
-             }
+             val tile = if (is_array_assign)
+                          add_initial_array(store(tensor,List(tp),tile_dims,stile),
+                                            Nth(Var("_array"),dn+sn+1))
+                        else Store(tile_type(block,tp),List(tp),tile_dims,stile)
              val array_assigns = block_array_assignment match {
                                    case Some(array)
                                      => val array_coords = tuple(is.map( i => VarPat(prefix("array",i)) ))
                                         Generator(TuplePat(List(array_coords,VarPat("_array"))),
                                                   Lift("rdd",Nth(array,dn+sn+1)))::
                                              is.map { i => Predicate(MethodCall(Var(prefix("array",i)),
-                                                                   "==",List(Var(prefix("coord",i))))) }
+                                                                "==",List(Var(prefix("coord",i))))) }
                                    case _ => Nil
                                  }
-             if (is_rdd_comprehension(qs)) {
+             if (is_rdd_comprehension(qs) || is_array_assign) {
                val Comprehension(nhs,nqs)
                        = optimize(Comprehension(Tuple(List(tuple(tile_coords),tile)),
                                                 rdd_qualifiers(qs,vars)++array_assigns++tbinds))
@@ -1039,12 +1039,9 @@ object ComprehensionTranslator {
                tuple(dims:+translate_rdd(nhs,nqs,vars))
              } else {
                val p = tuple(is.map( i => VarPat(prefix("coord",i)) )
-                             ++ is.map( i => VarPat(prefix("size",i)) )
-                             ++ (block_array_assignment match {
-                                   case Some(array) => List(VarPat("_array"))
-                                   case _ => Nil }))
+                             ++ is.map( i => VarPat(prefix("size",i)) ))
                val nc = Comprehension(toExpr(p),
-                                      rdd_qualifiers(qs,vars)++array_assigns++tbinds)
+                                      rdd_qualifiers(qs,vars)++tbinds)
                tuple(dims:+flatMap(Lambda(p,Seq(List(tuple(List(tuple(tile_coords),tile))))),
                                    MethodCall(Var("spark_context"),
                                               "parallelize",
@@ -1058,7 +1055,7 @@ object ComprehensionTranslator {
 
   def shuffles_tiles ( key: Expr, qs: List[Qualifier] ): Boolean
     = !hasGroupBy(qs) && {
-         var key_vars = freevars(key).toSet
+         var key_vars = freevars(key).filter(v => typecheck_var(v).isEmpty).toSet
          val indices = unique_indices(qs).toSet
          val cis = correlated_indices(qs,key_vars)
          key_vars.forall(indices.contains) //&& indices == cis
@@ -1108,6 +1105,8 @@ object ComprehensionTranslator {
              val tile = Store(tile_type(block,tp),List(tp),tile_dims,
                               Comprehension(Tuple(List(Tuple(gkeys("%")),h)),
                                             tile_qualifiers(qs,vars,true)++tqs))
+            if (trace) println("Comprehension that does not preserve tilling:\n"
+                               +Pretty.print(Comprehension(Tuple(List(tuple(vs.map(Var)),tile)),rqs)))
              val Comprehension(nhs,nqs) = optimize(Comprehension(Tuple(List(tuple(vs.map(Var)),tile)),rqs))
              val rdd = if (is_rdd_comprehension(qs))
                          translate_rdd(nhs,nqs,vars)
@@ -1162,22 +1161,12 @@ object ComprehensionTranslator {
                    def nvar ( s: String ) = tuple(1.to(ndims).map(i => Var(s+i)).toList)
                    def nvarp ( s: String ) = tuple(1.to(ndims).map(i => VarPat(s+i)).toList)
                    def combine ( x: String, y: String, m: String, tp: Type ): Expr = {
-                     val tileType =  tile_type(block,tp)  // tensor type is based on monoid type
-                     val cdims = if (ndims == 1)
-                                   List(Nth(Var(x),1))
-                                 else 1.to(ndims).map(i => Nth(Var(x),i)).toList
-                     val cb = Store(tileType,List(tp),cdims,
-                             Comprehension(Tuple(List(nvar("i"),mcall(m,Var("v"),Var("w")))),
-                                           List(Generator(TuplePat(List(nvarp("i"),VarPat("v"))),
-                                                          Lift(tileType,Var(x))),
-                                                Generator(TuplePat(List(nvarp("j"),VarPat("w"))),
-                                                          Lift(tileType,Var(y))))
-                                           ++1.to(ndims).map(i => Predicate(MethodCall(Var("j"+i),
-                                                                         "==",List(Var("i"+i)))))))
-                     val ctp = TupleType((1 to ndims).map(i => intType).toList:+ArrayType(1,tp))
-                     val env = Map(x->ctp,y->ctp)
-                     typecheck(cb.value,env)
-                     cb
+                     val zero = zeroValue(tp)
+                     val mst = Call("merge_tensors",
+                                    List(Nth(Var(x),ndims+1),Nth(Var(y),ndims+1),
+                                         Lambda(TuplePat(List(VarPat("v"),VarPat("w"))),
+                                                mcall(m,Var("v"),Var("w"))),zero))
+                     Tuple(1.to(ndims).map(i => Nth(Var(x),i)).toList:+mst)
                    }
                    val md = h match {
                               case reduce(_,_)
@@ -1249,6 +1238,10 @@ object ComprehensionTranslator {
                                         else Nil)
                                }))
                        }
+                   if (trace) println("Comprehension without group-by:\n"
+                                  +Pretty.print(Comprehension(Tuple(List(kp,liftedTile)),
+                                          List(Generator(TuplePat(List(p,tuple(env.map(x => VarPat(x._2))))),
+                                                         rdd)))))
                    val res = translate_rdd(Tuple(List(kp,liftedTile)),
                                            List(Generator(TuplePat(List(p,tuple(env.map(x => VarPat(x._2))))),
                                                           rdd)),vars)

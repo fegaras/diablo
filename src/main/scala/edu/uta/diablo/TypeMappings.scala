@@ -159,31 +159,6 @@ object TypeMappings {
               }
        }
       """
-/*
-    else  if (true) // a general tensor with dn dense and sn sparse dimensions   ****
-      s"""
-       typemap tensor_${dn}_$sn $dims: array${dn+sn}[Double] {
-          def view ( dense: vector[Int], sparse: vector[Int], values: vector[Double] )
-            = [ (($dvars,$svars),binarySearch($skey,dense[loc],dense[loc+1],sparse,values)) |
-                $drange, $srange,
-                let loc = $dkey ]
-          def store ( L: list[($ldims,Double)] )
-            = { var buffer: vector[$arrayBuffer[(Int,Double)]] = array($dsize);
-                [ { var a: $arrayBuffer[(Int,Double)]; buffer[i] = a } | i <- 0..($dsize-1) ];
-                [ buffer[$dkey].append(($skey,v)) |
-                  (($dvars,$svars),v) <- L, v != 0.0 ];
-                var dense: vector[Int] = array($dsize+1);
-                var sparse: $arrayBuffer[Int];
-                var values: $arrayBuffer[Double];
-                [ { [ { sparse.append(i); values.append(v) } |
-                      k <- 0..(buffer[$dkey].length-1), let (i,v) = buffer[$dkey].apply(k) ];
-                    sort(dense[$dkey],sparse,values);
-                    dense[$dkey+1] = values.length } |
-                  $drange ];
-                (dense,sparse.toArray,values.toArray) }
-       }
-      """
-*/
     else  // a general tensor with dn dense and sn sparse dimensions
       s"""
        typemap tensor_${dn}_$sn[T] $dims: array${dn+sn}[T] {

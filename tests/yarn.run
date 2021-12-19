@@ -1,0 +1,43 @@
+#!/bin/bash
+
+nodes=10
+echo "Number of nodes = " $nodes
+
+# Each node: 12 cores (10 available), 46 GB RAM
+#   executor-cores = 2   (6 executors/node)
+#   executor-memory = 7GB
+#   num-executors = nodes*5-1
+executors=$((nodes*6-1))
+echo "Number of executors = " $executors
+
+SPARK_OPTIONS="--driver-memory 7G --num-executors $executors --executor-cores 2 --executor-memory 7G"
+
+SW=/export
+export DIABLO_HOME=$HOME/diablo
+export SCALA_HOME=$SW/scala-2.12.3
+export HADOOP_HOME=/export/hadoop-3.2.2
+export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop
+export SPARK_HOME=$SW/spark-3.1.2-bin-hadoop3.2
+export MASTER=spark://hadoop.fast:7077
+
+PATH="$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$SPARK_HOME/bin:$SCALA_HOME/bin:$PATH"
+
+JARS=.
+for I in `ls $SPARK_HOME/jars/*.jar -I *unsafe*`; do
+    JARS=$JARS:$I
+done
+
+rm -rf classes
+mkdir -p classes
+
+scala_files="add.scala multiply.scala"
+for f in $scala_files; do
+    echo compiling $f ...
+    scalac -d classes -cp classes:${JARS}:${DIABLO_HOME}/lib/diablo.jar $f
+done
+
+jar cf test.jar -C classes .
+
+n=10000
+
+spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master yarn --deploy-mode client $SPARK_OPTIONS test.jar 1 $n

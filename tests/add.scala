@@ -137,6 +137,42 @@ object Add {
       (System.currentTimeMillis()-t)/1000.0
     }
 
+    // matrix addition of dense-dense tiled matrices giving a sparse matrix using Diablo array comprehensions
+    def testAddDiabloDACdenseSparseOut (): Double = {
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n)(m)[ ((i,j),a+b) | ((i,j),a) <= AA, ((ii,jj),b) <- BB, ii == i, jj == j ];
+                  """)
+        C._3.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix addition of sparse-dense tiled matrices giving a sparse matrix using Diablo array comprehensions
+    def testAddDiabloDACsparseDenseSparseOut (): Double = {
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n)(m)[ ((i,j),a+b) | ((i,j),a) <= Az, ((ii,jj),b) <- BB, ii == i, jj == j ];
+                  """)
+        C._3.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix addition of sparse-sparse tiled matrices giving a sparse matrix using Diablo array comprehensions
+    def testAddDiabloDACsparseSparseSparseOut (): Double = {
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n)(m)[ ((i,j),a+b) | ((i,j),a) <= Az, ((ii,jj),b) <- Bz, ii == i, jj == j ];
+                  """)
+        C._3.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
     // matrix addition of tiled matrices using loops
     def testAddDiabloDACloop: Double = {
       val t = System.currentTimeMillis()
@@ -241,6 +277,9 @@ object Add {
     test("DIABLO Add",testAddDiabloDAC)
     test("DIABLO Add sparse-sparse",testAddDiabloDACsparse)
     test("DIABLO Add sparse-dense",testAddDiabloDACsparseDense)
+    test("DIABLO Add dense-dense giving sparse",testAddDiabloDACdenseSparseOut)
+    test("DIABLO Add sparse-dense giving sparse",testAddDiabloDACsparseDenseSparseOut)
+    test("DIABLO Add sparse-sparse giving sparse",testAddDiabloDACsparseSparseSparseOut)
     test("DIABLO loop Add",testAddDiabloDACloop)
     test("Hand-written Add",testAddCode)
     test("SQL Add",testAddSQL)
