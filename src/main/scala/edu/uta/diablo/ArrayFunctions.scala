@@ -102,12 +102,10 @@ trait ArrayFunctions {
 
   // merge two dense tensors using the monoid op/zero
   def merge_tensors[T:ClassTag] ( X: Array[T], Y: Array[T], op: (T,T) => T, zero: T ): Array[T] = {
-    var i = 0
     val len = Math.min(X.length,Y.length)
     val values = Array.ofDim[T](X.length)
-    while (i < len) {
-      values(i) = op(X(i),Y(i))
-      i += 1
+    0.until(len).par.foreach {
+      i => values(i) = op(X(i),Y(i))
     }
     values
   }
@@ -317,14 +315,13 @@ trait ArrayFunctions {
     val buffer: Array[T] = Array.tabulate[T](dsize*ssize)( i => zero )
     if (init != null) {
       val (dense,sparse,values) = init
-      var i = 0
-      while ( i < dense.length-1 ) {
-        var j = dense(i)
-        while ( j < dense(i+1) ) {
-          buffer(i*ssize+sparse(j)) = values(j)
-          j += 1
-        }
-        i += 1
+      0.until(dense.length-1).par.foreach {
+        i => { var j = dense(i)
+               while ( j < dense(i+1) ) {
+                  buffer(i*ssize+sparse(j)) = values(j)
+                  j += 1
+               }
+             }
       }
     }
     buffer
@@ -336,14 +333,13 @@ trait ArrayFunctions {
     val buffer: Array[Boolean] = Array.tabulate(dsize*ssize)( i => false )
     if (init != null) {
       val (dense,sparse) = init
-      var i = 0
-      while ( i < dense.length-1 ) {
-        var j = dense(i)
-        while ( j < dense(i+1) ) {
-          buffer(i*ssize+sparse(j)) = true
-          j += 1
-        }
-        i += 1
+      0.until(dense.length-1).par.foreach {
+        i => { var j = dense(i)
+               while ( j < dense(i+1) ) {
+                  buffer(i*ssize+sparse(j)) = true
+                  j += 1
+               }
+             }
       }
     }
     buffer
@@ -355,10 +351,8 @@ trait ArrayFunctions {
     val buffer: Array[T] = Array.tabulate[T](ssize)( i => zero )
     if (init != null) {
       val (sparse,values) = init
-      var j = 0
-      while ( j < sparse.length ) {
-        buffer(sparse(j)) = values(j)
-        j += 1
+      sparse.indices.par.foreach {
+        j => buffer(sparse(j)) = values(j)
       }
     }
     buffer
@@ -370,10 +364,8 @@ trait ArrayFunctions {
     val buffer: Array[Boolean] = Array.tabulate(ssize)( i => false )
     if (init != null) {
       val sparse = init
-      var j = 0
-      while ( j < sparse.length ) {
-        buffer(sparse(j)) = true
-        j += 1
+      sparse.indices.par.foreach {
+        j => buffer(sparse(j)) = true
       }
     }
     buffer

@@ -16,7 +16,7 @@
 package edu.uta
 
 import scala.language.experimental.macros
-import org.apache.spark.{SparkContext,Partitioner,HashPartitioner}
+import org.apache.spark.SparkContext
 import diablo.Parser.parse
 import scala.reflect.macros.whitebox
 import scala.reflect.macros.whitebox.Context
@@ -34,7 +34,7 @@ package object diablo extends diablo.ArrayFunctions {
 
   def opt ( e: Expr): Expr = Optimizer.optimizeAll(Normalizer.normalizeAll(e))
 
-  def q_impl ( c: Context ) ( query: c.Expr[String] ): c.Expr[Any] = {
+  def q_impl( c: Context )(query: c.Expr[String] ): c.Expr[Any] = {
     import c.universe.{Expr=>_,Type=>_,_}
     val context: c.type = c
     val cg = new { val c: context.type = context } with CodeGeneration

@@ -33,7 +33,8 @@ object ComprehensionTranslator {
   // Block tensor used in the current assignment
   var block_array_assignment: Option[Expr] = None
 
-  def zeroValue ( tp: Type ): Expr
+  @tailrec
+  def zeroValue(tp: Type ): Expr
     = if (tp == intType) IntConst(0)
       else if (tp == longType) LongConst(0)
       else if (tp == doubleType) DoubleConst(0.0)

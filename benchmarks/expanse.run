@@ -23,6 +23,7 @@ SPARK_OPTIONS="--driver-memory 24G --num-executors $executors --executor-cores 1
 
 export HADOOP_CONF_DIR=$HOME/expansecluster
 module load openjdk
+
 SW=/expanse/lustre/projects/uot166/fegaras
 
 export DIABLO_HOME=$SW/diablo
@@ -33,13 +34,24 @@ export SPARK_HOME=$SW/spark-3.1.2-bin-hadoop3.2
 
 PATH="$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$SPARK_HOME/bin:$MYHADOOP_HOME/bin:$SCALA_HOME/bin:$PATH"
 
-myhadoop-configure.sh -s /scratch/$USER/job_$SLURM_JOB_ID
+# location of scratch space
+scratch=/scratch/$USER/job_$SLURM_JOB_ID
+
+myhadoop-configure.sh -s $scratch
+echo "export TMP=$scratch" >> $HADOOP_CONF_DIR/spark/spark-env.sh
+echo "export TMPDIR=$scratch" >> $HADOOP_CONF_DIR/spark/spark-env.sh
+echo "export SPARK_MASTER_HOST=$SPARK_MASTER_IP" >> $HADOOP_CONF_DIR/spark/spark-env.sh
+export SPARK_MASTER_HOST=$SPARK_MASTER_IP
 source $HADOOP_CONF_DIR/spark/spark-env.sh
+
+export SPARK_LOCAL_DIRS=$scratch
+export TMPDIR=$scratch/tmp
+export _JAVA_OPTIONS=-Djava.io.tmpdir=$TMPDIR
 
 # start HDFS
 start-dfs.sh
 # start Spark
-$SPARK_HOME/sbin/start-all.sh -h $SPARK_MASTER_HOST
+myspark start
 
 JARS=.
 for I in `ls $SPARK_HOME/jars/*.jar -I *unsafe*`; do
@@ -52,7 +64,7 @@ mkdir -p classes
 scala_files="add.scala multiply.scala factorization.scala"
 for f in $scala_files; do
     echo compiling $f ...
-    scalac -d classes -cp classes:${JARS}:${DIABLO_HOME}/lib/diablo.jar $f
+    scalac -d classes -cp classes:${JARS}:${DIABLO_HOME}/lib/diablo.jar $f >/dev/null
 done
 
 jar cf test.jar -C classes .
@@ -80,6 +92,6 @@ for ((i=1; i<=$ns; i++)); do   # for each different dataset
 
 done
 
-$SPARK_HOME/sbin/stop-all.sh
+myspark stop
 stop-dfs.sh
 myhadoop-cleanup.sh
