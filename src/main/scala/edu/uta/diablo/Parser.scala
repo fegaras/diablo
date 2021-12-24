@@ -19,8 +19,8 @@ import Typechecker.tuple
 import scala.util.parsing.combinator.lexical.StdLexical
 import scala.util.parsing.combinator.syntactical.StandardTokenParsers
 import scala.util.parsing.combinator.token.StdTokens
+import scala.util.parsing.input.{NoPosition,CharArrayReader}
 import scala.util.matching.Regex
-
 
 trait MyTokens extends StdTokens {
   case class LongLit ( chars: String ) extends Token
@@ -75,7 +75,7 @@ object Parser extends StandardTokenParsers {
 
   lexical.delimiters += ( "(" , ")" , "[", "]", "{", "}", "," , ":", ";", ".", "=>", "=", "->", "<-",
                           "||", "&&", "!", "==", "<=", ">=", "<", ">", "!=", "+", "-", "*", "/", "%",
-                          ":=", "#", "^", "|", "&", ".." )
+                          ":=", "#", "^", "|", "&", "..", "::" )
 
   lexical.reserved += ( "var", "for", "in", "do", "while", "if", "else", "true", "false", "def", "let",
                         "return", "typemap", "group", "by", "tensor" )
@@ -101,8 +101,8 @@ object Parser extends StandardTokenParsers {
           case "=" => (x:Expr,y:Expr) => Assign(x,Seq(List(y)))
           case op => (x:Expr,y:Expr) => MethodCall(x,op,List(y)) }
   def infix ( level: Int ): Parser[Expr]
-      = if (level >= precedence.length) conses
-        else infix(level+1) * terms(level)
+      = positioned(if (level >= precedence.length) conses
+                   else infix(level+1) * terms(level))
 
   def fromRaw ( s: String ): String = s.replaceAllLiterally("""\n""","\n")
         
@@ -124,9 +124,10 @@ object Parser extends StandardTokenParsers {
       = accept("double literal",{ case t: lexical.DoubleLit => t.chars.toDouble })
 
   def conses: Parser[Expr]      /* :: is treated specially: right associative, flips operands */
-      = rep1sep( matches, "::" ) ^^
+      = positioned(
+        rep1sep( matches, "::" ) ^^
         { es => es.init.foldRight(es.last)
-                  { case (e,r) => MethodCall(r,"::",List(e)) } }
+                  { case (e,r) => MethodCall(r,"::",List(e)) } })
 
   def matches: Parser[Expr]
       = factor ~ rep( "match" ~ "{" ~ rep1sep( "case" ~ pat ~ opt( "if" ~> expr ) ~ "=>" ~ expr, sem ) ~ "}" ) ^^
@@ -136,7 +137,8 @@ object Parser extends StandardTokenParsers {
                                                      case _~p~_~_~b => Case(p,BoolConst(true),b) }) } }
 
  def factorList ( e: Expr ): Parser[Expr]
-     = ( "[" ~ rep1sep( expr, "," ) ~ "]" ^^
+     = positioned(
+         "[" ~ rep1sep( expr, "," ) ~ "]" ^^
          { case _~s~_ => Index(e,s) }
        | "." ~ ident ~ "(" ~ repsep( expr, "," ) ~ ")" ^^
          { case _~m~_~el~_ => MethodCall(e,m,el) }
@@ -149,16 +151,18 @@ object Parser extends StandardTokenParsers {
        )
 
  def factor: Parser[Expr]
-      = term ~ rep( factorList(IntConst(0)) ) ^^
+      = positioned(
+        term ~ rep( factorList(IntConst(0)) ) ^^
         { case e~s => s.foldLeft(e){
                           case (r,Project(_,a)) => Project(r,a)
                           case (r,Nth(_,n)) => Nth(r,n)
                           case (r,Index(_,s)) => Index(r,s)
                           case (r,MethodCall(_,m,el)) => MethodCall(r,m,el)
-                          case (r,_) => r } }
+                          case (r,_) => r } })
 
  def dest: Parser[Expr]
-      = ident ~ rep( factorList(IntConst(0)) ) ^^
+      = positioned(
+        ident ~ rep( factorList(IntConst(0)) ) ^^
         { case nm~s
             => val e: Expr = Var(nm)
                s.foldLeft(e) {
@@ -167,12 +171,12 @@ object Parser extends StandardTokenParsers {
                   case (r,Index(_,s)) => Index(r,s)
                   case (r,MethodCall(_,m,el)) => MethodCall(r,m,el)
                   case (r,_) => r }
-        }
+        })
 
   def qual: Parser[Qualifier]
       = ( "group" ~ "by" ~ pat ~ opt( ":" ~ expr ) ^^
           { case _~_~p~Some(_~e) => GroupByQual(p,e)
-            case _~_~p~None => GroupByQual(p,toExpr(p)) }
+            case _~_~p~None => val e = toExpr(p); e.pos = p.pos; GroupByQual(p,e) }
         | "let" ~ pat ~ "=" ~ expr ^^
           { case _~p~_~e => LetBinding(p,e) }
         | "var" ~ ident ~ ":" ~ stype ~ "=" ~ expr ^^
@@ -188,11 +192,13 @@ object Parser extends StandardTokenParsers {
         )
 
   def compr: Parser[Comprehension]
-    = "[" ~ expr ~ "|" ~ repsep( qual, "," ) ~ "]" ^^
-      { case _~e~_~qs~_ => Comprehension(e,qs) }
+    = positioned(
+      "[" ~ expr ~ "|" ~ repsep( qual, "," ) ~ "]" ^^
+      { case _~e~_~qs~_ => Comprehension(e,qs) })
 
   def term: Parser[Expr]
-      = ( compr
+      = positioned(
+          compr
         | "tensor" ~ opt("*") ~ "(" ~ repsep( expr, "," ) ~ ")"
               ~ "(" ~ repsep( expr, "," ) ~ ")" ~ term ^^
           { case _~None~_~ds~_~_~ss~_~e
@@ -266,7 +272,8 @@ object Parser extends StandardTokenParsers {
         )
 
   def lambda: Parser[Lambda]
-      = ( "(" ~ repsep( pat, "," ) ~ ")" ~ "=>" ~ expr ^^
+      = positioned(
+          "(" ~ repsep( pat, "," ) ~ ")" ~ "=>" ~ expr ^^
           { case _~ps~_~_~b => Lambda(TuplePat(ps),b) }
         | ident ~ "=>" ~ expr ^^
           { case v~_~b => Lambda(VarPat(v),b) }
@@ -274,7 +281,8 @@ object Parser extends StandardTokenParsers {
         )
 
   def pat: Parser[Pattern]
-      = ( "(" ~ repsep( pat, "," ) ~ ")"
+      = positioned(
+        "(" ~ repsep( pat, "," ) ~ ")"
           ^^ { case _~ps~_ => if (ps.length==1) ps.head else TuplePat(ps) }
         | "_"
           ^^^ { StarPat() }
@@ -302,7 +310,8 @@ object Parser extends StandardTokenParsers {
           => (f,params.map{ case v~_~t => (v,t) },body) }
 
   def stmt: Parser[Stmt]
-      = ( "var" ~ ident ~ ":" ~ stype ~ opt( "=" ~ expr ) ^^
+      = positioned(
+          "var" ~ ident ~ ":" ~ stype ~ opt( "=" ~ expr ) ^^
           { case _~v~_~t~None => VarDeclS(v,Some(t),None)
             case _~v~_~t~Some(_~e) => VarDeclS(v,Some(t),Some(e)) }
         | "var" ~ ident ~ "=" ~ expr ^^
@@ -394,17 +403,24 @@ object Parser extends StandardTokenParsers {
                               else List(s)
                 }) }
 
+  def line_reader ( line: String)
+    = new lexical.Scanner(new CharArrayReader(line.toArray))
+
   /** Parse a statement */
   def parse ( line: String ): Stmt
-      = phrase(program)(new lexical.Scanner(line)) match {
-          case Success(e,_) => e:Stmt
+      = phrase(positioned(program))(line_reader(line)) match {
+          case Success(e,_)
+            => setPositions(e:Stmt,NoPosition)
+               e:Stmt
           case m => println(m); BlockS(Nil)
         }
 
   /** Parse an expression */
   def parse_expr ( line: String ): Expr
-      = phrase(expr)(new lexical.Scanner(line)) match {
-          case Success(e,_) => e:Expr
+      = phrase(positioned(expr))(line_reader(line)) match {
+          case Success(e,_)
+            => setPositions(e:Expr,NoPosition)
+               e:Expr
           case m => println(m); Block(Nil)
         }
 

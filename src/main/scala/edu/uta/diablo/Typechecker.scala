@@ -16,6 +16,7 @@
 package edu.uta.diablo
 
 import scala.util.matching.Regex
+import scala.util.parsing.input.NoPosition
 
 object Typechecker {
     import AST._
@@ -549,7 +550,11 @@ object Typechecker {
         }
         e.tpe = tpe
         tpe
-      } catch { case m: Error => throw new Error(m.getMessage+"\nFound in: "+e+"\nwith env: "+env) }
+      } catch { case m: Error
+                  => val pos = e.pos
+                     val line = if (pos == NoPosition) "" else " line "+pos
+                     throw new Error(m.getMessage+"\nFound in"+line+": "+e+"\nwith env: "+env)
+              }
 
     def typecheck ( s: Stmt, return_types: List[Type], env: Environment ): Environment
       = try { s match {
@@ -632,7 +637,11 @@ object Typechecker {
             => typeMap(f,tps,ps,at,st,lt,view,store)
                env
           case _ => throw new Error("Illegal statement: "+s)
-    } } catch { case m: Error => throw new Error(m.getMessage+"\nFound in: "+s) }
+    } } catch { case m: Error
+                  => val pos = s.pos
+                     val line = if (pos == NoPosition) "" else " line "+pos
+                     throw new Error(m.getMessage+"\nFound in"+line+": "+s)
+              }
 
     // clean cached type info in every Expr node
     def clean ( e: Expr ): Boolean = {

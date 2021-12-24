@@ -15,7 +15,7 @@
  */
 package edu.uta.diablo
 
-import scala.util.parsing.input.Positional
+import scala.util.parsing.input.{Positional,Position,NoPosition}
 
 sealed abstract class Type
     case class AnyType () extends Type
@@ -31,7 +31,7 @@ sealed abstract class Type
     // storage type based on a storage mapping with type params and args
     case class StorageType ( mapping: String, typeParams: List[Type], args: List[Expr] ) extends Type
 
-sealed abstract class Pattern
+sealed abstract class Pattern extends Positional
     case class TuplePat ( components: List[Pattern] ) extends Pattern
     case class VarPat ( name: String ) extends Pattern
     case class StarPat () extends Pattern
@@ -503,4 +503,54 @@ object AST {
           => Var(n)
         case _ => Tuple(Nil)
       }
+
+  def getPos ( e: Expr ): Position = {
+    val zero = NoPosition
+    def max ( x: Position, y: Position ) = if (x<y) y else x
+    accumulate[Position](e,getPos(_),max,zero)
+  }
+
+  def getPos ( e: Stmt ): Position = {
+    val zero = NoPosition
+    def max ( x: Position, y: Position ) = if (x<y) y else x
+    accumulateStmt[Position](e,getPos(_),max,zero)
+  }
+
+  def setPositions ( e: Expr, pos: Position ) {
+    val npos = if (e.pos == NoPosition) pos else e.pos
+    e.pos = npos
+    accumulate[Unit](e,setPositions(_,npos),(x:Unit,y:Unit)=>x,())
+  }
+
+  def setPositions ( e: Stmt, pos: Position ) {
+    val npos = if (e.pos == NoPosition) pos else e.pos
+    e.pos = npos
+    accumulateStmt[Unit](e,setPositions(_,npos),(x:Unit,y:Unit)=>x,())
+  }
+
+  def setPos ( e: Expr, pos: Position ) {
+    if (e.pos == NoPosition) {
+      e.pos = pos
+      accumulate[Unit](e,setPos(_,pos),(x:Unit,y:Unit)=>x,())
+    }
+  }
+
+  def setPos ( e: Stmt, pos: Position ) {
+    if (e.pos == NoPosition) {
+      e.pos = pos
+      accumulateStmt[Unit](e,setPos(_,pos),(x:Unit,y:Unit)=>x,())
+    }
+  }
+
+  def setPos ( src: Expr, dst: Expr ): Expr = {
+    if (src.pos != NoPosition)
+      setPos(dst,src.pos)
+    dst
+  }
+
+  def setPos ( src: Stmt, dst: Expr ): Expr = {
+    if (src.pos != NoPosition)
+      setPos(dst,src.pos)
+    dst
+  }
 }

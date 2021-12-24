@@ -37,9 +37,9 @@ object Translator {
   val monoids = List("+","*","min","max","&&","||")
 
   def translate ( e: Expr, env: Environment, vars: List[String], fncs: Defs ): Expr
-    = e match {
+    = setPos(e,e match {
         case Var(n)
-          => elem(Var(n))
+          => elem(e)
         case Nth(x,n)
           => val v = newvar
              Comprehension(Nth(Var(v),n),
@@ -180,7 +180,7 @@ object Translator {
              Comprehension(reduce(op,Var(w)),
                            List(Generator(VarPat(w),translate(e,env,vars,fncs))))
         case _ => elem(apply(e,translate(_,env,vars,fncs)))
-      }
+      })
 
   def key ( d: Expr, env: Environment, vars: List[String], fncs: Defs ): Expr
     = d match {
@@ -200,9 +200,9 @@ object Translator {
       }
 
   def destination ( d: Expr, k: Expr, vars: List[String] ): Expr
-    = d match {
+    = setPos(d,d match {
         case Var(n)
-          => elem(Var(n))
+          => elem(d)
         case Project(u,a)
           => val v = newvar
              Comprehension(Project(Var(v),a),
@@ -223,7 +223,7 @@ object Translator {
                                 Generator(TuplePat(List(TuplePat(vS.map(VarPat)),VarPat(v))),Var(A)))++
                            (vS zip vs).map{ case (v,w) => Predicate(MethodCall(Var(v),"==",List(Var(w)))) })
         case _ => throw new Error("Illegal destination: "+d)
-      }
+      })
 
   def simpleDest ( e: Expr ): Boolean
     = accumulate[Boolean](e,{ case Index(_,_) => false
@@ -381,7 +381,7 @@ object Translator {
 
   def translate_assign ( d: Expr, s: Expr, quals: List[Qualifier], decl: Boolean,
                          env: Environment, vars: List[String], fncs: Defs ): List[Expr]
-    = (d,s) match {
+    = ((d,s) match {
           case (d@Index(Var(a),is),MethodCall(x,op,List(e)))
             if d == x && monoids.contains(op)
             => val v = newvar
@@ -476,7 +476,7 @@ object Translator {
                                       quals++List(Generator(VarPat(v),translate(ne,env,vars,fncs)),
                                                   Generator(VarPat(k),key(d,env,vars,fncs)))),
                       env,vars,fncs)
-    }
+    }).map(setPos(d,_))
 
   def indexed_access ( v: String, e: Expr ): Boolean
     = e match {
@@ -490,7 +490,7 @@ object Translator {
 
   def translate ( s: Stmt, quals: List[Qualifier], retVars: List[String],
                   env: Environment, vars: List[String], fncs: Defs ): List[Expr]
-    = s match {
+    = (s match {
           case AssignS(d,e)
             => translate_assign(d,e,quals,false,env,vars,fncs)
           case ForS(v,e1,e2,e3,b)
@@ -582,7 +582,7 @@ object Translator {
           case TypeMapS(v,tps,ps,tp,from,to,map,inv)
             => Nil
           case _ => throw new Error("Illegal statement: "+s)
-    }
+    }).map(setPos(s,_))
 
   def arrays_read ( e: Expr ): List[Expr]
     = e match {
