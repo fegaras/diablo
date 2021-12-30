@@ -23,9 +23,9 @@ object PageRank {
     parami(block_dim_size,1024)
     val bSize = 1024
     val repeats = 1
-    var N = args(0);  // # of graph nodes
-	var b = 0.85;
-	val numIter = 10;
+    var N = args(0).toInt  // # of graph nodes
+	var b = 0.85
+	val numIter = 10
 
     val G = spark_context.textFile(args(1))
               .map( line => { val a = line.split(" ").toList
