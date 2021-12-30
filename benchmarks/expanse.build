@@ -58,9 +58,16 @@ for I in `ls $SPARK_HOME/jars/*.jar -I *unsafe*`; do
     JARS=$JARS:$I
 done
 
-n=10000
+rm -rf classes
+mkdir -p classes
 
-spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master $MASTER $SPARK_OPTIONS test.jar 1 $n
+scala_files="add.scala factorization.scala linear_regression.scala multiply.scala nn_binary_classification.scala pagerank.scala"
+for f in $scala_files; do
+    echo compiling $f ...
+    scalac -d classes -cp classes:${JARS}:${DIABLO_HOME}/lib/diablo.jar $f >/dev/null
+done
+echo compilation complete...
+jar cf test.jar -C classes .
 
 myspark stop
 stop-dfs.sh
