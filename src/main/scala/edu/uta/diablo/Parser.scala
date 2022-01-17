@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2021 University of Texas at Arlington
+ * Copyright © 2020-2022 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -204,12 +204,14 @@ object Parser extends StandardTokenParsers {
           { case _~None~_~ds~_~_~ss~_~e
               => Call(s"tensor_${ds.length}_${ss.length}",ds++ss:+e)
             case _~_~_~ds~_~_~ss~_~e
-              => Call(s"block_tensor_${ds.length}_${ss.length}",ds++ss:+e) }
+              => val cm = if (data_frames) "dataset" else "rdd"
+                 Call(s"${cm}_block_tensor_${ds.length}_${ss.length}",ds++ss:+e) }
         | "tensor" ~ opt("*") ~ "(" ~ repsep( expr, "," ) ~ ")" ~ term ^^
           { case _~None~_~ds~_~e
               => Call(s"tensor_${ds.length}_0",ds:+e)
             case _~_~_~ds~_~e
-              => Call(s"block_tensor_${ds.length}_0",ds:+e) }
+              => val cm = if (data_frames) "dataset" else "rdd"
+                 Call(s"${cm}_block_tensor_${ds.length}_0",ds:+e) }
         | ident ~ "*" ~ expr ^?
           { case "map"~_~e => Call("block_map",List(e)) }
         | ident ~ "(" ~ repsep( expr, "," ) ~ ")" ~ opt( compr ) ^^
@@ -344,9 +346,9 @@ object Parser extends StandardTokenParsers {
         | "if" ~ "(" ~ expr ~ ")" ~ stmt ~ opt( ";" ~ "else" ~ stmt ) ^^
           { case _~_~p~_~st~None => IfS(p,st,BlockS(Nil))
             case _~_~p~_~st~Some(_~_~se) => IfS(p,st,se) }
-        | "def" ~ ident ~ "(" ~ repsep( ident ~ ":" ~ stype, "," ) ~ ")" ~ ":" ~ stype ~ stmt ^^
-          { case _~f~_~params~_~_~tp~body
-              => DefS(f,params.map{ case v~_~t => (v,t) }.toMap,tp,body) }
+        | "def" ~ ident ~ "(" ~ repsep( ident ~ ":" ~ stype, "," ) ~ ")" ~ ":" ~ stype ~ opt("=") ~ stmt ^^
+          { case _~f~_~params~_~_~tp~_~body
+              => DefS(f,params.map{ case v~_~t => (v,t) },tp,body) }
         | "return" ~ expr ^^
           { case _~e => ReturnS(e) }
         | expr ^^ ExprS
@@ -361,7 +363,7 @@ object Parser extends StandardTokenParsers {
 
   val tensor_pat = """tensor_(\d+)_(\d+)""".r
   val bool_tensor_pat = """bool_tensor_(\d+)_(\d+)""".r
-  val block_tensor_pat = """(block_|)tensor_(\d+)_(\d+)""".r
+  val block_tensor_pat = """(rdd_block_|dataset_block|)tensor_(\d+)_(\d+)""".r
 
   def simpleType: Parser[Type]
       = ( "(" ~ rep1sep( stype, "," ) ~ ")" ^^
@@ -386,10 +388,10 @@ object Parser extends StandardTokenParsers {
         | rep1sep( ident, "." ) ~ "[" ~ rep1sep( stype, "," ) ~ "]" ^^
           { case List("map")~_~List(kt,vt)~_ => MapType(kt,vt)
             case ns~_~ts~_ => ParametricType(ns.mkString("."),ts) }
-        | ident ^^
-          { case n@bool_tensor_pat(dn,sn)
+        | rep1sep( ident, "." ) ^^
+          { case List(n@bool_tensor_pat(dn,sn))
               => StorageType(n,Nil,1.to(dn.toInt+sn.toInt).map(i => IntConst(block_dim_size)).toList)
-            case s => BasicType(s) }
+            case s => BasicType(s.mkString(".")) }
         )
 
   // if true, display query string at run-time

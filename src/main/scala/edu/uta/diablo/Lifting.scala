@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2021 University of Texas at Arlington
+ * Copyright © 2020-2022 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ object Lifting {
     val Lambda(vp,vb) = view
     val Lambda(sp,sb) = store
     val venv = bindPattern(vp,st,params)
-    if (!typeMatch(typecheck(vb,venv),liftedType))
+    if (vb != Tuple(Nil) && !typeMatch(typecheck(vb,venv),liftedType))
       throw new Error("Wrong view function: "+view+" "+typecheck(vb,venv)+" "+liftedType)
     val nvp = tuple(params.keys.toList.map(VarPat):+vp)
     val senv = bindPattern(sp,liftedType,params)
@@ -58,8 +58,8 @@ object Lifting {
   val pat: Regex = """(full_|)(block_|)(bool_|)tensor_(\d+)_(\d+)""".r
   val btpat: Regex = """(full_|)bool_tensor_(\d+)_(\d+)""".r
   val tpat: Regex = """(full_|)tensor_(\d+)_(\d+)""".r
-  val bpat: Regex = """(full_|)block_tensor_(\d+)_(\d+)""".r
-  val bbtpat: Regex = """(full_|)block_bool_tensor_(\d+)_(\d+)""".r
+  val bpat: Regex = """(full_|)(rdd|dataset)_block_tensor_(\d+)_(\d+)""".r
+  val bbtpat: Regex = """(full_|)(rdd|dataset)_block_bool_tensor_(\d+)_(\d+)""".r
 
   // get a type map if exists, or create a type map from a tensor
   def getTypeMap ( name: String ): Option[TypeMapS] = {
@@ -75,9 +75,9 @@ object Lifting {
             => full_tensor(dn.toInt,sn.toInt,true)
           case tpat(_,dn,sn)
             => full_tensor(dn.toInt,sn.toInt)
-          case bbtpat(full,dn,sn)
+          case bbtpat(full,_,dn,sn)
             => block_tensor(dn.toInt,sn.toInt,true,full)
-          case bpat(full,dn,sn)
+          case bpat(full,_,dn,sn)
             => block_tensor(dn.toInt,sn.toInt,false,full)
           case _ => ""
         }
@@ -154,6 +154,9 @@ object Lifting {
                     => (r + (v->at), s:+x)
                   case ((r,s),x@VarDecl(v,at,Seq(List(Call(array_buffer_pat(_),_)))))
                     => (r + (v->at), s:+x)
+                  case ((r,s),x@VarDecl(v,at,Seq(List(Var(w)))))
+                    => (r + (v->r(w)),
+                        s:+VarDecl(v,r(w),Seq(List(Var(w)))))
                   case ((r,s),x@VarDecl(v,at,Seq(Nil)))
                     => (r + (v->at), s:+x)
                   case ((r,s),VarDecl(v,at,u))
@@ -162,7 +165,7 @@ object Lifting {
                        (r + (v->tp),
                         s:+VarDecl(v,tp,nu))
                   case ((r,s),Def(f,ps,tp,b))
-                    => (r + (f->FunctionType(TupleType(ps.values.toList),tp)),
+                    => (r + (f->FunctionType(TupleType(ps.map(_._2)),tp)),
                         s:+Def(f,ps,tp,lift_expr(b,r)))
                   case ((r,s),e)
                     => (r,s:+lift_expr(e,r))
@@ -260,6 +263,18 @@ object Lifting {
       }
 
   def lift ( mapping: String, storage: Expr ): Expr = {
+    val Some(TypeMapS(_,tps,_,_,st,_,map,_)) = getTypeMap(mapping).map(fresh)
+    val view = if (mapping == "dataset")
+                 MethodCall(MethodCall(storage,"collect",Nil),"toList",null)
+               else Apply(map,storage)
+    if (storage.tpe == null) view
+    else {
+      val ev = tmatch(st,storage.tpe)
+      substType(view,ev)
+    }
+  }
+
+  def lift2 ( mapping: String, storage: Expr ): Expr = {
     val Some(TypeMapS(_,tps,_,_,st,_,map,_)) = getTypeMap(mapping).map(fresh)
     if (storage.tpe == null)
       Apply(map,storage)

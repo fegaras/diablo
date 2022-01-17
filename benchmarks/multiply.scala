@@ -39,6 +39,9 @@ object Multiply {
 
     val conf = new SparkConf().setAppName("tiles")
     spark_context = new SparkContext(conf)
+    val spark = SparkSession.builder().config(conf).getOrCreate()
+    import spark.implicits._
+
     conf.set("spark.logConf","false")
     conf.set("spark.eventLog.enabled","false")
     LogManager.getRootLogger().setLevel(Level.WARN)
@@ -132,7 +135,7 @@ object Multiply {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    // matrix multiplication of tiled matrices using Diablo array comprehensions
+    // matrix multiplication of tiled matrices using Diablo array comprehensions (in RDD)
     def testMultiplyDiabloDAC (): Double = {
       val t = System.currentTimeMillis()
       try {
@@ -141,6 +144,20 @@ object Multiply {
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix multiplication of tiled matrices using Diablo array comprehensions (in DataFrame SQL)
+    def testMultiplyDiabloDF (): Double = {
+      val t = System.currentTimeMillis()
+      param(data_frames,true)
+      try {
+        val C = q("""
+                  tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
+                  """)
+        C._3.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      param(data_frames,false)
       (System.currentTimeMillis()-t)/1000.0
     }
 
@@ -352,9 +369,6 @@ object Multiply {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    val spark = SparkSession.builder().config(conf).getOrCreate()
-    import spark.implicits._
-
     val ADF = Am.map{ case ((i,j),v) => (i,j,v) }.toDF("I", "J", "TILE")
     val BDF = Bm.map{ case ((i,j),v) => (i,j,v) }.toDF("I", "J", "TILE")
 
@@ -376,9 +390,9 @@ object Multiply {
       }
       def reduce ( a: DenseMatrix, b: DenseMatrix ): DenseMatrix = {
         val c = a.values
-        for { i <- (0 until a.numRows).par
-              j <- 0 until a.numCols
-            } c(i*a.numCols+j) += a(i,j)
+        for { i <- (0 until a.numRows).par if i < b.numRows
+              j <- 0 until a.numCols if j < b.numCols
+            } c(i*a.numCols+j) += b(i,j)
         new DenseMatrix(a.numRows,a.numCols,c)
       }
       def finish ( buf: DenseMatrix ): DenseMatrix = buf
@@ -395,8 +409,9 @@ object Multiply {
                               GROUP BY A.I, B.J
                           """)
         //println(C.queryExecution)
-        val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
-        result.blocks.count()
+        //val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
+        //result.blocks.count()
+        C.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -421,8 +436,9 @@ object Multiply {
                               GROUP BY A.I, B.J
                           """)
         //println(C.queryExecution)
-        val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
-        result.blocks.count()
+        //val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
+        //result.blocks.count()
+        C.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -455,6 +471,7 @@ object Multiply {
     //test("DIABLO IJV Multiply",testMultiplyIJV)
     test("MLlib Multiply",testMultiplyMLlib)
     test("DIABLO Multiply dense-dense giving dense",testMultiplyDiabloDAC)
+    test("DIABLO Multiply SQL",testMultiplyDiabloDF)
     test("DIABLO Multiply sparse-dense giving dense",testMultiplyDiabloDACsparseDense)
     test("DIABLO Multiply sparse-sparse giving dense",testMultiplyDiabloDACsparse)
     test("DIABLO Multiply dense-dense giving sparse",testMultiplyDiabloDACsparseOut)
@@ -469,6 +486,7 @@ object Multiply {
     test("SQL Multiply UDAF",testMultiplySQL)
     test("SQL Multiply UDF",testMultiplySQL2)
 */
+
     spark_context.stop()
   }
 }

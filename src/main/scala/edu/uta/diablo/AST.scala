@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2021 University of Texas at Arlington
+ * Copyright © 2020-2022 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -72,7 +72,7 @@ sealed abstract class Expr ( var tpe: Type = null ) extends Positional
     case class While ( predicate: Expr, body: Expr ) extends Expr
     case class Assign ( destination: Expr, value: Expr ) extends Expr
     case class VarDecl ( name: String, atype: Type, value: Expr ) extends Expr
-    case class Def ( name: String, params: Map[String,Type], rtype: Type, body: Expr ) extends Expr
+    case class Def ( name: String, params: List[(String,Type)], rtype: Type, body: Expr ) extends Expr
     // store: storage of a value based on a storage mapping with type params and args
     case class Store ( var mapping: String, typeParams: List[Type], args: List[Expr], value: Expr ) extends Expr
     // view: implicit lifting of the domain of a generator in a comprehension
@@ -95,7 +95,7 @@ sealed abstract class Stmt extends Positional
     case class ForeachS ( pat: Pattern, domain: Expr, body: Stmt ) extends Stmt
     case class WhileS ( predicate: Expr, body: Stmt ) extends Stmt
     case class IfS ( predicate: Expr, thenp: Stmt, elsep: Stmt ) extends Stmt
-    case class DefS ( name: String, params: Map[String,Type], rtype: Type, body: Stmt ) extends Stmt
+    case class DefS ( name: String, params: List[(String,Type)], rtype: Type, body: Stmt ) extends Stmt
     case class ReturnS ( value: Expr ) extends Stmt
     case class ExprS ( value: Expr ) extends Stmt
     // declare a new storage mapping as an isomorphism store <-> view

@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2021 University of Texas at Arlington
+ * Copyright © 2020-2022 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ object ComprehensionTranslator {
   import Typechecker._
   import Lifting.{store,lift}
   import TypeMappings.{block_tensor_tiles}
+  import SQLGenerator.translate_sql
 
   val ignore: Expr = Block(Nil)
 
@@ -119,13 +120,13 @@ object ComprehensionTranslator {
          case _ => (0,0)
        }
 
-  val block_tensor_pat: Regex = """(full_|)block_tensor_(\d+)_(\d+)""".r
-  val block_bool_tensor_pat: Regex = """(full_|)block_bool_tensor_(\d+)_(\d+)""".r
+  val block_tensor_pat: Regex = """(full_|)(rdd|dataset)_block_tensor_(\d+)_(\d+)""".r
+  val block_bool_tensor_pat: Regex = """(full_|)(rdd|dataset)_block_bool_tensor_(\d+)_(\d+)""".r
 
   def isBlockTensor ( name: String ): Boolean
     = name match {
-        case block_tensor_pat(_,_,_) => true
-        case block_bool_tensor_pat(_,_,_) => true
+        case block_tensor_pat(_,_,_,_) => true
+        case block_bool_tensor_pat(_,_,_,_) => true
         case _ => false
       }
 
@@ -488,6 +489,7 @@ object ComprehensionTranslator {
     = e match {
         case Lift(name,_) if isBlockTensor(name) => true
         case Lift("rdd",_) => true
+        case Lift("dataset",_) => true
         case Lift("block_map",_) => true
         case _ => false
       }
@@ -512,19 +514,20 @@ object ComprehensionTranslator {
   // for a lifted RDD storage, return the RDD collection
   def get_rdd ( e: Expr ): Expr
     = e match {
-        case Lift(block_tensor_pat(full,dn,sn),x)
+        case Lift(block_tensor_pat(_,_,dn,sn),x)
           => block_tensor_tiles(dn.toInt,sn.toInt,x)
-        case Lift(block_bool_tensor_pat(full,dn,sn),x)
+        case Lift(block_bool_tensor_pat(_,_,dn,sn),x)
           => block_tensor_tiles(dn.toInt,sn.toInt,x)
         case Lift("rdd",x) => x
+        case Lift("dataset",x) => x
         case _ => e
       }
 
   def block_arrays_to_rdds ( qs: List[Qualifier] ): List[Qualifier]
     = qs.flatMap {
-               case Generator(p,Lift(f@block_tensor_pat(_,dn,sn),x))
+               case Generator(p,Lift(f@block_tensor_pat(_,_,dn,sn),x))
                  => List(Generator(p,lift(f,x)))
-               case Generator(p,Lift(f@block_bool_tensor_pat(_,dn,sn),x))
+               case Generator(p,Lift(f@block_bool_tensor_pat(_,_,dn,sn),x))
                  => List(Generator(p,lift(f,x)))
                case q => List(q)
              }
@@ -697,6 +700,11 @@ object ComprehensionTranslator {
           }
     }
 
+  def translate_dataset ( hs: Expr, qs: List[Qualifier], vars: List[String] ): Expr
+    = if (data_frames)
+        translate_sql(hs,qs)
+      else translate_rdd(hs,qs,vars)
+
 
 /*---------------------------- Tiled Comprehensions ------------------------------------------*/
 
@@ -750,20 +758,20 @@ object ComprehensionTranslator {
 
   def tile_type ( block: String ): String
     = block match {
-        case block_tensor_pat(full,dn,sn)
+        case block_tensor_pat(full,_,dn,sn)
           => s"${full}tensor_${dn}_$sn"
-        case block_bool_tensor_pat(full,dn,sn)
+        case block_bool_tensor_pat(full,_,dn,sn)
           => s"${full}bool_tensor_${dn}_$sn"
       }
 
   def tile_type ( block: String, tp: Type ): String = {
     val isBool = tp == boolType
     block match {
-        case block_tensor_pat(full,dn,sn)
+        case block_tensor_pat(full,_,dn,sn)
           => if (isBool && sn.toInt > 0)
                s"${full}bool_tensor_${dn}_$sn"
               else s"${full}tensor_${dn}_$sn"
-        case block_bool_tensor_pat(full,dn,sn)
+        case block_bool_tensor_pat(full,_,dn,sn)
           => if (isBool && sn.toInt > 0)
                s"${full}bool_tensor_${dn}_$sn"
               else s"${full}tensor_${dn}_$sn"
@@ -838,6 +846,8 @@ object ComprehensionTranslator {
             => s++patvars(p):+v
           case (s,Generator(p,Lift("rdd",_)))
             => s++patvars(p)
+          case (s,Generator(p,Lift("dataset",_)))
+            => s++patvars(p)
           case (s,Generator(VarPat(i),Range(_,_,_)))
             => s:+i
           case (s,LetBinding(p,e))
@@ -848,7 +858,7 @@ object ComprehensionTranslator {
 
   def prefix ( prefix: String, v: String ): String = "_"+prefix+"_"+v
 
-  val block_pat: Regex = """(full_|)block_(bool_|)tensor_(\d+)_(\d+)""".r
+  val block_pat: Regex = """(full_|)(dataset|rdd)_block_(bool_|)tensor_(\d+)_(\d+)""".r
 
   // from the comprehension qualifiers qs, generate the RDD qualifiers
   def rdd_qualifiers ( qs: List[Qualifier], vars: List[String], shuffle: Boolean = false ): List[Qualifier] = {
@@ -857,17 +867,19 @@ object ComprehensionTranslator {
     qs.flatMap (
         q => q match {
           case Generator(TuplePat(List(p,VarPat(v))),
-                         Lift(block_pat(full,bool,dn,sn),e))
+                         Lift(block_pat(full,cm,bool,dn,sn),e))
             => val is = patvars(p)
                Generator(tuple(List(tuple(is.map(i => VarPat(prefix("coord",i)))),
                                     VarPat(prefix("tile",v)))),
-                         Lift("rdd",block_tensor_tiles(dn.toInt,sn.toInt,e)))::
+                         Lift(cm,block_tensor_tiles(dn.toInt,sn.toInt,e)))::
                   (if (shuffle)   // will contain all needed tiles after group-by
                      List(LetBinding(VarPat(prefix("tiles",v)),
                                      tuple(List(tuple(is.map(i => Var(prefix("coord",i)))),
                                                 Var(prefix("tile",v))))))
                    else Nil)
           case Generator(_,Lift("rdd",_))
+            => List(q)
+          case Generator(_,Lift("dataset",_))
             => List(q)
           case Generator(VarPat(i),Range(n1,n2,n3))
             => List(Generator(VarPat(prefix("coord",i)),
@@ -934,6 +946,8 @@ object ComprehensionTranslator {
     qs.flatMap (
         q => q match {
           case Generator(p,Lift("rdd",_))
+            => Nil   // goes into the rdd_qualifiers
+          case Generator(p,Lift("dataset",_))
             => Nil   // goes into the rdd_qualifiers
           case Generator(TuplePat(List(p,VarPat(v))),
                          Lift(block,_))
@@ -1022,11 +1036,12 @@ object ComprehensionTranslator {
                           add_initial_array(store(tensor,List(tp),tile_dims,stile),
                                             Nth(Var("_array"),dn+sn+1))
                         else Store(tile_type(block,tp),List(tp),tile_dims,stile)
+             val cm = if (data_frames) "dataset" else "rdd"
              val array_assigns = block_array_assignment match {
                                    case Some(array)
                                      => val array_coords = tuple(is.map( i => VarPat(prefix("array",i)) ))
                                         Generator(TuplePat(List(array_coords,VarPat("_array"))),
-                                                  Lift("rdd",Nth(array,dn+sn+1)))::
+                                                  Lift(cm,Nth(array,dn+sn+1)))::
                                              is.map { i => Predicate(MethodCall(Var(prefix("array",i)),
                                                                 "==",List(Var(prefix("coord",i))))) }
                                    case _ => Nil
@@ -1037,17 +1052,18 @@ object ComprehensionTranslator {
                                                 rdd_qualifiers(qs,vars)++array_assigns++tbinds))
                if (trace) println("Comprehension that preserves tilling:\n"
                                   +Pretty.print(Comprehension(nhs,nqs)))
-               tuple(dims:+translate_rdd(nhs,nqs,vars))
+               tuple(dims:+translate_dataset(nhs,nqs,vars))
              } else {
                val p = tuple(is.map( i => VarPat(prefix("coord",i)) )
                              ++ is.map( i => VarPat(prefix("size",i)) ))
                val nc = Comprehension(toExpr(p),
                                       rdd_qualifiers(qs,vars)++tbinds)
-               tuple(dims:+flatMap(Lambda(p,Seq(List(tuple(List(tuple(tile_coords),tile))))),
-                                   MethodCall(Var("spark_context"),
-                                              "parallelize",
-                                              List(translate(optimize(nc),vars),
-                                                   IntConst(number_of_partitions)))))
+               val rdd = flatMap(Lambda(p,Seq(List(tuple(List(tuple(tile_coords),tile))))),
+                                 MethodCall(Var("spark_context"),
+                                            "parallelize",
+                                            List(translate(optimize(nc),vars),
+                                                 IntConst(number_of_partitions))))
+               tuple(dims:+(if (data_frames) MethodCall(rdd,"toDF",null) else rdd))
              }
       }
 
@@ -1110,12 +1126,12 @@ object ComprehensionTranslator {
                                +Pretty.print(Comprehension(Tuple(List(tuple(vs.map(Var)),tile)),rqs)))
              val Comprehension(nhs,nqs) = optimize(Comprehension(Tuple(List(tuple(vs.map(Var)),tile)),rqs))
              val rdd = if (is_rdd_comprehension(qs))
-                         translate_rdd(nhs,nqs,vars)
+                         translate_dataset(nhs,nqs,vars)
                        else MethodCall(Var("spark_context"),
                                        "parallelize",
-                                       List(translate_rdd(nhs,nqs,vars),
+                                       List(translate_dataset(nhs,nqs,vars),
                                             IntConst(number_of_partitions)))
-             tuple(dims:+rdd)
+             tuple(dims:+(if (data_frames) MethodCall(rdd,"toDF",null) else rdd))
     }
 
 
@@ -1166,7 +1182,8 @@ object ComprehensionTranslator {
                      val mst = Call("merge_tensors",
                                     List(Nth(Var(x),ndims+1),Nth(Var(y),ndims+1),
                                          Lambda(TuplePat(List(VarPat("v"),VarPat("w"))),
-                                                mcall(m,Var("v"),Var("w"))),zero))
+                                                mcall(m,Var("v"),Var("w"))),
+                                         zero))
                      Tuple(1.to(ndims).map(i => Nth(Var(x),i)).toList:+mst)
                    }
                    val md = h match {
@@ -1201,20 +1218,6 @@ object ComprehensionTranslator {
                    val coord_gb_key = coord_indices.foldLeft(k) { case (r,(from,to)) => subst(from,to,r) }
                    val nc = Comprehension(Tuple(List(toExpr(tile_coords),tuple(tiles))),
                                           (rqs:+LetBinding(tile_coords,coord_gb_key))++tbinds)
-                   val rdd = block_array_assignment match {
-                               case Some(array)
-                                 => val tensor = tile_type(block,tp)
-                                    val (dn,sn) = tensor_dims(tensor)
-                                    val dest = Nth(array,dn+sn+1)
-                                    Call("outerJoin",
-                                         List(dest,
-                                              MethodCall(Store("rdd",Nil,Nil,nc),
-                                                         "reduceByKey",
-                                                         List(md,IntConst(number_of_partitions))),
-                                              md))
-                               case _ => MethodCall(Store("rdd",Nil,Nil,nc),
-                                                    "reduceByKey",List(md,IntConst(number_of_partitions)))
-                             }
                    val env = rt.map{ case (n,e) => (e,newvar) }
                    def liftExpr ( x: Expr ): Expr
                      = env.foldLeft(x) { case (r,(from,to)) => subst(from,Var(to+"_"),r) }
@@ -1239,14 +1242,43 @@ object ComprehensionTranslator {
                                         else Nil)
                                }))
                        }
-                   if (trace) println("Comprehension without group-by:\n"
-                                  +Pretty.print(Comprehension(Tuple(List(kp,liftedTile)),
-                                          List(Generator(TuplePat(List(p,tuple(env.map(x => VarPat(x._2))))),
-                                                         rdd)))))
-                   val res = translate_rdd(Tuple(List(kp,liftedTile)),
-                                           List(Generator(TuplePat(List(p,tuple(env.map(x => VarPat(x._2))))),
-                                                          rdd)),vars)
-                   translate(Tuple(dims:+res),vars)
+                   if (data_frames) {
+                       val ndims = dims.map( i => IntConst(block_dim_size) )
+                       // empty tile:
+                       val zero = tuple(msTypes.map(tp => Store(tile_type(block,tp),
+                                                                List(tp),ndims,Seq(Nil))))
+                       val rval = tuple(env.map(x => VarPat(x._2)))
+                       val mapper = if (liftedTile != toExpr(rval))
+                                      Some(Lambda(rval,liftedTile))
+                                    else None
+                       // translate it to DataFrames SQL
+                       val sql = translate_sql(Tuple(List(toExpr(tile_coords),tuple(tiles))),
+                                               (rqs:+LetBinding(tile_coords,coord_gb_key))++tbinds,
+                                               md,zero,mapper)
+                       Tuple(dims:+sql)
+                   } else {
+                       val rdd = block_array_assignment match {
+                                   case Some(array)
+                                     => val tensor = tile_type(block,tp)
+                                        val (dn,sn) = tensor_dims(tensor)
+                                        val dest = Nth(array,dn+sn+1)
+                                        Call("outerJoin",
+                                             List(dest,
+                                                  MethodCall(Store("rdd",Nil,Nil,nc),
+                                                             "reduceByKey",
+                                                             List(md,IntConst(number_of_partitions))),
+                                                  md))
+                                   case _ => MethodCall(Store("rdd",Nil,Nil,nc),
+                                                        "reduceByKey",List(md,IntConst(number_of_partitions)))
+                                 }
+                       val rval = tuple(env.map(x => VarPat(x._2)))
+                       if (trace) println("Comprehension without group-by:\n"
+                                          +Pretty.print(Comprehension(Tuple(List(kp,liftedTile)),
+                                                     List(Generator(TuplePat(List(p,rval)),rdd)))))
+                       val res =  translate_rdd(Tuple(List(kp,liftedTile)),
+                                                List(Generator(TuplePat(List(p,rval)),rdd)),vars)
+                       translate(Tuple(dims:+res),vars)
+                   }
             case _ => throw new Error("Expected a group-by comprehension: "
                                       +Comprehension(hs,qs))
           }
@@ -1436,7 +1468,8 @@ object ComprehensionTranslator {
         case _
           if is_rdd_comprehension(qs)
           // A tiled comprehension that depends on RDDs
-          => val mp = qs.flatMap {
+          => val cm = if (data_frames) "dataset" else "rdd"
+             val mp = qs.flatMap {
                          case q@Generator(p,Lift(b,x))
                            if isBlockTensor(b)
                            => List(q -> newvar)
@@ -1445,16 +1478,16 @@ object ComprehensionTranslator {
              val ns = qs.map {
                          case q@Generator(p,Lift(b,x))
                            if isBlockTensor(b)
-                           => Generator(p,Lift("rdd",Var(mp(q))))
+                           => Generator(p,Lift(cm,Var(mp(q))))
                          case q => q
                        }
              val Comprehension(nh,nqs) = optimize(Comprehension(hs,ns))
              // pull out block tensors from the comprehension as RDDs
              val ne = mp.foldLeft[Expr](store(block,List(tp),dims,
-                                              Lift("rdd",translate_rdd(nh,nqs,vars)))) {
+                                              Lift(cm,translate_dataset(nh,nqs,vars)))) {
                            case (r,((q@Generator(p,_),v)))
                              => Let(VarPat(v),
-                                    Store("rdd",List(tp),Nil,
+                                    Store(cm,List(tp),Nil,
                                           Comprehension(toExpr(p),List(q))),r)
                       }
              translate(optimize(ne),vars)

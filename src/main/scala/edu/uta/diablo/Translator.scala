@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2021 University of Texas at Arlington
+ * Copyright © 2020-2022 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -568,12 +568,10 @@ object Translator {
                          val es = translate(e,ls,vs,fs)
                          ( ns:+VarDecl(v,tp,es), ls+(v->tp), v::vs, fs )
                     case ((ns,ls,vs,fs),DefS(f,ps,tp,b))
-                      => val ftp = FunctionType(TupleType(ps.values.toList),tp)
-                         val nfs = fs + (f -> (ps.toList.map(_._1),b))
-                         val v = newvar
-                         val df = Def(f,ps,tp,Block(translate(BlockS(List(VarDeclS(v,Some(tp),None),b)),
-                                                              quals,v::retVars,ls+(f->ftp),vs,nfs)
-                                                    :+Var(v)))
+                      => val ftp = FunctionType(TupleType(ps.map(_._2)),tp)
+                         val nfs = fs + (f -> (ps.map(_._1),b))
+                         val v = newvar  // fix retVars
+                         val df = Def(f,ps,tp,Block(translate(b,quals,v::retVars,ls+(f->ftp),vs,nfs)))
                          ( ns:+df, ls+(f->ftp), vs, nfs )
                     case ((ns,ls,vs,fs),stmt)
                       => ( ns++translate(stmt,quals,retVars,ls,vs,fs), ls, vs, fs )

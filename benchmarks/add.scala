@@ -35,6 +35,9 @@ object Add {
 
     val conf = new SparkConf().setAppName("add")
     spark_context = new SparkContext(conf)
+    val spark = SparkSession.builder().config(conf).getOrCreate()
+    import spark.implicits._
+
     conf.set("spark.logConf","false")
     conf.set("spark.eventLog.enabled","false")
     LogManager.getRootLogger().setLevel(Level.WARN)
@@ -101,7 +104,7 @@ object Add {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    // matrix addition of tiled matrices using Diablo array comprehensions
+    // matrix addition of tiled matrices using Diablo array comprehensions (in RDD)
     def testAddDiabloDAC: Double = {
       val t = System.currentTimeMillis()
       try {
@@ -110,6 +113,20 @@ object Add {
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix addition of tiled matrices using Diablo array comprehensions (in DataFrame SQL)
+    def testAddDiabloDF: Double = {
+      param(data_frames,true)
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <- AA, ((ii,jj),b) <- BB, ii == i, jj == j ];
+                  """)
+        C._3.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      param(data_frames,false)
       (System.currentTimeMillis()-t)/1000.0
     }
 
@@ -218,9 +235,6 @@ object Add {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    val spark = SparkSession.builder().config(conf).getOrCreate()
-    import spark.implicits._
-
     val ADF = Am.map{ case ((i,j),v) => (i,j,v) }.toDF("I", "J", "TILE")
     val BDF = Bm.map{ case ((i,j),v) => (i,j,v) }.toDF("I", "J", "TILE")
 
@@ -275,6 +289,7 @@ object Add {
 
     test("MLlib Add",testAddMLlib)
     test("DIABLO Add",testAddDiabloDAC)
+    test("DIABLO Add SQL",testAddDiabloDF)
     test("DIABLO Add sparse-sparse",testAddDiabloDACsparse)
     test("DIABLO Add sparse-dense",testAddDiabloDACsparseDense)
     test("DIABLO Add dense-dense giving sparse",testAddDiabloDACdenseSparseOut)

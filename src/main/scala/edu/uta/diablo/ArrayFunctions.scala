@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2021 University of Texas at Arlington
+ * Copyright © 2020-2022 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,42 +34,82 @@ trait ArrayFunctions {
 
   // convert a dense array to a tensor (dense dimensions dn>0 & sparse dimensions sn>0)
   def array2tensor[T:ClassTag] ( dn: Int, sn: Int, zero: T, buffer: Array[T] ): (Array[Int],Array[Int],Array[T]) = {
+    val splits = 10
+    val split_size = (dn-1)/splits+1
     val dense = Array.ofDim[Int](dn+1)
-    val sparse = new mutable.ArrayBuffer[Int]()
-    val values = new mutable.ArrayBuffer[T]()
-    var i = 0
-    while ( i < dn ) {
-      var j = 0
-      while ( j < sn ) {
-        val v = buffer(i*sn+j)
-        if ( v != zero ) {
-          sparse.append(j)
-          values.append(v)
-        }
-        j += 1
-      }
-      i += 1
-      dense(i) = sparse.length
+    val sparseV = Array.ofDim[mutable.ArrayBuffer[Int]](splits)
+    val valuesV = Array.ofDim[mutable.ArrayBuffer[T]](splits)
+    for ( i <- 0 until splits ) {
+      sparseV(i) = new mutable.ArrayBuffer[Int]()
+      valuesV(i) = new mutable.ArrayBuffer[T]()
     }
-    (dense,sparse.toArray,values.toArray)
+    (0 until splits).par.foreach {
+      s => var i = 0
+           while ( i < split_size ) {
+              var j = 0
+              val ni = s*split_size+i
+              while ( j < sn && ni*sn+j < buffer.length ) {
+                  val v = buffer(ni*sn+j)
+                  if ( v != zero ) {
+                     sparseV(s) += j
+                     valuesV(s) += v
+                  }
+                  j += 1
+              }
+              if (ni < dn)
+                dense(ni+1) = sparseV(s).length
+              i += 1
+           }
+    }
+    val sizes = Array.ofDim[Int](splits)
+    var len = 0
+    for ( s <- 0 until splits ) {
+      sizes(s) = len
+      len += sparseV(s).length
+    }
+    val sparse = Array.ofDim[Int](len)
+    val values = Array.ofDim[T](len)
+    (0 until splits).par.foreach {
+      s => sparseV(s).copyToArray(sparse,sizes(s))
+           valuesV(s).copyToArray(values,sizes(s))
+    }
+    (dense,sparse,values)
   }
 
   // convert a dense boolean array to a boolean tensor (dense dimensions dn>0 & sparse dimensions sn>0)
   def array2tensor_bool ( dn: Int, sn: Int, buffer: Array[Boolean] ): (Array[Int],Array[Int]) = {
+    val splits = 10
+    val split_size = (dn-1)/splits+1
     val dense = Array.ofDim[Int](dn+1)
-    val sparse = new mutable.ArrayBuffer[Int]()
-    var i = 0
-    while ( i < dn ) {
-      var j = 0
-      while ( j < sn ) {
-        if ( buffer(i*sn+j) )
-          sparse.append(j)
-        j += 1
-      }
-      i += 1
-      dense(i) = sparse.length
+    val sparseV = Array.ofDim[mutable.ArrayBuffer[Int]](splits)
+    for ( i <- 0 until splits )
+      sparseV(i) = new mutable.ArrayBuffer[Int]()
+    (0 until splits).par.foreach {
+      s => var i = 0
+           while ( i < split_size ) {
+              var j = 0
+              val ni = s*split_size+i
+              while ( j < sn && ni*sn+j < buffer.length ) {
+                  if ( buffer(ni*sn+j) )
+                     sparseV(s) += j
+                  j += 1
+              }
+              if (ni < dn)
+                dense(ni+1) = sparseV(s).length
+              i += 1
+           }
     }
-    (dense,sparse.toArray)
+    val sizes = Array.ofDim[Int](splits)
+    var len = 0
+    for ( s <- 0 until splits ) {
+      sizes(s) = len
+      len += sparseV(s).length
+    }
+    val sparse = Array.ofDim[Int](len)
+    (0 until splits).par.foreach {
+      s => sparseV(s).copyToArray(sparse,sizes(s))
+    }
+    (dense,sparse)
   }
 
   // convert a dense array to a sparse tensor (dense dimensions dn=0 & sparse dimensions sn>0)
@@ -80,8 +120,8 @@ trait ArrayFunctions {
     while ( j < sn ) {
       val v = buffer(j)
       if ( v != zero ) {
-        sparse.append(j)
-        values.append(v)
+        sparse += j
+        values += v
       }
       j += 1
     }
@@ -94,7 +134,7 @@ trait ArrayFunctions {
     var j = 0
     while ( j < sn ) {
       if ( buffer(j) )
-        sparse.append(j)
+        sparse += j
       j += 1
     }
     sparse.toArray
@@ -126,23 +166,23 @@ trait ArrayFunctions {
         if (X._2(xn) == Y._2(yn)) {
           val v = op(X._3(xn),Y._3(yn))
           if (v != zero) {
-            sparse.append(X._2(xn))
-            values.append(v)
+            sparse += X._2(xn)
+            values += v
           }
           xn += 1
           yn += 1
         } else if (X._2(xn) < Y._2(yn)) {
           val v = op(X._3(xn),zero)
           if (v != zero) {
-            sparse.append(X._2(xn))
-            values.append(X._3(xn))
+            sparse += X._2(xn)
+            values += v
           }
           xn += 1
         } else {
           val v = op(zero,Y._3(yn))
           if (v != zero) {
-            sparse.append(Y._2(yn))
-            values.append(Y._3(yn))
+            sparse += Y._2(yn)
+            values += v
           }
           yn += 1
         }
@@ -150,16 +190,16 @@ trait ArrayFunctions {
       while (xn < X._1(i+1)) {
         val v = op(X._3(xn),zero)
         if (v != zero) {
-          sparse.append(X._2(xn))
-          values.append(X._3(xn))
+          sparse += X._2(xn)
+          values += v
         }
         xn += 1
       }
       while (yn < Y._1(i+1)) {
         val v = op(zero,Y._3(yn))
         if (v != zero) {
-          sparse.append(Y._2(yn))
-          values.append(Y._3(yn))
+          sparse += Y._2(yn)
+          values += v
         }
         yn += 1
       }
@@ -183,31 +223,31 @@ trait ArrayFunctions {
         if (X._2(xn) == Y._2(yn)) {
           val v = op(true,true)
           if (v)
-            sparse.append(X._2(xn))
+            sparse += X._2(xn)
           xn += 1
           yn += 1
         } else if (X._2(xn) < Y._2(yn)) {
           val v = op(true,false)
           if (v)
-            sparse.append(X._2(xn))
+            sparse += X._2(xn)
           xn += 1
         } else {
           val v = op(false,true)
           if (v)
-            sparse.append(Y._2(yn))
+            sparse += Y._2(yn)
           yn += 1
         }
       }
       while (xn < X._1(i+1)) {
         val v = op(true,false)
         if (v)
-          sparse.append(X._2(xn))
+          sparse += X._2(xn)
         xn += 1
       }
       while (yn < Y._1(i+1)) {
         val v = op(false,true)
         if (v)
-          sparse.append(Y._2(yn))
+          sparse += Y._2(yn)
         yn += 1
       }
       i += 1
@@ -228,23 +268,23 @@ trait ArrayFunctions {
         if (X._1(xn) == Y._1(yn)) {
           val v = op(X._2(xn),Y._2(yn))
           if (v != zero) {
-            sparse.append(X._1(xn))
-            values.append(v)
+            sparse += X._1(xn)
+            values += v
           }
           xn += 1
           yn += 1
         } else if (X._1(xn) < Y._1(yn)) {
           val v = op(X._2(xn),zero)
           if (v != zero) {
-            sparse.append(X._1(xn))
-            values.append(X._2(xn))
+            sparse += X._1(xn)
+            values += v
           }
           xn += 1
         } else {
           val v = op(zero,Y._2(yn))
           if (v != zero) {
-            sparse.append(Y._1(yn))
-            values.append(Y._2(yn))
+            sparse += Y._1(yn)
+            values += v
           }
           yn += 1
         }
@@ -252,16 +292,16 @@ trait ArrayFunctions {
       while (xn < X._1.length) {
         val v = op(X._2(xn),zero)
         if (v != zero) {
-          sparse.append(X._1(xn))
-          values.append(X._2(xn))
+          sparse += X._1(xn)
+          values += v
         }
         xn += 1
       }
       while (yn < Y._1.length) {
         val v = op(zero,Y._2(yn))
         if (v != zero) {
-          sparse.append(Y._1(yn))
-          values.append(Y._2(yn))
+          sparse += Y._1(yn)
+          values += v
         }
         yn += 1
       }
@@ -278,31 +318,31 @@ trait ArrayFunctions {
         if (X(xn) == Y(yn)) {
           val v = op(true,true)
           if (v)
-            sparse.append(X(xn))
+            sparse += X(xn)
           xn += 1
           yn += 1
         } else if (X(xn) < Y(yn)) {
           val v = op(true,false)
           if (v)
-            sparse.append(X(xn))
+            sparse += X(xn)
           xn += 1
         } else {
           val v = op(false,true)
           if (v)
-            sparse.append(Y(yn))
+            sparse += Y(yn)
           yn += 1
         }
       }
       while (xn < X.length) {
         val v = op(true,false)
         if (v)
-          sparse.append(X(xn))
+          sparse += X(xn)
         xn += 1
       }
       while (yn < Y.length) {
         val v = op(false,true)
         if (v)
-          sparse.append(Y(yn))
+          sparse += Y(yn)
         yn += 1
       }
     sparse.toArray
@@ -506,4 +546,19 @@ trait ArrayFunctions {
   def update_array[T] ( a: Object, u: T ): T = u
 
   def increment_array[T] ( a: Object, op: String, u: T ): T = u
+
+  import org.apache.spark.sql.expressions.Aggregator
+  import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+  import org.apache.spark.sql.Encoder
+  import scala.reflect.runtime.universe.TypeTag
+
+  def reducer[T] ( mergeT: (T,T) => T, zeroT: T ) ( implicit tag: TypeTag[T] ): Aggregator[T,T,T]
+    = new Aggregator[T,T,T] {
+        def zero: T = zeroT
+        def merge ( x: T, y: T ): T = merge(x,y)
+        def reduce ( x: T, y: T ): T = merge(x,y)
+        def finish ( x: T ): T = x
+        def bufferEncoder: Encoder[T] = ExpressionEncoder[T]()
+        def outputEncoder: Encoder[T] = ExpressionEncoder[T]()
+      }
 }

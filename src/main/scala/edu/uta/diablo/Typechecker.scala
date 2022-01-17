@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2021 University of Texas at Arlington
+ * Copyright © 2020-2022 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,9 +36,7 @@ object Typechecker {
     var typecheck_method: ( Type, String, List[Type] ) => Option[Type] = _
     var typecheck_var: String => Option[Type] = _
 
-    val rddClass = "org.apache.spark.rdd.RDD"
-
-    val collection_names = List("array","map","List",rddClass)
+    val collection_names = List("array","map","List",collectionClass)
 
     val system_functions = List("binarySearch","zero","array2tensor","array2tensor_bool")
 
@@ -111,6 +109,10 @@ object Typechecker {
          case (TupleType(ts1),TupleType(ts2))
            if ts1.length == ts2.length
            => (ts1 zip ts2).map{ case (x,y) => tmatch(x,y) }.reduce[Env](merge)
+         case (TupleType(List(t1)),t2)
+           => tmatch(t1,t2)
+         case (t1,TupleType(List(t2)))
+           => tmatch(t1,t2)
          case (RecordType(rs1),RecordType(rs2))
            if rs1.keys == rs2.keys
            => ((rs1.values) zip (rs2.values)).map{ case (x,y) => tmatch(x,y) }.reduce[Env](merge)
@@ -158,23 +160,23 @@ object Typechecker {
       }
 
     def import_type ( tp: Type, vname: String ): Type
-      = tp match {
+      = { val collectionClass = rddClass; tp match {
           case TupleType(is:+ParametricType(rdd,List(TupleType(List(TupleType(ks),
                                        TupleType(js:+ArrayType(1,etp)))))))
             // imported dense block tensor variable
-            if rdd == rddClass && is.length == js.length && is.length == ks.length
+            if rdd == collectionClass && is.length == js.length && is.length == ks.length
                && (is++ks++js).forall(_ == intType)
             => if (useStorageTypes)
-                 StorageType("block_tensor_"+is.length+"_0",List(etp),
+                 StorageType("rdd_block_tensor_"+is.length+"_0",List(etp),
                              (1 to is.length).map(i => Nth(Var(vname),i)).toList)
                else ArrayType(is.length,etp)
           case TupleType(is:+ParametricType(rdd,List(TupleType(List(TupleType(ks),
                      TupleType(js:+TupleType(List(ArrayType(1,ct),ArrayType(1,rt),ArrayType(1,etp)))))))))
             // imported sparse block tensor variable
-            if rdd == rddClass && is.length == js.length && is.length == ks.length
+            if rdd == collectionClass && is.length == js.length && is.length == ks.length
                && (ct::rt::is++ks++js).forall(_ == intType)
             => if (useStorageTypes)
-                 StorageType("block_tensor_"+(is.length-1)+"_1",List(etp),
+                 StorageType("rdd_block_tensor_"+(is.length-1)+"_1",List(etp),
                              (1 to is.length).map(i => Nth(Var(vname),i)).toList)
                else ArrayType(is.length,etp)
           case TupleType(is:+ArrayType(1,etp))     // imported tensor variable
@@ -184,12 +186,12 @@ object Typechecker {
                              (1 to is.length).map(i => Nth(Var(vname),i)).toList)
                else ArrayType(is.length,etp)
           case ParametricType(rdd,List(etp))
-            if rdd == rddClass
+            if rdd == collectionClass
             => if (useStorageTypes)
-                 StorageType("rdd",List(etp),Nil)
+                 StorageType(if (data_frames) "dataset" else "rdd",List(etp),Nil)
                else SeqType(etp)
           case _ => tp
-      }
+      }}
 
     def is_reduction ( op: String, tp: Type ): Boolean = {
       tp match {
@@ -200,7 +202,7 @@ object Typechecker {
     }
 
     val tpat: Regex = """(full_|)tensor_(\d+)_(\d+)""".r
-    val btpat: Regex = """(full_|)block_tensor_(\d+)_(\d+)""".r
+    val btpat: Regex = """(full_|)(rdd|dataset)_block_tensor_(\d+)_(\d+)""".r
 
     def typecheck ( e: Expr, env: Environment ): Type
       = if (e.tpe != null)
@@ -320,9 +322,9 @@ object Typechecker {
                         case tpat(full,dn,sn) if sn.toInt > 0
                           => // change tensor_*_* to bool_tensor_*_*
                              x.mapping = full+"bool_"+f                         // destructive
-                        case btpat(full,dn,sn) if sn.toInt > 0
+                        case btpat(full,cn,dn,sn) if sn.toInt > 0
                           => // change block_tensor_*_* to block_bool_tensor_*_*
-                             x.mapping = s"${full}block_bool_tensor_${dn}_$sn"    // destructive
+                             x.mapping = s"${full}${cn}_block_bool_tensor_${dn}_$sn"    // destructive
                         case _ => ;
                       }
                  case _ => ;
@@ -339,9 +341,9 @@ object Typechecker {
                         case tpat(full,dn,sn) if sn.toInt > 0
                           => // change tensor_*_* to bool_tensor_*_*
                              x.name = full+"bool_"+f                         // destructive
-                        case btpat(full,dn,sn) if sn.toInt > 0
+                        case btpat(full,cn,dn,sn) if sn.toInt > 0
                           => // change block_tensor_*_* to block_bool_tensor_*_*
-                             x.name = s"${full}block_bool_tensor_${dn}_$sn"    // destructive
+                             x.name = s"${full}${cn}_block_bool_tensor_${dn}_$sn"    // destructive
                         case _ => ;
                       }
                   case _ => ;
@@ -360,7 +362,7 @@ object Typechecker {
                   case StorageType(f@tpat(_,dn,sn),tps,args)
                     if sn.toInt > 0       // full sparse tensor scan
                     => StorageType("full_"+f,tps,args)
-                  case StorageType(f@btpat(_,dn,sn),tps,args)
+                  case StorageType(f@btpat(_,_,dn,sn),tps,args)
                     if sn.toInt > 0       // full block sparse tensor scan
                     => StorageType("full_"+f,tps,args)
                   case tp => tp
@@ -378,7 +380,7 @@ object Typechecker {
                else substType(at,ev)
           case Call(f,args)
             if env.contains(f)
-            => val tp = typecheck(Tuple(args),env)
+            => val tp = typecheck(tuple(args),env)
                env(f) match {
                   case FunctionType(dt,rt)
                     => if (typeMatch(dt,tp)) rt
@@ -391,7 +393,7 @@ object Typechecker {
                val tas = args.map(typecheck(_,env)).map {
                                        case ArrayType(n,t)   // convert abstract arrays to storage tensors
                                          if !system_functions.contains(f)
-                                         => TupleType(1.to(n).map(i => intType).toList:+ArrayType(1,t))
+                                         => tuple(1.to(n).map(i => intType).toList:+ArrayType(1,t))
                                        case t => t
                                   }
                typecheck_call(f,tas)
@@ -507,10 +509,15 @@ object Typechecker {
                        if (!typeMatch(tp,at))
                          throw new Error("Incompatible value in variable declaration: "
                                          +x+"\n(expected "+at+" found "+tp+")")
-                       (at,r + (v->at))
+                       if (useStorageTypes)
+                          (tp,r + (v->tp))
+                       else (at,r + (v->at))
+                  case ((_,r),Def(f,List(p),tp,b))
+                    => typecheck(b,r+p)
+                       (tp,r + (f -> FunctionType(p._2,tp)))
                   case ((_,r),Def(f,ps,tp,b))
                     => typecheck(b,r++ps.toMap)
-                       (tp,r + (f -> FunctionType(TupleType(ps.values.toList),tp)))
+                       (tp,r + (f -> FunctionType(tuple(ps.map(_._2)),tp)))
                   case ((_,r),e)
                     => (typecheck(e,r),r)
                }._1
@@ -518,12 +525,12 @@ object Typechecker {
             => if (elemType(typecheck(p,env)) != boolType)
                   throw new Error("The while-statement condition "+p+" must be a boolean")
                typecheck(b,env)
-          case VarDecl(_,at,u)
+          case VarDecl(v,at,u)
             => val tp = elemType(typecheck(u,env))  // type of u is concrete
                if (!typeMatch(tp,at))
                  throw new Error("Incompatible value in variable declaration: "
                                  +e+"\n(expected "+at+" found "+tp+")")
-               at
+               if (useStorageTypes) tp else at
           case Assign(d,u)
             => val ut = typecheck(u,env)    // u is lifted to a collection
                val dt = typecheck(d,env)
@@ -568,9 +575,12 @@ object Typechecker {
           case VarDeclS(v,None,Some(u))
             => val t = typecheck(u,env)
                env + (v->t)
+          case DefS(f,List(p),tp,b)
+            => typecheck(b,tp::return_types,env+p)
+               env + (f -> FunctionType(p._2,tp))
           case DefS(f,ps,tp,b)
             => typecheck(b,tp::return_types,env++ps.toMap)
-               env + (f -> FunctionType(TupleType(ps.values.toList),tp))
+               env + (f -> FunctionType(TupleType(ps.map(_._2)),tp))
           case BlockS(cs)
             => cs.foldLeft(env){ case (r,c) => typecheck(c,return_types,r) }
           case AssignS(d,u)

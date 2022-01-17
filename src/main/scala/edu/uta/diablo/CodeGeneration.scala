@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2021 University of Texas at Arlington
+ * Copyright © 2020-2022 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -116,6 +116,8 @@ abstract class CodeGeneration {
     = tp match {
       case StorageType(_,_,_)
         => Type2Tree(Typechecker.unfold_storage_type(tp))
+      case TupleType(List(t))
+        => Type2Tree(t)
       case TupleType(cs) if cs.nonEmpty
         => val tcs = cs.map(Type2Tree)
            tq"(..$tcs)"
@@ -138,6 +140,10 @@ abstract class CodeGeneration {
       case SeqType(t)
         => val tc = Type2Tree(t)
            tq"List[$tc]"
+      case FunctionType(dt,rt)
+        => val dc = Type2Tree(dt)
+           val rc = Type2Tree(rt)
+           tq"$dc => $rc"
       case BasicType(n)
         => get_type_name(n)
       case TypeParameter(v)
@@ -358,9 +364,14 @@ abstract class CodeGeneration {
                                  => val vc = TermName(v)
                                     val tc = Type2Tree(tp)
                                     ( s:+codeGen(u,el), (pq"$vc",tc)::el )
+                               case ((s,el),u@Def(f,List(p),tp,b))
+                                 => val fc = TermName(f)
+                                    val pt = p._2
+                                    val tc = Type2Tree(FunctionType(pt,tp))
+                                    ( s:+codeGen(u,el), (pq"$fc",tc)::el )
                                case ((s,el),u@Def(f,ps,tp,b))
                                  => val fc = TermName(f)
-                                    val pt = TupleType(ps.values.toList)
+                                    val pt = TupleType(ps.map(_._2))
                                     val tc = Type2Tree(FunctionType(pt,tp))
                                     ( s:+codeGen(u,el), (pq"$fc",tc)::el )
                                case ((s,el),u)
@@ -451,6 +462,14 @@ abstract class CodeGeneration {
                   q"$xc.reduceByKey(($nx:$et,$ny:$et) => ($nx,$ny) match { case $pc => $bc },$nc)"
              case _ => throw new Exception("Wrong reduceByKey: "+e)
            }
+      case Call("reducer",List(Lambda(p,b),zero))  // DataFrame custom aggregator
+        => val zc = codeGen(zero,env)
+           val tp = getType(zc,env)
+           val pc = code(p)
+           val nx = TermName(c.freshName("x"))
+           val ny = TermName(c.freshName("y"))
+           val bc = codeGen(b,add(p,tq"($tp,$tp)",env))
+           q"reducer(($nx:$tp,$ny:$tp) => ($nx,$ny) match { case $pc => $bc },$zc)"
       case Call("outerJoin",List(x,y,Lambda(p,b)))
         => val (tp,xc) = typedCode(x,env)
            val pc = code(p)
@@ -534,6 +553,14 @@ abstract class CodeGeneration {
                          case _ => q"null"
                       }
            q"binarySearch(..$sc,$vc,$zero)"
+      case Block(List(d,Call("udf",List(Var(f)))))
+        // the declaration d of f must be compiled before the macro udf
+        => val fm = TermName(method_name(f))
+           val dc = codeGen(d,env) 
+           q"{ $dc; udf($fm _) }"
+      case Call("udf",List(Var(f)))
+        => val fm = TermName(method_name(f))
+           q"udf($fm _)"
       case Call(n,es)
         => val fm = TermName(method_name(n))
            codeList(es,cs => q"$fm(..$cs)",env)
@@ -700,9 +727,14 @@ abstract class CodeGeneration {
                                  => val vc = TermName(v)
                                     val tc = Type2Tree(tp)
                                     ( s:+codeGen(u,el), (pq"$vc",tc)::el )
+                               case ((s,el),u@Def(f,List(p),tp,b))
+                                 => val fc = TermName(f)
+                                    val pt = p._2
+                                    val tc = Type2Tree(FunctionType(pt,tp))
+                                    ( s:+codeGen(u,el), (pq"$fc",tc)::el )
                                case ((s,el),u@Def(f,ps,tp,b))
                                  => val fc = TermName(f)
-                                    val pt = TupleType(ps.values.toList)
+                                    val pt = TupleType(ps.map(_._2))
                                     val tc = Type2Tree(FunctionType(pt,tp))
                                     ( s:+codeGen(u,el), (pq"$fc",tc)::el )
                                case ((s,el),u)
@@ -755,7 +787,7 @@ abstract class CodeGeneration {
            val bc = codeGen(b,ps.map {
                        case (v,t)
                          => val vc = TermName(v)
-                            (q"$vc",Type2Tree(t)) 
+                            (pq"$vc",Type2Tree(t)) 
                     }.toList++env)
            val tc = Type2Tree(tp)
            val psc = ps.map{ case (v,tp)
@@ -800,9 +832,14 @@ abstract class CodeGeneration {
                                  => val vc = TermName(v)
                                     val tc = typecheck(x,el)
                                     ( s:+codeGen(u,el), (pq"$vc",tc)::el )
+                               case ((s,el),u@DefS(f,List(p),tp,b))
+                                 => val fc = TermName(f)
+                                    val pt = p._2
+                                    val tc = Type2Tree(FunctionType(pt,tp))
+                                    ( s:+codeGen(u,el), (pq"$fc",tc)::el )
                                case ((s,el),u@DefS(f,ps,tp,b))
                                  => val fc = TermName(f)
-                                    val pt = TupleType(ps.values.toList)
+                                    val pt = TupleType(ps.map(_._2))
                                     val tc = Type2Tree(FunctionType(pt,tp))
                                     ( s:+codeGen(u,el), (pq"$fc",tc)::el )
                                case ((s,el),u)

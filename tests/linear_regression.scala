@@ -121,8 +121,9 @@ object LinearRegression extends Serializable {
     	var theta = sc.parallelize(0 to m-1).map(i => (i,1.0)).cache
     	val input = X
     	val output = y
+        val A = q("tensor*(n)(m)[((i,j),v) | ((i,j),v) <- input]");
+        A._3.cache;
     	val theta1 = q("""
-			var A = tensor*(n)(m)[((i,j),v) | ((i,j),v) <- input];
 			var B = tensor*(n)[(i,v) | (i,v) <- output];
 			var W = tensor*(m)[(i,v) | (i,v) <- theta];
 			var itr = 0;

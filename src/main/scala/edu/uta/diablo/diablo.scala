@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2021 University of Texas at Arlington
+ * Copyright © 2020-2022 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,6 +27,15 @@ package object diablo extends diablo.ArrayFunctions {
   var parallel = true            // Yes for multicore parellism
   var block_dim_size = 1000      // size of each dimension of a block tensor
   var number_of_partitions = 10  // num of partitions in shuffling operations
+  var data_frames = false        // false for RDD, true for DataFrame
+
+  val rddClass = "org.apache.spark.rdd.RDD"
+  val datasetClass = "edu.uta.diablo.DiabloDataFrame"
+
+  // a Spark DataFrame with type information at compile-time
+  type DiabloDataFrame[T] = org.apache.spark.sql.DataFrame
+
+  var collectionClass = rddClass
 
   var spark_context: SparkContext = _
 
@@ -97,6 +106,9 @@ package object diablo extends diablo.ArrayFunctions {
        case "trace" => trace = bv
        case "groupByJoin" => groupByJoin = bv
        case "parallel" => parallel = bv
+       case "data_frames"
+         => data_frames = bv
+            collectionClass = if (data_frames) datasetClass else rddClass
        case p => throw new Error("Wrong param: "+p)
     }
     c.Expr[Unit](q"()")

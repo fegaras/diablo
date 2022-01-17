@@ -1,5 +1,5 @@
 /*
- * Copyright © 2021 University of Texas at Arlington
+ * Copyright © 2021-2022 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,11 +18,8 @@ package edu.uta.diablo
 import Lifting.{typeMaps,getTypeMap}
 import scala.util.matching.Regex
 
-
 object TypeMappings {
-
   val arrayBuffer = "scala.collection.mutable.ArrayBuffer"
-  val rddClass = "org.apache.spark.rdd.RDD"
   val mapClass = "scala.collection.immutable.Map"
 
   /* initial type mappings */
@@ -49,6 +46,12 @@ object TypeMappings {
     typemap rdd[T] (): list[T] {
        def view ( R: $rddClass[T] ) = R.collect.toList
        def store ( L: list[T] ) = spark_context.parallelize(L)
+    }
+
+    // A Spark Dataset collection
+    typemap dataset[T] (): list[T] {
+       def view ( R: DiabloDataFrame[T] ) = ()
+       def store ( L: list[T] ) = ()
     }
 
     typemap block_map[K,V] (): map[K,V] {
@@ -234,6 +237,7 @@ object TypeMappings {
  /* generate a typemap for a distributed block tensor with dn dense and sn sparse dimensions */
   def block_tensor ( dn: Int, sn: Int, boolean_values: Boolean = false, full: String = "" ): String = {
     assert(sn+dn > 0)
+    val cm = if (data_frames) "dataset" else "rdd"
     def rep ( f: Int => String, sep: String = "," ): String = 1.to(dn+sn).map(f).mkString(sep)
     val N = block_dim_size
     val ldims = rep(i => "Int")
@@ -248,14 +252,14 @@ object TypeMappings {
     val ranges = rep(k => s"ii$k * $N + i$k < d$k")
     if (boolean_values) {
       s"""   // needs boolean tensor tiles
-       typemap ${full}block_bool_tensor_${dn}_$sn ($dims): array${dn+sn}[Boolean] {
-          def view ( x: rdd[(($ldims),bool_tensor_${dn}_$sn)] )
+       typemap ${full}${cm}_block_bool_tensor_${dn}_$sn ($dims): array${dn+sn}[Boolean] {
+          def view ( x: $cm[(($ldims),bool_tensor_${dn}_$sn)] )
             = [ (($idx),v) |
-                (($vars2),a) <- lift(rdd,x),
+                (($vars2),a) <- lift($cm,x),
                 (($vars),v) <- lift(${full}bool_tensor_${dn}_$sn,a),
                 $ranges ]
           def store ( L: list[(($ldims),Boolean)] )
-            = rdd[ (($vars2),bool_tensor_${dn}_$sn($ndims,w)) |
+            = $cm[ (($vars2),bool_tensor_${dn}_$sn($ndims,w)) |
                    (($vars),v) <- L, v,
                    $div_vars,
                    let w = (($mod_vars),v),
@@ -263,14 +267,14 @@ object TypeMappings {
        }
     """
     } else s"""
-       typemap ${full}block_tensor_${dn}_$sn[T] ($dims): array${dn+sn}[T] {
-          def view ( x: rdd[(($ldims),tensor_${dn}_$sn[T])] )
+       typemap ${full}${cm}_block_tensor_${dn}_$sn[T] ($dims): array${dn+sn}[T] {
+          def view ( x: $cm[(($ldims),tensor_${dn}_$sn[T])] )
             = [ (($idx),v) |
-                (($vars2),a) <- lift(rdd,x),
+                (($vars2),a) <- lift($cm,x),
                 (($vars),v) <- lift(${full}tensor_${dn}_$sn,a),
                 $ranges ]
           def store ( L: list[(($ldims),T)] )
-            = rdd[ (($vars2),tensor_${dn}_$sn($ndims,w)) |
+            = $cm[ (($vars2),tensor_${dn}_$sn($ndims,w)) |
                    (($vars),v) <- L,
                    $div_vars,
                    let w = (($mod_vars),v),
