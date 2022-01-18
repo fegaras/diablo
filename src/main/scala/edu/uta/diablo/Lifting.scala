@@ -75,10 +75,10 @@ object Lifting {
             => full_tensor(dn.toInt,sn.toInt,true)
           case tpat(_,dn,sn)
             => full_tensor(dn.toInt,sn.toInt)
-          case bbtpat(full,_,dn,sn)
-            => block_tensor(dn.toInt,sn.toInt,true,full)
-          case bpat(full,_,dn,sn)
-            => block_tensor(dn.toInt,sn.toInt,false,full)
+          case bbtpat(full,cm,dn,sn)
+            => block_tensor(dn.toInt,sn.toInt,cm,true,full)
+          case bpat(full,cm,dn,sn)
+            => block_tensor(dn.toInt,sn.toInt,cm,false,full)
           case _ => ""
         }
         if (tm != "") {

@@ -47,9 +47,11 @@ object SQLGenerator {
                       => val nn2 = MethodCall(n2,"-",List(IntConst(1)))
                          val (nu,el) = translate(Call("range",List(n1,nn2,n3)),env)
                          (es++el,SQL(s,f+(v->nu),w,g,h),env)
+/*
                     case Generator(p@VarPat(v),u)
                       => val (nu,el) = translate(u,env)
                          (es++el,SQL(s,f+(v->nu),w,g,h),env)
+*/
                     case Generator(p,Lift("dataset",u))
                       => val v = newvar
                          val (nu,el) = translate(u,env)
@@ -62,9 +64,10 @@ object SQLGenerator {
                                                "createOrReplaceTempView",List(StringConst(v)))
                          (es++el:+view,SQL(s,f+(v->Var(v)),w,g,h),bind(p,Var(v),env))
                     case Generator(p,u)
-                      => val v = newvar
+                      => /* val v = newvar
                          val (nu,el) = translate(u,env)
-                         (es++el,SQL(s,f+(v->nu),w,g,h),bind(p,Var(v),env))
+                         (es++el,SQL(s,f+(v->nu),w,g,h),bind(p,Var(v),env)) */
+                         throw new Error("Cannot convert to SQL: "+Comprehension(hs,qs))
                     case Predicate(u)
                       if g.isEmpty
                       => val (nu,el) = translate(u,env)
@@ -88,7 +91,7 @@ object SQLGenerator {
       }, el++nl )
   }
 
-  val sql_oprs = Map( "+"->"+", "-"->"-", "*"->"*", "/"->"/",
+  val sql_oprs = Map( "+"->"+", "-"->"-", "*"->"*", "/"->"/", "%"->"%",
                       "&&" -> "and", "||" -> "or",
                       "=="->"=", "<"->"<", ">"->">", "<="->"<=", ">="->">=" )
 
@@ -102,7 +105,7 @@ object SQLGenerator {
     = e match {
         case Var(v)
           if env.contains(v)
-          => translate(env(v),env)
+          => if (env(v) == e) (e,Nil) else translate(env(v),env)
         case Var(v) => (e,Nil)
         case IntConst(n) => (e,Nil)
         case LongConst(n) => (e,Nil)
@@ -120,7 +123,8 @@ object SQLGenerator {
                           (cs:+cu,ds++d)
                   }
              (Tuple(ces),ds)
-        case Call(f,es)
+/*
+        case Call(f,es) 
           => val (ces,ds)
                 = es.foldLeft[(List[Expr],List[Expr])]((Nil,Nil)) {
                      case ((cs,ds),u)
@@ -128,6 +132,7 @@ object SQLGenerator {
                           (cs:+cu,ds++d)
                   }
              (Call(f,ces),ds)
+*/
         case MethodCall(x,op,List(y))
           if sql_oprs.contains(op)
           => val (cx,nx) = translate(x,env)
@@ -144,11 +149,20 @@ object SQLGenerator {
              val fname = "f"+newvar
              val type_env = fs.map(v => (v,typeof(v,e)))
              val tp = typecheck(e,type_env.toMap)
-             (Call(fname,fs.map(env(_))),
-              List(Block(List(Def(fname,type_env,tp,e),
-                              MethodCall(MethodCall(Var("spark"),"udf",null),
-                                         "register",
-                                         List(StringConst(fname),Call("udf",List(Var(fname)))))))))
+             // Spark UDFs can handle at most 10 arguments
+             if (fs.length > 10) {
+               val nv = newvar
+               (Call(fname,List(Tuple(fs.map(env(_))))),   // put args in a tuple
+                List(Block(List(Def(fname,List((nv,tuple(type_env.map(_._2)))),tp,
+                                    MatchE(Var(nv),List(Case(tuple(fs.map(VarPat(_))),BoolConst(true),e)))),
+                                MethodCall(MethodCall(Var("spark"),"udf",null),
+                                           "register",
+                                           List(StringConst(fname),Call("udf",List(Var(fname)))))))))
+             } else (Call(fname,fs.map(env(_))),
+                     List(Block(List(Def(fname,type_env,tp,e),
+                                     MethodCall(MethodCall(Var("spark"),"udf",null),
+                                                "register",
+                                                List(StringConst(fname),Call("udf",List(Var(fname)))))))))
       }
 
   def toSQL ( e: Expr ): String
@@ -174,7 +188,7 @@ object SQLGenerator {
   def toSQL ( sql: SQL ): String
     = sql match {
           case SQL(ts,f,w,g,h)
-            => val tss = ts.zipWithIndex.map{ case (t,i) => toSQL(t)+" AS col"+(i+1) }.mkString(", ")
+            => val tss = ts.zipWithIndex.map{ case (t,i) => toSQL(t)+" AS _"+(i+1) }.mkString(", ")
                val fs = f.map{ case (v,Var(w)) if v==w => v
                                case (v,u) => toSQL(u)+" AS "+v }.mkString(", ")
                val ws = if (w.isEmpty) "" else " WHERE "+w.map(toSQL).mkString(" and ")

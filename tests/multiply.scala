@@ -149,11 +149,28 @@ object Multiply {
 
     // matrix multiplication of tiled matrices using Diablo array comprehensions (in DataFrame SQL)
     def testMultiplyDiabloDF (): Double = {
-      val t = System.currentTimeMillis()
       param(data_frames,true)
+      val t = System.currentTimeMillis()
+      // generate DataFrame tiles from RDD tiles
       try {
         val C = q("""
                   tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
+                  """)
+        C._3.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      param(data_frames,false)
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    def testMultiplyDiabloDF2 (): Double = {
+      val aDF = (AA._1,AA._2,AA._3.toDF.asInstanceOf[DiabloDataFrame[((Int,Int),(Int,Int,Array[Double]))]])
+      val bDF = (BB._1,BB._2,BB._3.toDF.asInstanceOf[DiabloDataFrame[((Int,Int),(Int,Int,Array[Double]))]])
+      param(data_frames,true)
+      val t = System.currentTimeMillis()
+      // generate DataFrame tiles from DataFrame tiles
+      try {
+        val C = q("""
+                  tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- aDF, ((kk,j),b) <- bDF, k == kk, let c = a*b, group by (i,j) ]
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }

@@ -235,9 +235,8 @@ object TypeMappings {
   }
 
  /* generate a typemap for a distributed block tensor with dn dense and sn sparse dimensions */
-  def block_tensor ( dn: Int, sn: Int, boolean_values: Boolean = false, full: String = "" ): String = {
+  def block_tensor ( dn: Int, sn: Int, cm: String, boolean_values: Boolean = false, full: String = "" ): String = {
     assert(sn+dn > 0)
-    val cm = if (data_frames) "dataset" else "rdd"
     def rep ( f: Int => String, sep: String = "," ): String = 1.to(dn+sn).map(f).mkString(sep)
     val N = block_dim_size
     val ldims = rep(i => "Int")
@@ -293,6 +292,6 @@ object TypeMappings {
 
   def main ( args: Array[String] ) {
      println(tensor(args(0).toInt,args(1).toInt,args(3).toInt == 1))
-     println(block_tensor(args(0).toInt,args(1).toInt,args(2).toInt == 1))
+     println(block_tensor(args(0).toInt,args(1).toInt,"rdd",args(2).toInt == 1))
   }
 }

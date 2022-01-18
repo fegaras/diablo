@@ -5,7 +5,7 @@ import org.apache.spark.rdd._
 object Test {
   def main ( args: Array[String] ) {
     val conf = new SparkConf().setAppName("Test")
-    val spark_context = new SparkContext(conf)
+    spark_context = new SparkContext(conf)
     parami(block_dim_size,100)  // size of each dimension
     val N = 200
 
