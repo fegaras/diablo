@@ -175,17 +175,23 @@ object SQLGenerator {
           => val fs = localvars(freevars(e),env).distinct
              val fname = "f"+newvar
              val type_env = fs.map(v => (v,typeof(v,e)))
-             val tp = typecheck(e,type_env.toMap)
+             val tenv = type_env.toMap
+             val tp = typecheck(e,tenv)
+             val args = fs.map(x => tenv(x) match {
+                                         case SeqType(_)
+                                           => Call("collect_list",List(env(x)))
+                                         case _ => env(x)
+                                    })
              // Spark UDFs can handle at most 10 arguments
              if (fs.length > 10) {
                val nv = newvar
-               (Call(fname,List(Tuple(fs.map(env(_))))),   // put args in a tuple
+               (Call(fname,List(Tuple(args))),   // put args in a tuple
                 List(Block(List(Def(fname,List((nv,tuple(type_env.map(_._2)))),tp,
                                     MatchE(Var(nv),List(Case(tuple(fs.map(VarPat(_))),BoolConst(true),e)))),
                                 MethodCall(MethodCall(Var("spark"),"udf",null),
                                            "register",
                                            List(StringConst(fname),Call("udf",List(Var(fname)))))))))
-             } else (Call(fname,fs.map(env(_))),
+             } else (Call(fname,args),
                      List(Block(List(Def(fname,type_env,tp,e),
                                      MethodCall(MethodCall(Var("spark"),"udf",null),
                                                 "register",

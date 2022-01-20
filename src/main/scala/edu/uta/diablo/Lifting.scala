@@ -263,9 +263,9 @@ object Lifting {
       }
 
   def lift ( mapping: String, storage: Expr ): Expr = {
-    val Some(TypeMapS(_,tps,_,_,st,_,map,_)) = getTypeMap(mapping).map(fresh)
+    val Some(TypeMapS(_,tps,_,_,st,lt,map,_)) = getTypeMap(mapping).map(fresh)
     val view = if (mapping == "dataset")
-                 MethodCall(MethodCall(storage,"collect",Nil),"toList",null)
+                 Coerce(MethodCall(MethodCall(storage,"collect",Nil),"toList",null),lt)
                else Apply(map,storage)
     if (storage.tpe == null) view
     else {

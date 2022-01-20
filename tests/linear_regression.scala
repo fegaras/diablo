@@ -33,7 +33,9 @@ object LinearRegression extends Serializable {
     conf.set("spark.logConf","false")
     conf.set("spark.eventLog.enabled","false")
     LogManager.getRootLogger().setLevel(Level.WARN)
-	
+    val spark = SparkSession.builder().config(conf).getOrCreate()
+    import spark.implicits._
+
 	parami(number_of_partitions,10)
     parami(block_dim_size,1000)
 param(data_frames,true)
@@ -136,7 +138,7 @@ param(data_frames,true)
 				W = tensor*(m)[(i,a-(1.0/n)*lrate*b) | (i,a) <- W, (ii,b) <- d_theta, i==ii];
 			  	itr += 1;
 			};
-			rdd[(i,v) | (i,v) <- W];
+			//rdd[(i,v) | (i,v) <- W];
 		""")
 	  	//println("Theta: ")
 	  	//theta1.collect.map(println)
@@ -159,8 +161,6 @@ param(data_frames,true)
 	  	(System.currentTimeMillis()-t)/1000.0
     }
 
-    val spark = SparkSession.builder().config(conf).getOrCreate()
-    import spark.implicits._
 
 	def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()
