@@ -161,6 +161,25 @@ object Typechecker {
 
     def import_type ( tp: Type, vname: String ): Type
       = tp match {
+          case TupleType(List(itp,ParametricType(rdd,List(TupleType(List(ktp,
+                                       TupleType(List(jtp,ArrayType(1,etp)))))))))
+            // imported dense block tensor variable
+            if (rdd == rddClass || rdd == datasetClass)
+               && itp == intType && ktp == intType && jtp == intType
+            => val cm = if (rdd == rddClass) "rdd" else "dataset"
+               if (useStorageTypes)
+                 StorageType(cm+"_block_tensor_1_0",List(etp),List(Nth(Var(vname),0)))
+               else ArrayType(1,etp)
+          case TupleType(List(itp,ParametricType(rdd,List(TupleType(List(ktp,
+                     TupleType(List(jtp,TupleType(List(ArrayType(1,ct),ArrayType(1,rt),ArrayType(1,etp)))))))))))
+            // imported sparse block tensor variable
+            if (rdd == rddClass || rdd == datasetClass)
+               && itp == intType && ktp == intType && jtp == intType
+               && ct == intType && rt == intType
+            => val cm = if (rdd == rddClass) "rdd" else "dataset"
+               if (useStorageTypes)
+                 StorageType(cm+"_block_tensor_0_1",List(etp),List(Nth(Var(vname),0)))
+               else ArrayType(1,etp)
           case TupleType(is:+ParametricType(rdd,List(TupleType(List(TupleType(ks),
                                        TupleType(js:+ArrayType(1,etp)))))))
             // imported dense block tensor variable

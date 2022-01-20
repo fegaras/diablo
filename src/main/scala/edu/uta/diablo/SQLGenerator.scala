@@ -18,7 +18,7 @@ package edu.uta.diablo
 object SQLGenerator {
   import AST._
   import ComprehensionTranslator._
-  import Typechecker.{typecheck,bindPattern,unfold_storage_type}
+  import Typechecker.{typecheck,bindPattern,unfold_storage_type,typecheck_var}
 
   type Env = Map[String,Expr]
 
@@ -44,30 +44,24 @@ object SQLGenerator {
              case ((es,SQL(s,f,w,g,h),env),e)
                => e match {
                     case Generator(VarPat(v),Range(n1,n2,n3))
-                      => val nn2 = MethodCall(n2,"-",List(IntConst(1)))
-                         val (nu,el) = translate(Call("range",List(n1,nn2,n3)),env)
-                         (es++el,SQL(s,f+(v->nu),w,g,h),env)
-/*
-                    case Generator(p@VarPat(v),u)
-                      => val (nu,el) = translate(u,env)
-                         (es++el,SQL(s,f+(v->nu),w,g,h),env)
-*/
+                      => val (nn1,el1) = translate(n1,env)
+                         val (nn2,el2) = translate(MethodCall(n2,"-",List(IntConst(1))),env)
+                         val (nn3,el3) = translate(n3,env)
+                         val nu = Call("range",List(nn1,nn2,nn3))
+                         (es++el1++el2++el3,SQL(s,f+(v->nu),w,g,h),env+(v->MethodCall(Var(v),"id",null)))
                     case Generator(p,Lift("dataset",u))
                       => val v = newvar
-                         val (nu,el) = translate(u,env)
+                         val nu = translate_domain(u)
                          val view = MethodCall(nu,"createOrReplaceTempView",List(StringConst(v)))
-                         (es++el:+view,SQL(s,f+(v->Var(v)),w,g,h),bind(p,Var(v),env))
+                         (es:+view,SQL(s,f+(v->Var(v)),w,g,h),bind(p,Var(v),env+(v->Var(v))))
                     case Generator(p,Lift("rdd",u))
                       => val v = newvar
-                         val (nu,el) = translate(u,env)
+                         val nu = translate_domain(u)
                          val view = MethodCall(MethodCall(nu,"toDF",null),
                                                "createOrReplaceTempView",List(StringConst(v)))
-                         (es++el:+view,SQL(s,f+(v->Var(v)),w,g,h),bind(p,Var(v),env))
+                         (es:+view,SQL(s,f+(v->Var(v)),w,g,h),bind(p,Var(v),env+(v->Var(v))))
                     case Generator(p,u)
-                      => /* val v = newvar
-                         val (nu,el) = translate(u,env)
-                         (es++el,SQL(s,f+(v->nu),w,g,h),bind(p,Var(v),env)) */
-                         throw new Error("Cannot convert to SQL: "+Comprehension(hs,qs))
+                      => throw new Error("Cannot convert to SQL: "+Comprehension(hs,qs))
                     case Predicate(u)
                       if g.isEmpty
                       => val (nu,el) = translate(u,env)
@@ -91,9 +85,18 @@ object SQLGenerator {
       }, el++nl )
   }
 
+  def translate_domain ( e: Expr ): Expr
+    = e match {
+        case Nth(u,n)
+          => Nth(translate_domain(u),n)
+        case _ => e
+      }
+
   val sql_oprs = Map( "+"->"+", "-"->"-", "*"->"*", "/"->"/", "%"->"%",
                       "&&" -> "and", "||" -> "or",
                       "=="->"=", "<"->"<", ">"->">", "<="->"<=", ">="->">=" )
+
+  val sql_udafs = Map( "+"->"SUM", "*"->"PROD", "max"->"MAX", "min"->"MIN" )
 
   def typeof ( v: String, e: Expr ): Type
     = e match {
@@ -101,12 +104,29 @@ object SQLGenerator {
         case _ => accumulate[Type](e,typeof(v,_),(x:Type,y:Type)=>if (x==null) y else x,null)
       }
 
+  def localvars ( vars: List[String], env: Env ): List[String]
+    = vars.flatMap(v => if (env.contains(v))
+                          if (Var(v) == env(v))
+                            List(v)
+                          else List(v)//v::localvars(freevars(env(v)),env)
+                        else Nil)
+
   def translate ( e: Expr, env: Env ): (Expr,List[Expr])
     = e match {
         case Var(v)
           if env.contains(v)
           => if (env(v) == e) (e,Nil) else translate(env(v),env)
-        case Var(v) => (e,Nil)
+        case Var(v)
+          => typecheck_var(v) match {
+                case Some(tp)
+                  => val fname = "f"+newvar
+                     (Call(fname,Nil),
+                      List(Block(List(Def(fname,Nil,tp,e),
+                                      MethodCall(MethodCall(Var("spark"),"udf",null),
+                                                 "register",
+                                                 List(StringConst(fname),Call("udf",List(Var(fname)))))))))
+                case _ => (e,Nil)
+             }
         case IntConst(n) => (e,Nil)
         case LongConst(n) => (e,Nil)
         case BoolConst(n) => (e,Nil)
@@ -123,8 +143,8 @@ object SQLGenerator {
                           (cs:+cu,ds++d)
                   }
              (Tuple(ces),ds)
-/*
         case Call(f,es) 
+          if List("range").contains(f)
           => val (ces,ds)
                 = es.foldLeft[(List[Expr],List[Expr])]((Nil,Nil)) {
                      case ((cs,ds),u)
@@ -132,20 +152,27 @@ object SQLGenerator {
                           (cs:+cu,ds++d)
                   }
              (Call(f,ces),ds)
-*/
+        case MethodCall(x,"id",null)
+          => (e,Nil)
+        case MethodCall(x,f,List(y))
+          if List("contains").contains(f)
+          => val (cx,nx) = translate(x,env)
+             val (cy,ny) = translate(y,env)
+             (MethodCall(cx,f,List(cy)),nx++ny)
         case MethodCall(x,op,List(y))
           if sql_oprs.contains(op)
           => val (cx,nx) = translate(x,env)
              val (cy,ny) = translate(y,env)
              (MethodCall(cx,sql_oprs(op),List(cy)),nx++ny)
-        case reduce("+",u)
+        case reduce(op,u)
+          if sql_udafs.contains(op)
           => val (cu,ds) = translate(u,env)
-             (Call("SUM",List(cu)),ds)
+             (Call(sql_udafs(op),List(cu)),ds)
         case reduce(f,u)
           => val (cu,ds) = translate(u,env)
              (Call(f,List(cu)),ds)
         case _
-          => val fs = freevars(e).intersect(env.keys.toList)
+          => val fs = localvars(freevars(e),env).distinct
              val fname = "f"+newvar
              val type_env = fs.map(v => (v,typeof(v,e)))
              val tp = typecheck(e,type_env.toMap)
@@ -172,12 +199,16 @@ object SQLGenerator {
         case LongConst(n) => n.toString
         case BoolConst(n) => n.toString
         case DoubleConst(n) => n.toString
-          case StringConst(n)
+        case StringConst(n)
           => "\'"+n+"\'"
         case Nth(x,n)
           => toSQL(x)+"._"+n
         case Tuple(es)
           => "("+es.map(toSQL).mkString(",")+")"
+        case MethodCall(x,"id",null)
+          => toSQL(x)+".id"
+        case MethodCall(x,"contains",es)
+          => "array_contains("+toSQL(x)+","+es.map(toSQL).mkString(",")+")"
         case MethodCall(x,op,List(y))
           => "("+toSQL(x)+" "+op+" "+toSQL(y)+")"
         case Call(f,es)

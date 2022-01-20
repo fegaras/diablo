@@ -257,8 +257,9 @@ object Add {
                               FROM A JOIN B ON A.I = B.I AND A.J = B.J
                           """)
         //println(C.queryExecution)
-        val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
-        result.blocks.count()
+        //val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
+        //result.blocks.count()
+        C.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }

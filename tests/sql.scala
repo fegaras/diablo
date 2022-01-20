@@ -18,23 +18,27 @@ object Test {
 
     var t = System.currentTimeMillis()
 
+/*
+    val x = spark_context.parallelize(List(1,2,3))
+
+    val z = q("tensor*(10)[ (i,i) | i <- x ]")
+
+    q("tensor*(10)[ (i,v+1) | (i,v) <- z ]")
+*/
+
     val C = q("""
 
-        var V1 = tensor*(N)[ (i,f(i)) | i <- 0..(N-1) ]              // dense block vector
-        var V2 = tensor*()(N)[ (i,f(i)) | i <- 0..(N-1) ]            // sparse block vector
-
-        V2 = [ (i,v+1) | (i,v) <- V1 ];
-
-/*
       var M = tensor(N,N)[ ((i,j),if (random()>0.5) 0.0 else random()*100) | i <- 0..N-1, j <- 0..N-1 ];
 
       var E = tensor*(N,N)[ ((i,j),M[i,j]) | i <- 0..N-1, j <- 0..N-1 ];
       var EE = E;
 
       //tensor*(N,N)[ ((i,j),(+/c)/c.length) | ((i,k),a) <- E, ((kk,j),b) <- EE, k == kk, let c = a*b, group by (i,j) ];
-      tensor*(N,N)[ (((i+1)%N,j),a+b) | ((i,j),a) <- E, ((ii,jj),b) <- EE, ii == i, jj == j ];
-*/
+      //tensor*(N,N)[ ((i,j),a+b) | ((i,j),a) <- E, ((ii,jj),b) <- EE, ii == i, jj == j ];
+      tensor*(N,N)[ (((i+1)%N,j),a+1) | ((i,j),a) <- E ];
     """)
+
+    q("tensor*(N,N)[ ((i,j),v+1) | ((i,j),v) <- C ]")
 
     //println(C._3.queryExecution)
     //C._3.count()

@@ -60,6 +60,7 @@ sealed abstract class Expr ( var tpe: Type = null ) extends Positional
     case class Call ( var name: String, args: List[Expr] ) extends Expr
     case class MethodCall ( obj: Expr, method: String, args: List[Expr] ) extends Expr
     case class Apply ( function: Expr, arg: Expr ) extends Expr
+    case class Coerce ( arg: Expr, tp: Type ) extends Expr
     case class IfE ( predicate: Expr, thenp: Expr, elsep: Expr ) extends Expr
     case class Tuple ( args: List[Expr] ) extends Expr
     case class Record ( args: Map[String,Expr] ) extends Expr
@@ -184,6 +185,8 @@ object AST {
         => MethodCall(f(o),m,es.map(f))
       case Apply(h,a)
         => Apply(f(h),f(a))
+      case Coerce(u,tp)
+        => Coerce(f(u),tp)
       case IfE(p,x,y)
         => IfE(f(p),f(x),f(y))
       case MatchE(x,cs)
@@ -270,6 +273,8 @@ object AST {
         => es.map(f).fold(f(o))(acc)
       case Apply(h,a)
         => acc(f(h),f(a))
+      case Coerce(u,tp)
+        => f(u)
       case Let(_,v,b)
         => acc(f(v),f(b))
       case IfE(p,x,y)

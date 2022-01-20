@@ -274,20 +274,16 @@ object Lifting {
     }
   }
 
-  def lift2 ( mapping: String, storage: Expr ): Expr = {
-    val Some(TypeMapS(_,tps,_,_,st,_,map,_)) = getTypeMap(mapping).map(fresh)
-    if (storage.tpe == null)
-      Apply(map,storage)
-    else {
-      val ev = tmatch(st,storage.tpe)
-      substType(Apply(map,storage),ev)
-    }
-  }
-
   def store ( mapping: String, typeParams: List[Type], args: List[Expr], value: Expr ): Expr = {
     val TypeMapS(_,tps,_,_,_,_,_,inv) = fresh(typeMaps(mapping))
+    val f = if (mapping == "dataset") {
+              val vs = args.map(v => newvar)
+              Lambda(TuplePat(vs.map(VarPat):+VarPat("x")),
+                     Tuple(vs.map(Var):+Coerce(MethodCall(Var("x"),"toDF",null),
+                                               ParametricType(datasetClass,List(typeParams.head)))))
+            } else inv
     val ev = Some((tps zip typeParams).toMap)
-    substType(Apply(inv,tuple(args:+value)),ev)
+    substType(Apply(f,tuple(args:+value)),ev)
   }
 
   def lift ( e: Expr ): Expr = {

@@ -653,6 +653,10 @@ abstract class CodeGeneration {
            val lc = codeGen(l,env)
            val sc = codeGen(s,env)
            q"$ic.to($lc,$sc)"
+      case Coerce(x,tp)
+        => val xc = codeGen(x,env)
+           val ctp = Type2Tree(tp)
+           q"$xc.asInstanceOf[$ctp]"
       case IfE(p,x,y)
         => val pc = codeGen(p,env)
            val xc = codeGen(x,env)

@@ -36,6 +36,8 @@ object LinearRegression extends Serializable {
 	
 	parami(number_of_partitions,10)
     parami(block_dim_size,1000)
+param(data_frames,true)
+
 	val repeats = args(0).toInt
 	val N = 1000
 	
@@ -81,7 +83,7 @@ object LinearRegression extends Serializable {
 	  //theta.map(println)
 	  (System.currentTimeMillis()-t)/1000.0
 	}
-
+/*
     def testDiabloLoopLR(): Double = {
     	val t = System.currentTimeMillis()
     	var theta = sc.parallelize(0 to m-1).map(i => (i,1.0)).cache
@@ -115,7 +117,7 @@ object LinearRegression extends Serializable {
 	  	//theta1.collect.map(println)
 	  	(System.currentTimeMillis()-t)/1000.0
     }
-    
+*/
     def testDiabloLR(): Double = {
     	val t = System.currentTimeMillis()
     	var theta = sc.parallelize(0 to m-1).map(i => (i,1.0)).cache
@@ -179,7 +181,7 @@ object LinearRegression extends Serializable {
       println("tries=%d %.3f secs".format(i,s))
     }
 
-    test("Handwritten-Loop Linear Regression",testHandWrittenLoopLR)
+    //test("Handwritten-Loop Linear Regression",testHandWrittenLoopLR)
     test("Diablo loop Linear Regression",testDiabloLoopLR)
     test("Diablo Linear Regression",testDiabloLR)
     test("MLlib Linear Regression",testMLlibLR)
