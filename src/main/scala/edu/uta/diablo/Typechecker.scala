@@ -393,6 +393,8 @@ object Typechecker {
                }
           case Call("unique_values",List(Lambda(VarPat(i),b)))
             => SeqType(typecheck(b,env+((i,intType))))
+          case Call("unique_values",List(Lambda(TuplePat(ps),b)))
+            => SeqType(typecheck(b,ps.foldLeft(env){ case (r,p) => bindPattern(p,intType,r) }))
           case Call(f,args)
             if getTypeMap(f).isDefined
             => val Some(TypeMapS(_,tps,ps,at,st,lt,view,store)) = getTypeMap(f)

@@ -36,9 +36,9 @@ object LinearRegression extends Serializable {
     val spark = SparkSession.builder().config(conf).getOrCreate()
     import spark.implicits._
 
-	parami(number_of_partitions,10)
+    parami(number_of_partitions,10)
     parami(block_dim_size,1000)
-param(data_frames,true)
+    param(data_frames,true)
 
 	val repeats = args(0).toInt
 	val N = 1000
@@ -92,7 +92,7 @@ param(data_frames,true)
     	val input = X
     	val output = y
     	val theta1 = q("""
-			var A = tensor*(n)(m)[((i,j),v) | ((i,j),v) <- input];
+			var A = tensor*(n,m)[((i,j),v) | ((i,j),v) <- input];
 			var B = tensor*(n)[(i,v) | (i,v) <- output];
 			var W = tensor*(m)[(i,v) | (i,v) <- theta];
 			var itr = 0;
@@ -113,23 +113,22 @@ param(data_frames,true)
 				}
 				itr += 1;
 			}
-			rdd[(i,v) | (i,v) <- W];
+			W; // rdd[(i,v) | (i,v) <- W];
 		""")
 		//println("Theta:")
-	  	//theta1.collect.map(println)
+	  	theta1.collect().map(println)
 	  	(System.currentTimeMillis()-t)/1000.0
     }
 */
     def testDiabloLR(): Double = {
-    	val t = System.currentTimeMillis()
     	var theta = sc.parallelize(0 to m-1).map(i => (i,1.0)).cache
     	val input = X
     	val output = y
-        val A = q("tensor*(n)(m)[((i,j),v) | ((i,j),v) <- input]");
-        A._3.cache;
+        val A = q("tensor*(n,m)[((i,j),v) | ((i,j),v) <- input]")
+	val B = q("tensor*(n)[(i,v) | (i,v) <- output]")
+	var W = q("tensor*(m)[(i,v) | (i,v) <- theta]")
+    	val t = System.currentTimeMillis()
     	val theta1 = q("""
-			var B = tensor*(n)[(i,v) | (i,v) <- output];
-			var W = tensor*(m)[(i,v) | (i,v) <- theta];
 			var itr = 0;
 			while (itr < numIter) {
 				var x_theta = tensor*(n)[(i,+/v) | ((i,j),a) <- A, (jj,w) <- W, j==jj, let v=w*a, group by i];
@@ -138,11 +137,11 @@ param(data_frames,true)
 				W = tensor*(m)[(i,a-(1.0/n)*lrate*b) | (i,a) <- W, (ii,b) <- d_theta, i==ii];
 			  	itr += 1;
 			};
-			//rdd[(i,v) | (i,v) <- W];
+			W;
 		""")
-	  	//println("Theta: ")
-	  	//theta1.collect.map(println)
-	  	(System.currentTimeMillis()-t)/1000.0
+	  //println("Theta: ")
+	  theta1._2.collect.map(println)
+	  (System.currentTimeMillis()-t)/1000.0
     }
     
     def testMLlibLR(): Double = {
@@ -181,8 +180,8 @@ param(data_frames,true)
       println("tries=%d %.3f secs".format(i,s))
     }
 
-    //test("Handwritten-Loop Linear Regression",testHandWrittenLoopLR)
-    test("Diablo loop Linear Regression",testDiabloLoopLR)
+    test("Handwritten-Loop Linear Regression",testHandWrittenLoopLR)
+    //test("Diablo loop Linear Regression",testDiabloLoopLR)
     test("Diablo Linear Regression",testDiabloLR)
     test("MLlib Linear Regression",testMLlibLR)
     

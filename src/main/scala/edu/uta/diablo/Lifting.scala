@@ -21,7 +21,7 @@ import scala.util.matching.Regex
 object Lifting {
   import AST._
   import Typechecker._
-  import Normalizer.renameVars
+  import Normalizer.{normalizeAll,renameVars}
   import scala.collection.mutable
 
   // Contains the natural transformations for type abstractions
@@ -278,12 +278,12 @@ object Lifting {
     val TypeMapS(_,tps,_,_,_,_,_,inv) = fresh(typeMaps(mapping))
     val f = if (mapping == "dataset") {
               val vs = args.map(v => newvar)
-              Lambda(TuplePat(vs.map(VarPat):+VarPat("x")),
-                     Tuple(vs.map(Var):+Coerce(MethodCall(Var("x"),"toDF",null),
+              Lambda(TuplePat(vs.map(VarPat):+VarPat("_x")),
+                     Tuple(vs.map(Var):+Coerce(MethodCall(Var("_x"),"toDF",null),
                                                ParametricType(datasetClass,List(typeParams.head)))))
             } else inv
     val ev = Some((tps zip typeParams).toMap)
-    substType(Apply(f,tuple(args:+value)),ev)
+    substType(normalizeAll(Apply(f,tuple(args:+value))),ev)
   }
 
   def lift ( e: Expr ): Expr = {

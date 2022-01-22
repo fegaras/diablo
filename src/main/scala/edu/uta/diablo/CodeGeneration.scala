@@ -159,10 +159,10 @@ abstract class CodeGeneration {
   def getOptionalType ( code: c.Tree, env: Environment ): Either[c.Tree,TypecheckException] = {
     val fc = env.foldLeft(code) {
                 case (r,(Bind(v@TermName(_),_),tp))
-                  => val nv = TermName(c.freshName("x"))
+                  => val nv = TermName(c.freshName("_x"))
                      q"($nv:$tp) => { var $v = $nv; $r }"
                 case (r,(p,tp))
-                  => val nv = TermName(c.freshName("x"))
+                  => val nv = TermName(c.freshName("_x"))
                      q"($nv:$tp) => $nv match { case $p => $r }"
              }
     val te = try c.Expr[Any](c.typecheck(q"{ import edu.uta.diablo._; $fc }")).actualType
@@ -205,7 +205,7 @@ abstract class CodeGeneration {
 
   /** Return the result type of a function using the Scala's typechecker */
   def typecheck_call ( f: String, args: List[DType] ): Option[DType] = {
-    val vs = args.zipWithIndex.map{ case (_,i) => "x"+i }
+    val vs = args.zipWithIndex.map{ case (_,i) => "_x"+i }
     val env: Environment
           = vs.zip(args).map{ case (v,t) => (code(VarPat(v)),Type2Tree(t)) }.toList
     typecheckOpt(Call(f,vs.map(Var)),env).map(Tree2Type)
@@ -213,7 +213,7 @@ abstract class CodeGeneration {
 
   /** Return the result type of a method using the Scala's typechecker */
   def typecheck_method ( o: DType, m: String, args: List[DType] ): Option[DType] = {
-    val vo = c.freshName("x")
+    val vo = c.freshName("_x")
     if (args == null) {
        typecheckOpt(MethodCall(Var(vo),m,null),
                     List((code(VarPat(vo)),Type2Tree(o)))).map(Tree2Type)
@@ -283,7 +283,7 @@ abstract class CodeGeneration {
     val n = es.map{ case Var("_") => 1; case _ => 0 }.sum
     if (n == 0)
        return f(es.map(codeGen(_,env)))
-    val ns = es.map{ case Var("_") => val nv = TermName(c.freshName("x"))
+    val ns = es.map{ case Var("_") => val nv = TermName(c.freshName("_x"))
                                       (nv,q"$nv":c.Tree)
                      case e => (null,codeGen(e,env)) }
     val tpt = tq""  // empty type
@@ -337,7 +337,7 @@ abstract class CodeGeneration {
         case flatMap(Lambda(p,b),x)
           => val pc = code(p)
              val (tp,xc) = typedCode(x,env)
-             val nv = TermName(c.freshName("x"))
+             val nv = TermName(c.freshName("_x"))
              val bc = codeStmt(b,add(p,tp,env))
              q"$xc.foreach(($nv:$tp) => $nv match { case $pc => $bc })"
         case MethodCall(x@flatMap(Lambda(p,u),b),"toList",null)
@@ -412,7 +412,7 @@ abstract class CodeGeneration {
         if irrefutable(p)
         => val pc = code(p)
            val (tp,xc) = typedCode(x,env)
-           val nv = TermName(c.freshName("x"))
+           val nv = TermName(c.freshName("_x"))
            val bc = codeGen(b,add(p,tp,env))
            if (isUnitType(getType(bc,add(p,tp,env))))
              return codeStmt(e,env)
@@ -421,7 +421,7 @@ abstract class CodeGeneration {
         if irrefutable(p)
         => val pc = code(p)
            val (tp,xc) = typedCode(x,env)
-           val nv = TermName(c.freshName("x"))
+           val nv = TermName(c.freshName("_x"))
            val qc = code(q)
            val yc = codeGen(y,add(p,tp,env))
            val tc = getType(yc,add(p,tp,env))
@@ -432,7 +432,7 @@ abstract class CodeGeneration {
       case flatMap(Lambda(p,b),x)
         => val pc = code(p)
            val (tp,xc) = typedCode(x,env)
-           val nv = TermName(c.freshName("x"))
+           val nv = TermName(c.freshName("_x"))
            val bc = codeGen(b,add(p,tp,env))
            if (isUnitType(element_type(getType(bc,add(p,tp,env)))))
              return codeStmt(e,env)
@@ -442,8 +442,8 @@ abstract class CodeGeneration {
       case MethodCall(x,"reduceByKey",List(Lambda(p,b)))
         => val (tp,xc) = typedCode(x,env)
            val pc = code(p)
-           val nx = TermName(c.freshName("x"))
-           val ny = TermName(c.freshName("y"))
+           val nx = TermName(c.freshName("_x"))
+           val ny = TermName(c.freshName("_y"))
            tp match {
              case tq"($kt,$et)"
                => val bc = codeGen(b,add(p,tq"($et,$et)",env))
@@ -453,8 +453,8 @@ abstract class CodeGeneration {
       case MethodCall(x,"reduceByKey",List(Lambda(p,b),n))
         => val (tp,xc) = typedCode(x,env)
            val pc = code(p)
-           val nx = TermName(c.freshName("x"))
-           val ny = TermName(c.freshName("y"))
+           val nx = TermName(c.freshName("_x"))
+           val ny = TermName(c.freshName("_y"))
            val nc = codeGen(n,env)
            tp match {
              case tq"($kt,$et)"
@@ -466,16 +466,16 @@ abstract class CodeGeneration {
         => val zc = codeGen(zero,env)
            val tp = getType(zc,env)
            val pc = code(p)
-           val nx = TermName(c.freshName("x"))
-           val ny = TermName(c.freshName("y"))
+           val nx = TermName(c.freshName("_x"))
+           val ny = TermName(c.freshName("_y"))
            val bc = codeGen(b,add(p,tq"($tp,$tp)",env))
            q"reducer(($nx:$tp,$ny:$tp) => ($nx,$ny) match { case $pc => $bc },$zc)"
       case Call("outerJoin",List(x,y,Lambda(p,b)))
         => val (tp,xc) = typedCode(x,env)
            val pc = code(p)
            val yc = codeGen(y,env)
-           val nx = TermName(c.freshName("x"))
-           val ny = TermName(c.freshName("y"))
+           val nx = TermName(c.freshName("_x"))
+           val ny = TermName(c.freshName("_y"))
            tp match {
              case tq"($kt,$et)"
                => val bc = codeGen(b,add(p,tq"($et,$et)",env))
@@ -493,6 +493,16 @@ abstract class CodeGeneration {
            if (zero == Var("Nil"))
                q"merge_tensors($xc,$yc,_++_,$zc)"
            else q"merge_tensors($xc,$yc,($nx:$tp,$ny:$tp) => $bc,$zc)"
+      case Call("unique_values",List(Lambda(p@VarPat(v),b)))
+        => val bc = codeGen(b,add(p,tq"Int",env))
+           val vc = TermName(v)
+           q"unique_values(($vc:Int) => $bc).toList"
+      case Call("unique_values",List(Lambda(p@TuplePat(vs),b)))
+        => val ts = vs.map( v => tq"Int")
+           val bc = codeGen(b,add(p,tq"(..$ts)",env))
+           val pc = vs.map{ case VarPat(v) => val vc = TermName(v); q"val $vc: Int"
+                            case p => code(p) }
+           q"unique_values((..$pc) => $bc).toList"
       case groupBy(x)
         => val xc = codeGen(x,env)
            q"$xc.groupBy(_._1).mapValues( _.map(_._2)).toList"
@@ -580,7 +590,7 @@ abstract class CodeGeneration {
            q"$dc = $uc"
       case Assign(Tuple(xs),y)
         => val yc = codeGen(y,env)
-           val v = TermName(c.freshName("x"))
+           val v = TermName(c.freshName("_x"))
            val xc = xs.zipWithIndex.map {
                       case (x,n)
                         => val xc = codeGen(x,env)
@@ -593,7 +603,7 @@ abstract class CodeGeneration {
            val dc = codeGen(d,env)
            q"$dc = $uc.head"
       case MethodCall(Var("_"),m,null)
-        => val nv = TermName(c.freshName("x"))
+        => val nv = TermName(c.freshName("_x"))
            val fm = TermName(method_name(m))
            val tpt = tq""  // empty type
            val p = q"val $nv: $tpt"
@@ -877,7 +887,7 @@ abstract class CodeGeneration {
       case ForeachS(p,x,b)
         => val pc = code(p)
            val (tp,xc) = typedCode(x,env)
-           val nv = TermName(c.freshName("x"))
+           val nv = TermName(c.freshName("_x"))
            val bc = codeGen(b,add(p,tp,env))
            q"$xc.foreach(($nv:$tp) => $nv match { case $pc => $bc })"
       case WhileS(p,b)

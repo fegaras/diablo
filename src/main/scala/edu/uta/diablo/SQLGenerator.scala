@@ -22,8 +22,8 @@ object SQLGenerator {
 
   type Env = Map[String,Expr]
 
-  case class SQL ( select: List[Expr], from: Env, where: List[Expr],
-                   groupBy: Option[Expr], having: List[Expr] )
+  case class SQL ( select: List[Expr], from: Env, lateralView: Env,
+                   where: List[Expr], groupBy: Option[Expr], having: List[Expr] )
 
   def bind ( p: Pattern, e: Expr, env: Env ): Env
     = p match {
@@ -39,49 +39,52 @@ object SQLGenerator {
       }
 
   def translate ( hs: Expr, qs: List[Qualifier] ): (SQL,List[Expr]) = {
-    val (el,SQL(s,f,w,g,h),env)
-        = qs.foldLeft[(List[Expr],SQL,Env)]((Nil,SQL(Nil,Map(),Nil,None,Nil),Map())) {
-             case ((es,SQL(s,f,w,g,h),env),e)
+    val (el,SQL(s,f,l,w,g,h),env)
+        = qs.foldLeft[(List[Expr],SQL,Env)]((Nil,SQL(Nil,Map(),Map(),Nil,None,Nil),Map())) {
+             case ((es,SQL(s,f,l,w,g,h),env),e)
                => e match {
                     case Generator(VarPat(v),Range(n1,n2,n3))
                       => val (nn1,el1) = translate(n1,env)
                          val (nn2,el2) = translate(MethodCall(n2,"-",List(IntConst(1))),env)
                          val (nn3,el3) = translate(n3,env)
                          val nu = Call("range",List(nn1,nn2,nn3))
-                         (es++el1++el2++el3,SQL(s,f+(v->nu),w,g,h),env+(v->MethodCall(Var(v),"id",null)))
+                         (es++el1++el2++el3,SQL(s,f+(v->nu),l,w,g,h),env+(v->MethodCall(Var(v),"id",null)))
                     case Generator(p,Lift("dataset",u))
                       => val v = newvar
                          val nu = translate_domain(u)
                          val view = MethodCall(nu,"createOrReplaceTempView",List(StringConst(v)))
-                         (es:+view,SQL(s,f+(v->Var(v)),w,g,h),bind(p,Var(v),env+(v->Var(v))))
+                         (es:+view,SQL(s,f+(v->Var(v)),l,w,g,h),bind(p,Var(v),env+(v->Var(v))))
                     case Generator(p,Lift("rdd",u))
                       => val v = newvar
                          val nu = translate_domain(u)
                          val view = MethodCall(MethodCall(nu,"toDF",null),
                                                "createOrReplaceTempView",List(StringConst(v)))
-                         (es:+view,SQL(s,f+(v->Var(v)),w,g,h),bind(p,Var(v),env+(v->Var(v))))
+                         (es:+view,SQL(s,f+(v->Var(v)),l,w,g,h),bind(p,Var(v),env+(v->Var(v))))
                     case Generator(p,u)
-                      => throw new Error("Cannot convert to SQL: "+Comprehension(hs,qs))
+                      => // silly SQL uses lateral views & explode to specify dependent joins
+                         val v = newvar
+                         val (nu,el) = translate(u,env)
+                         (es++el,SQL(s,f,l+(v->nu),w,g,h),bind(p,Var(v),env+(v->Var(v))))
                     case Predicate(u)
                       if g.isEmpty
                       => val (nu,el) = translate(u,env)
-                         (es++el,SQL(s,f,w:+nu,g,h),env)
+                         (es++el,SQL(s,f,l,w:+nu,g,h),env)
                     case Predicate(u)
                       => val (nu,el) = translate(u,env)
-                         (es++el,SQL(s,f,w,g,h:+nu),env)
+                         (es++el,SQL(s,f,l,w,g,h:+nu),env)
                     case LetBinding(p,u)
                       => val (nu,el) = translate(u,env)
-                         (es++el,SQL(s,f,w,g,h),bind(p,nu,env))
+                         (es++el,SQL(s,f,l,w,g,h),bind(p,nu,env))
                     case GroupByQual(p,k)
                       => val (nk,el) = translate(k,env)
-                         (es++el,SQL(s,f,w,Some(nk),h),bind(p,nk,env))
+                         (es++el,SQL(s,f,l,w,Some(nk),h),bind(p,nk,env))
                   }
           }
     val (nh,nl) = translate(hs,env)
     ( nh match {
          case Tuple(ts)
-           => SQL(ts,f,w,g,h)
-         case _ => SQL(List(nh),f,w,g,h)
+           => SQL(ts,f,l,w,g,h)
+         case _ => SQL(List(nh),f,l,w,g,h)
       }, el++nl )
   }
 
@@ -224,11 +227,12 @@ object SQLGenerator {
 
   def toSQL ( sql: SQL ): String
     = sql match {
-          case SQL(ts,f,w,g,h)
+          case SQL(ts,f,l,w,g,h)
             => val tss = ts.zipWithIndex.map{ case (t,i) => toSQL(t)+" AS _"+(i+1) }.mkString(", ")
                val fs = f.map{ case (v,Var(w)) if v==w => v
                                case (v,u) => toSQL(u)+" AS "+v }.mkString(", ")
                val ws = if (w.isEmpty) "" else " WHERE "+w.map(toSQL).mkString(" and ")
+               val ls = l.map{ case (v,u) => " LATERAL VIEW EXPLODE("+toSQL(u)+") AS "+v }.mkString
                val gs = g match {
                           case Some(Tuple(es))
                             => " GROUP BY "+es.map(toSQL).mkString(", ")
@@ -237,7 +241,7 @@ object SQLGenerator {
                           case _ => ""
                         }
                val hs = if (h.isEmpty) "" else " HAVING "+h.map(toSQL).mkString(" and ")
-               "SELECT "+tss+" FROM "+fs+ws+gs+hs
+               "SELECT "+tss+" FROM "+fs+ls+ws+gs+hs
       }
 
   def translate_sql ( h: Expr, qs: List[Qualifier] ): Expr = {
@@ -251,12 +255,12 @@ object SQLGenerator {
     val tp = typecheck(Comprehension(h,qs))
     val ztp = typecheck(zero)
     val (se,el) = translate(h,qs)
-    val SQL(List(index,value),f,w,None,Nil) = se
+    val SQL(List(index,value),f,l,w,None,Nil) = se
     val rname = newvar
-    val update = Assign(Var("result"),Seq(List(Apply(acc,Tuple(List(Var("result"),Var("x")))))))
+    val update = Assign(Var("result"),Seq(List(Apply(acc,Tuple(List(Var("result"),Var("_x")))))))
     val reducer = Def(rname,List(("s",SeqType(ztp))),ztp,
                       Block(List(VarDecl("result",ztp,Seq(List(zero))),
-                                 flatMap(Lambda(VarPat("x"),Seq(List(update))),
+                                 flatMap(Lambda(VarPat("_x"),Seq(List(update))),
                                          Var("s")),
                                  Var("result"))))
     val aggr = MethodCall(MethodCall(Var("spark"),"udf",null),
@@ -272,12 +276,12 @@ object SQLGenerator {
                                   List(StringConst(mname),Call("udf",List(Var(mname)))))
             val sql = toSQL(SQL(List(index,Call(mname,List(Call(rname,List(Call("collect_list",
                                                                                 List(value))))))),
-                                f,w,Some(index),Nil))
+                                f,l,w,Some(index),Nil))
             Block( el:+reducer:+aggr:+mapper:+mapr
                    :+MethodCall(Var("spark"),"sql",List(StringConst(sql))) )
        case _
          => val sql = toSQL(SQL(List(index,Call(rname,List(Call("collect_list",List(value))))),
-                                f,w,Some(index),Nil))
+                                f,l,w,Some(index),Nil))
             Block( el:+reducer:+aggr
                    :+MethodCall(Var("spark"),"sql",List(StringConst(sql))) )
     }
