@@ -57,16 +57,16 @@ object LinearRegression extends Serializable {
                              if(rand.nextDouble() > 0.99) (a(0).toInt,a(1).toDouble) 
                              else (a(0).toInt,0.0) } ).cache
 	
-	def testHandWrittenLoopLR(): Double = {
-	  val t = System.currentTimeMillis()
-	  val input = Array.tabulate(n*m){i => 0.0}
-	  for (((i,j),v) <- X.collect)
-	  	input(i*m+j) = v
+    def testHandWrittenLoopLR(): Double = {
+      val t = System.currentTimeMillis()
+      val input = Array.tabulate(n*m){i => 0.0}
+      for (((i,j),v) <- X.collect)
+          input(i*m+j) = v
       val output = Array.tabulate(n){i => 0.0}
       for ((i,v) <- y.collect)
 	  	output(i) = v
-	  var theta = Array.tabulate(m){i => 1.0}
-	  for (itr <- 0 until numIter) {
+      var theta = Array.tabulate(m){i => 1.0}
+      for (itr <- 0 until numIter) {
 	  	var dev_sum = Array.tabulate(m){i => 0.0}
 	  	for (i <- 0 until m) {
 	  		for (j <- 0 until n) {
@@ -87,14 +87,14 @@ object LinearRegression extends Serializable {
 	}
 /*
     def testDiabloLoopLR(): Double = {
-    	val t = System.currentTimeMillis()
     	var theta = sc.parallelize(0 to m-1).map(i => (i,1.0)).cache
+        val A = q("tensor*(n,m)[((i,j),v) | ((i,j),v) <- input]")
+        val B = q("tensor*(n)[(i,v) | (i,v) <- output]")
+        val W = q("tensor*(m)[(i,v) | (i,v) <- theta]")
     	val input = X
     	val output = y
+    	val t = System.currentTimeMillis()
     	val theta1 = q("""
-			var A = tensor*(n,m)[((i,j),v) | ((i,j),v) <- input];
-			var B = tensor*(n)[(i,v) | (i,v) <- output];
-			var W = tensor*(m)[(i,v) | (i,v) <- theta];
 			var itr = 0;
 			while(itr < numIter) {
 				var x_theta = tensor*(n)[(i,0.0) | (i,v) <- output];
@@ -116,7 +116,7 @@ object LinearRegression extends Serializable {
 			W; // rdd[(i,v) | (i,v) <- W];
 		""")
 		//println("Theta:")
-	  	theta1.collect().map(println)
+	  	theta1._2.rdd.count()
 	  	(System.currentTimeMillis()-t)/1000.0
     }
 */
@@ -140,28 +140,25 @@ object LinearRegression extends Serializable {
 			W;
 		""")
 	  //println("Theta: ")
-	  theta1._2.collect.map(println)
+	  theta1._2.rdd.count()
 	  (System.currentTimeMillis()-t)/1000.0
     }
     
     def testMLlibLR(): Double = {
-    	val t = System.currentTimeMillis()
     	var theta = new CoordinateMatrix(sc.parallelize(0 to m-1).map(i => MatrixEntry(i,0,1.0))).toBlockMatrix(N,1).cache
     	val input = new CoordinateMatrix(X.map{ case ((i,j),v) => MatrixEntry(i,j,v)}).toBlockMatrix(N,N).cache
-		val output = new CoordinateMatrix(y.map{ case (i,v) => MatrixEntry(i,0,v)}).toBlockMatrix(N,1).cache
+        val output = new CoordinateMatrix(y.map{ case (i,v) => MatrixEntry(i,0,v)}).toBlockMatrix(N,1).cache
+    	val t = System.currentTimeMillis()
 		for(itr <- 0 until numIter) {
 			var d_theta = input.transpose.multiply(input.multiply(theta).subtract(output))
 			d_theta = new CoordinateMatrix(d_theta.toCoordinateMatrix().entries.map(entry => MatrixEntry(entry.i,entry.j,entry.value*lrate*(1.0/n)))).toBlockMatrix(N,1).cache
 			theta = theta.subtract(d_theta)
 		}
-	  	println("Theta: ")
-	  	val theta1 = theta.toLocalMatrix().toArray
-	  	theta1.map(println)
-	  	(System.currentTimeMillis()-t)/1000.0
+      (System.currentTimeMillis()-t)/1000.0
     }
 
 
-	def test ( name: String, f: => Double ) {
+    def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()
       var i = 0
       var j = 0

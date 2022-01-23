@@ -42,6 +42,8 @@ object Typechecker {
 
     var useStorageTypes: Boolean = false
 
+    var global_env: Environment = Map()
+
     def tuple ( s: List[Expr] ): Expr
       = s match { case List(x) => x; case _ => Tuple(s) }
 
@@ -180,6 +182,16 @@ object Typechecker {
                if (useStorageTypes)
                  StorageType(cm+"_block_tensor_0_1",List(etp),List(Nth(Var(vname),0)))
                else ArrayType(1,etp)
+          case TupleType(List(itp,ParametricType(rdd,List(TupleType(List(ktp,
+                     TupleType(List(jtp,TupleType(List(ArrayType(1,ct),ArrayType(1,rt)))))))))))
+            // imported boolean sparse block tensor variable
+            if (rdd == rddClass || rdd == datasetClass)
+               && itp == intType && ktp == intType && jtp == intType
+               && ct == intType && rt == intType
+            => val cm = if (rdd == rddClass) "rdd" else "dataset"
+               if (useStorageTypes)
+                 StorageType(cm+"_block_tensor_0_1",List(boolType),List(Nth(Var(vname),0)))
+               else ArrayType(1,boolType)
           case TupleType(is:+ParametricType(rdd,List(TupleType(List(TupleType(ks),
                                        TupleType(js:+ArrayType(1,etp)))))))
             // imported dense block tensor variable
@@ -202,6 +214,17 @@ object Typechecker {
                  StorageType(cm+"_block_tensor_"+(is.length-1)+"_1",List(etp),
                              (1 to is.length).map(i => Nth(Var(vname),i)).toList)
                else ArrayType(is.length,etp)
+          case TupleType(is:+ParametricType(rdd,List(TupleType(List(TupleType(ks),
+                     TupleType(js:+TupleType(List(ArrayType(1,ct),ArrayType(1,rt)))))))))
+            // imported boolean sparse block tensor variable
+            if (rdd == rddClass || rdd == datasetClass)
+               && is.length == js.length && is.length == ks.length
+               && (ct::rt::is++ks++js).forall(_ == intType)
+            => val cm = if (rdd == rddClass) "rdd" else "dataset"
+               if (useStorageTypes)
+                 StorageType(cm+"_block_tensor_"+(is.length-1)+"_1",List(boolType),
+                             (1 to is.length).map(i => Nth(Var(vname),i)).toList)
+               else ArrayType(is.length,boolType)
           case TupleType(is:+ArrayType(1,etp))     // imported tensor variable
             if is.forall(_ == intType)
             => if (useStorageTypes)
@@ -237,6 +260,8 @@ object Typechecker {
           case Var(v)
             => if (env.contains(v))
                  env(v)
+               else if (global_env.contains(v))
+                 global_env(v)
                else import_type(typecheck_var(v). // call the Scala typechecker to find var v
                             getOrElse(throw new Error("Undefined variable: "+v)),v)
           case Nth(u,n)
@@ -358,7 +383,7 @@ object Typechecker {
                typecheck(u,env)
                StorageType(x.mapping,tps,args)
           case x@Call(f,args@(_:+l))
-            if (f match { case tpat(_,_,_) => true; case btpat(_,_,_) => true; case _ => false })
+            if (f match { case tpat(_,_,_) => true; case btpat(_,_,_,_) => true; case _ => false })
             => typecheck(l,env) match {
                   case SeqType(TupleType(List(_, BasicType("Boolean"))))
                     => f match {
@@ -537,6 +562,7 @@ object Typechecker {
                        if (!typeMatch(tp,at))
                          throw new Error("Incompatible value in variable declaration: "
                                          +x+"\n(expected "+at+" found "+tp+")")
+                       global_env = global_env+(if (useStorageTypes) v->tp else v->at)
                        if (useStorageTypes)
                           (tp,r + (v->tp))
                        else (at,r + (v->at))
@@ -558,6 +584,7 @@ object Typechecker {
                if (!typeMatch(tp,at))
                  throw new Error("Incompatible value in variable declaration: "
                                  +e+"\n(expected "+at+" found "+tp+")")
+               global_env = global_env+(if (useStorageTypes) v->tp else v->at)
                if (useStorageTypes) tp else at
           case Assign(d,u)
             => val ut = typecheck(u,env)    // u is lifted to a collection

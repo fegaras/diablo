@@ -24,7 +24,7 @@ object ComprehensionTranslator {
   import Typechecker._
   import Lifting.{store,lift,getTypeMap}
   import TypeMappings.{block_tensor_tiles}
-  import SQLGenerator.translate_sql
+  import SQLGenerator.{translate_sql,outerJoinSQL}
 
   val ignore: Expr = Block(Nil)
 
@@ -918,7 +918,7 @@ object ComprehensionTranslator {
 
                                                 IntConst(1))) }
           case LetBinding(p,e)
-            if local_expr(e,local_vars)
+            if freevars(e).intersect(local_vars).isEmpty
             => List(q)
           case Predicate(MethodCall(Var(i),"==",List(Var(j))))
             if unique_is.contains(i) && unique_is.contains(j)
@@ -1050,32 +1050,48 @@ object ComprehensionTranslator {
              val tile_coords = is.map( i => Var(prefix("coord",i)) )
              val tile_indices = tuple(is.map{ i => MethodCall(Var(i),"%",
                                                      List(IntConst(block_dim_size))) })
-             val stile = Comprehension(Tuple(List(tile_indices,e)),
-                                       tile_qualifiers(qs,vars))
-             val tile = if (is_array_assign)
-                          add_initial_array(store(tensor,List(tp),tile_dims,stile),
-                                            Nth(Var("_array"),dn+sn+1))
-                        else Store(tensor,List(tp),tile_dims,stile)
-             val cm = if (data_frames) "dataset" else "rdd"
-             val array_assigns = block_array_assignment match {
-                                   case Some(array)
-                                     => val array_coords = tuple(is.map( i => VarPat(prefix("array",i)) ))
-                                        Generator(TuplePat(List(array_coords,VarPat("_array"))),
-                                                  Lift(cm,Nth(array,dn+sn+1)))::
-                                             is.map { i => Predicate(MethodCall(Var(prefix("array",i)),
-                                                                "==",List(Var(prefix("coord",i))))) }
-                                   case _ => Nil
-                                 }
-             if (is_rdd_comprehension(qs) || is_array_assign) {
+             val tc = Comprehension(Tuple(List(tile_indices,e)),
+                                    tile_qualifiers(qs,vars))
+             val tile = Store(tensor,List(tp),tile_dims,tc)
+             if (isDatasetTensor(block)) {
                val Comprehension(nhs,nqs)
-                       = optimize(Comprehension(Tuple(List(tuple(tile_coords),tile)),
-                                                rdd_qualifiers(qs,vars)++array_assigns++tbinds))
+                     = optimize(Comprehension(Tuple(List(tuple(tile_coords),tile)),
+                                              rdd_qualifiers(qs,vars)++tbinds))
                if (trace) println("Comprehension that preserves tilling:\n"
                                   +Pretty.print(Comprehension(nhs,nqs)))
-               val rdd = translate_dataset(nhs,nqs,vars)
-               if (data_frames)
-                 store("dataset",List(tileType(block,tp)),dims,rdd)
-               else tuple(dims:+rdd)
+               val sql = translate_sql(nhs,nqs)
+               val Some(TypeMapS(_,tvs,_,_,st,_,_,_)) = getTypeMap(tile_type(block,tp))
+               val stp = substType(st,Some(tvs.map(_->tp).toMap))
+               val ds = block_array_assignment match {
+                           case Some(array)
+                             => val tensor = tile_type(block,tp)
+                                val (dn,sn) = tensor_dims(tensor)
+                                val dest = Nth(array,dn+sn+1)
+                                val f = Lambda(TuplePat(List(VarPat("_x"),VarPat("_y"))),Var("_y"))
+                                outerJoinSQL(dest,sql,f,stp)
+                           case _ => sql
+                        }
+               store("dataset",List(tileType(block,tp)),dims,ds)
+             } else if (is_rdd_comprehension(qs) || is_array_assign) {
+               val otile = translate(optimize(tile),vars)
+               val mtile = if (is_array_assign)
+                             add_initial_array(otile,Nth(Var("_array"),dn+sn+1))
+                           else otile
+               val assigns = block_array_assignment match {
+                                case Some(array)
+                                  => val array_coords = tuple(is.map( i => VarPat(prefix("array",i)) ))
+                                     Generator(TuplePat(List(array_coords,VarPat("_array"))),
+                                               Lift("rdd",Nth(array,dn+sn+1)))::
+                                     is.map { i => Predicate(MethodCall(Var(prefix("array",i)),
+                                                                  "==",List(Var(prefix("coord",i))))) }
+                                case _ => Nil
+                             }
+               val Comprehension(nhs,nqs)
+                       = optimize(Comprehension(Tuple(List(tuple(tile_coords),mtile)),
+                                                rdd_qualifiers(qs,vars)++assigns++tbinds))
+               if (trace) println("Comprehension that preserves tilling:\n"
+                                  +Pretty.print(Comprehension(nhs,nqs)))
+               tuple(dims:+translate_rdd(nhs,nqs,vars))
              } else {
                val p = tuple(is.map( i => VarPat(prefix("coord",i)) )
                              ++ is.map( i => VarPat(prefix("size",i)) ))
@@ -1086,9 +1102,7 @@ object ComprehensionTranslator {
                                             "parallelize",
                                             List(translate(optimize(nc),vars),
                                                  IntConst(number_of_partitions))))
-               if (data_frames)
-                 store("dataset",List(tileType(block,tp)),dims,rdd)
-               else tuple(dims:+rdd)
+               tuple(dims:+rdd)
              }
       }
 
@@ -1156,7 +1170,7 @@ object ComprehensionTranslator {
                                        "parallelize",
                                        List(translate_dataset(nhs,nqs,vars),
                                             IntConst(number_of_partitions)))
-             if (data_frames)
+             if (isDatasetTensor(block))
                store("dataset",List(tileType(block,tp)),dims,rdd)
              else tuple(dims:+rdd)
     }
@@ -1269,7 +1283,7 @@ object ComprehensionTranslator {
                                         else Nil)
                                }))
                        }
-                   if (data_frames) {
+                   if (isDatasetTensor(block)) {
                        val ndims = dims.map( i => IntConst(block_dim_size) )
                        // empty tile:
                        val zero = tuple(msTypes.map(tp => Store(tile_type(block,tp),
@@ -1282,7 +1296,17 @@ object ComprehensionTranslator {
                        val sql = translate_sql(Tuple(List(toExpr(tile_coords),tuple(tiles))),
                                                (rqs:+LetBinding(tile_coords,coord_gb_key))++tbinds,
                                                md,zero,mapper)
-                       store("dataset",List(tileType(block,tp)),dims,sql)
+                       val Some(TypeMapS(_,tvs,_,_,st,_,_,_)) = getTypeMap(tile_type(block,tp))
+                       val stp = substType(st,Some(tvs.map(_->tp).toMap))
+                       val ds = block_array_assignment match {
+                                   case Some(array)
+                                     => val tensor = tile_type(block,tp)
+                                        val (dn,sn) = tensor_dims(tensor)
+                                        val dest = Nth(array,dn+sn+1)
+                                        outerJoinSQL(dest,sql,md,stp)
+                                   case _ => sql
+                                 }
+                       store("dataset",List(tileType(block,tp)),dims,ds)
                    } else {
                        val rdd = block_array_assignment match {
                                    case Some(array)
@@ -1590,9 +1614,9 @@ object ComprehensionTranslator {
            val res = translate(u,vars)
            array_assignment = None
            res
-      case Call("increment_array",List(Var(a),op,u@Seq(List(Store(tensor,List(tp),args,x)))))
+      case Call("increment_array",List(dest@Var(a),op,u@Seq(List(Store(tensor,List(tp),args,x)))))
         if array_assigns && isBlockTensor(tensor)
-        => block_array_assignment = Some(Var(a))
+        => block_array_assignment = Some(dest)
            val res = translate(u,vars)
            block_array_assignment = None
            res

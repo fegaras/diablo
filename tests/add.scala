@@ -259,7 +259,7 @@ object Add {
         //println(C.queryExecution)
         //val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
         //result.blocks.count()
-        C.count()
+        C.rdd.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }

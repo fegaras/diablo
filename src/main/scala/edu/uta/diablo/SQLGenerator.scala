@@ -18,7 +18,7 @@ package edu.uta.diablo
 object SQLGenerator {
   import AST._
   import ComprehensionTranslator._
-  import Typechecker.{typecheck,bindPattern,unfold_storage_type,typecheck_var}
+  import Typechecker.{tuple=>_,_}
 
   type Env = Map[String,Expr]
 
@@ -33,54 +33,88 @@ object SQLGenerator {
           => e match {
                case Tuple(es)
                  => (ps zip es).foldLeft(env) { case (m,(q,u)) => bind(q,u,m) }
-               case _ => ps.zipWithIndex.foldLeft(env) { case (m,(q,i)) => bind(q,Nth(e,i+1),m) }
+               case _ => ps.zipWithIndex.foldLeft(env) {
+                             case (m,(q,i)) => bind(q,Nth(e,i+1),m)
+                         }
              }
         case _ => env
       }
 
-  def translate ( hs: Expr, qs: List[Qualifier] ): (SQL,List[Expr]) = {
-    val (el,SQL(s,f,l,w,g,h),env)
-        = qs.foldLeft[(List[Expr],SQL,Env)]((Nil,SQL(Nil,Map(),Map(),Nil,None,Nil),Map())) {
-             case ((es,SQL(s,f,l,w,g,h),env),e)
+  def typenv ( qs: List[Qualifier], env: Environment ): Environment
+    = qs.foldLeft(env) {
+         case (r,Generator(p,u))
+           => bindPattern(p,elemType(typecheck(u,r)),r)
+         case (r,LetBinding(p,u))
+           => bindPattern(p,typecheck(u,r),r)
+         case (r,GroupByQual(p,k))
+           => bindPattern(p,typecheck(k,r),
+                          r.map{ case (v,tp) => (v,SeqType(tp)) })   // lift local vars
+         case (r,_) => r
+      }
+
+  def translate ( hs: Expr, qs: List[Qualifier], env: Environment ): (SQL,List[Expr]) = {
+    val (el,SQL(s,f,l,w,g,h),binds,nenv)
+        = qs.foldLeft[(List[Expr],SQL,Env,Environment)]((Nil,SQL(Nil,Map(),Map(),Nil,None,Nil),Map(),env)) {
+             case ((es,SQL(s,f,l,w,g,h),binds,r),e)
                => e match {
                     case Generator(VarPat(v),Range(n1,n2,n3))
-                      => val (nn1,el1) = translate(n1,env)
-                         val (nn2,el2) = translate(MethodCall(n2,"-",List(IntConst(1))),env)
-                         val (nn3,el3) = translate(n3,env)
+                      => val (nn1,el1) = translate(n1,binds,r)
+                         val (nn2,el2) = translate(MethodCall(n2,"+",List(IntConst(1))),binds,r)
+                         val (nn3,el3) = translate(n3,binds,r)
                          val nu = Call("range",List(nn1,nn2,nn3))
-                         (es++el1++el2++el3,SQL(s,f+(v->nu),l,w,g,h),env+(v->MethodCall(Var(v),"id",null)))
-                    case Generator(p,Lift("dataset",u))
+                         val id = Call("rangeVar",List(Var(v)))
+                         (es++el1++el2++el3,
+                          SQL(s,f+(v->nu),l,w,g,h),
+                          binds+(v->id),
+                          r+(v->intType))
+                    case Generator(p,d@Lift("dataset",u))
                       => val v = newvar
                          val nu = translate_domain(u)
                          val view = MethodCall(nu,"createOrReplaceTempView",List(StringConst(v)))
-                         (es:+view,SQL(s,f+(v->Var(v)),l,w,g,h),bind(p,Var(v),env+(v->Var(v))))
-                    case Generator(p,Lift("rdd",u))
+                         (es:+view,
+                          SQL(s,f+(v->Var(v)),l,w,g,h),
+                          bind(p,Var(v),binds+(v->Var(v))),
+                          bindPattern(p,elemType(typecheck(d,r)),r))
+                    case Generator(p,d@Lift("rdd",u))
                       => val v = newvar
                          val nu = translate_domain(u)
                          val view = MethodCall(MethodCall(nu,"toDF",null),
                                                "createOrReplaceTempView",List(StringConst(v)))
-                         (es:+view,SQL(s,f+(v->Var(v)),l,w,g,h),bind(p,Var(v),env+(v->Var(v))))
+                         (es:+view,
+                          SQL(s,f+(v->Var(v)),l,w,g,h),
+                          bind(p,Var(v),binds+(v->Var(v))),
+                          bindPattern(p,elemType(typecheck(d,r)),r))
                     case Generator(p,u)
-                      => // silly SQL uses lateral views & explode to specify dependent joins
+                      => // silly SQL uses lateral views & explode for dependent joins
                          val v = newvar
-                         val (nu,el) = translate(u,env)
-                         (es++el,SQL(s,f,l+(v->nu),w,g,h),bind(p,Var(v),env+(v->Var(v))))
+                         val (nu,el) = translate(u,binds,r)
+                         (es++el,
+                          SQL(s,f,l+(v->nu),w,g,h),
+                          bind(p,Var(v),binds+(v->Var(v))),
+                          bindPattern(p,elemType(typecheck(u,r)),r))
                     case Predicate(u)
                       if g.isEmpty
-                      => val (nu,el) = translate(u,env)
-                         (es++el,SQL(s,f,l,w:+nu,g,h),env)
+                      => val (nu,el) = translate(u,binds,r)
+                         (es++el,SQL(s,f,l,w:+nu,g,h),binds,r)
                     case Predicate(u)
-                      => val (nu,el) = translate(u,env)
-                         (es++el,SQL(s,f,l,w,g,h:+nu),env)
+                      => val (nu,el) = translate(u,binds,r)
+                         (es++el,SQL(s,f,l,w,g,h:+nu),binds,r)
                     case LetBinding(p,u)
-                      => val (nu,el) = translate(u,env)
-                         (es++el,SQL(s,f,l,w,g,h),bind(p,nu,env))
+                      => val (nu,el) = translate(u,binds,r)
+                         (es++el,
+                          SQL(s,f,l,w,g,h),
+                          bind(p,nu,binds),
+                          bindPattern(p,typecheck(u,r),r))
                     case GroupByQual(p,k)
-                      => val (nk,el) = translate(k,env)
-                         (es++el,SQL(s,f,l,w,Some(nk),h),bind(p,nk,env))
+                      => val (nk,el) = translate(k,binds,r)
+                         (es++el,
+                          SQL(s,f,l,w,Some(nk),h),
+                          bind(p,nk,binds),
+                          bindPattern(p,typecheck(k,r),
+                                      r.map{ case (v,tp) => (v,SeqType(tp)) }))   // lift local vars
                   }
           }
-    val (nh,nl) = translate(hs,env)
+    val (nh,nl) = translate(hs,binds,nenv)
     ( nh match {
          case Tuple(ts)
            => SQL(ts,f,l,w,g,h)
@@ -101,33 +135,20 @@ object SQLGenerator {
 
   val sql_udafs = Map( "+"->"SUM", "*"->"PROD", "max"->"MAX", "min"->"MIN" )
 
-  def typeof ( v: String, e: Expr ): Type
-    = e match {
-        case Var(w) if w==v => e.tpe
-        case _ => accumulate[Type](e,typeof(v,_),(x:Type,y:Type)=>if (x==null) y else x,null)
-      }
-
-  def localvars ( vars: List[String], env: Env ): List[String]
-    = vars.flatMap(v => if (env.contains(v))
-                          if (Var(v) == env(v))
-                            List(v)
-                          else List(v)//v::localvars(freevars(env(v)),env)
-                        else Nil)
-
-  def translate ( e: Expr, env: Env ): (Expr,List[Expr])
+  def translate ( e: Expr, binds: Env, env: Environment ): (Expr,List[Expr])
     = e match {
         case Var(v)
-          if env.contains(v)
-          => if (env(v) == e) (e,Nil) else translate(env(v),env)
+          if binds.contains(v)
+          => if (binds(v) == e) (e,Nil) else translate(binds(v),binds,env)
         case Var(v)
           => typecheck_var(v) match {
                 case Some(tp)
                   => val fname = "f"+newvar
+                     val rf = MethodCall(MethodCall(Var("spark"),"udf",null),
+                                         "register",
+                                         List(StringConst(fname),Call("udf",List(Var(fname)))))
                      (Call(fname,Nil),
-                      List(Block(List(Def(fname,Nil,tp,e),
-                                      MethodCall(MethodCall(Var("spark"),"udf",null),
-                                                 "register",
-                                                 List(StringConst(fname),Call("udf",List(Var(fname)))))))))
+                      List(Block(List(Def(fname,Nil,tp,e),rf))))
                 case _ => (e,Nil)
              }
         case IntConst(n) => (e,Nil)
@@ -136,13 +157,13 @@ object SQLGenerator {
         case DoubleConst(n) => (e,Nil)
         case StringConst(n) => (e,Nil)
         case Nth(u,n)
-          => val (cu,ds) = translate(u,env)
+          => val (cu,ds) = translate(u,binds,env)
              (Nth(cu,n),ds)
         case Tuple(es)
           => val (ces,ds)
                 = es.foldLeft[(List[Expr],List[Expr])]((Nil,Nil)) {
                      case ((cs,ds),u)
-                       => val (cu,d) = translate(u,env)
+                       => val (cu,d) = translate(u,binds,env)
                           (cs:+cu,ds++d)
                   }
              (Tuple(ces),ds)
@@ -151,7 +172,7 @@ object SQLGenerator {
           => val (ces,ds)
                 = es.foldLeft[(List[Expr],List[Expr])]((Nil,Nil)) {
                      case ((cs,ds),u)
-                       => val (cu,d) = translate(u,env)
+                       => val (cu,d) = translate(u,binds,env)
                           (cs:+cu,ds++d)
                   }
              (Call(f,ces),ds)
@@ -159,46 +180,46 @@ object SQLGenerator {
           => (e,Nil)
         case MethodCall(x,f,List(y))
           if List("contains").contains(f)
-          => val (cx,nx) = translate(x,env)
-             val (cy,ny) = translate(y,env)
+          => val (cx,nx) = translate(x,binds,env)
+             val (cy,ny) = translate(y,binds,env)
              (MethodCall(cx,f,List(cy)),nx++ny)
         case MethodCall(x,op,List(y))
           if sql_oprs.contains(op)
-          => val (cx,nx) = translate(x,env)
-             val (cy,ny) = translate(y,env)
+          => val (cx,nx) = translate(x,binds,env)
+             val (cy,ny) = translate(y,binds,env)
              (MethodCall(cx,sql_oprs(op),List(cy)),nx++ny)
         case reduce(op,u)
           if sql_udafs.contains(op)
-          => val (cu,ds) = translate(u,env)
+          => val (cu,ds) = translate(u,binds,env)
              (Call(sql_udafs(op),List(cu)),ds)
         case reduce(f,u)
-          => val (cu,ds) = translate(u,env)
+          => val (cu,ds) = translate(u,binds,env)
              (Call(f,List(cu)),ds)
         case _
-          => val fs = localvars(freevars(e),env).distinct
+          => val fs = freevars(e).distinct.filter(v => env.contains(v))
              val fname = "f"+newvar
-             val type_env = fs.map(v => (v,typeof(v,e)))
-             val tenv = type_env.toMap
-             val tp = typecheck(e,tenv)
-             val args = fs.map(x => tenv(x) match {
+             val type_env = fs.map( v => (v,env(v)))
+             val tp = typecheck(e,env)
+             val args = fs.map(x => env(x) match {
                                          case SeqType(_)
-                                           => Call("collect_list",List(env(x)))
-                                         case _ => env(x)
+                                           => Call("collect_list",List(binds(x)))
+                                         case _ => binds(x)
                                     })
+             val rf = MethodCall(MethodCall(Var("spark"),"udf",null),
+                                 "register",
+                                 List(StringConst(fname),Call("udf",List(Var(fname)))))
+
              // Spark UDFs can handle at most 10 arguments
              if (fs.length > 10) {
                val nv = newvar
                (Call(fname,List(Tuple(args))),   // put args in a tuple
                 List(Block(List(Def(fname,List((nv,tuple(type_env.map(_._2)))),tp,
-                                    MatchE(Var(nv),List(Case(tuple(fs.map(VarPat(_))),BoolConst(true),e)))),
-                                MethodCall(MethodCall(Var("spark"),"udf",null),
-                                           "register",
-                                           List(StringConst(fname),Call("udf",List(Var(fname)))))))))
+                                    MatchE(Var(nv),List(Case(tuple(fs.map(VarPat(_))),
+                                                             BoolConst(true),e)))),
+                                rf))))
              } else (Call(fname,args),
-                     List(Block(List(Def(fname,type_env,tp,e),
-                                     MethodCall(MethodCall(Var("spark"),"udf",null),
-                                                "register",
-                                                List(StringConst(fname),Call("udf",List(Var(fname)))))))))
+                     List(Block(List(Def(fname,type_env,tp,e),rf))))
+                                     
       }
 
   def toSQL ( e: Expr ): String
@@ -213,13 +234,15 @@ object SQLGenerator {
         case Nth(x,n)
           => toSQL(x)+"._"+n
         case Tuple(es)
-          => "("+es.map(toSQL).mkString(",")+")"
+          => "("+es.zipWithIndex.map{ case (u,i) => toSQL(u)+" AS _"+(i+1) }.mkString(",")+")"
         case MethodCall(x,"id",null)
           => toSQL(x)+".id"
         case MethodCall(x,"contains",es)
           => "array_contains("+toSQL(x)+","+es.map(toSQL).mkString(",")+")"
         case MethodCall(x,op,List(y))
           => "("+toSQL(x)+" "+op+" "+toSQL(y)+")"
+        case Call("rangeVar",List(x))
+          => "CAST ("+toSQL(x)+".id AS INT)"
         case Call(f,es)
           => f+"("+es.map(toSQL).mkString(",")+")"
         case _ => e.toString
@@ -245,31 +268,36 @@ object SQLGenerator {
       }
 
   def translate_sql ( h: Expr, qs: List[Qualifier] ): Expr = {
-    val tp = typecheck(Comprehension(h,qs))
-    val (se,el) = translate(h,qs)
+clean(h)
+println("+++ "+qs)
+    val (se,el) = translate(h,qs,global_env)
     val sql = toSQL(se)
     Block( el:+MethodCall(Var("spark"),"sql",List(StringConst(sql))) )
   }
 
   def translate_sql ( h: Expr, qs: List[Qualifier], acc: Lambda, zero: Expr, map: Option[Lambda] ): Expr = {
-    val tp = typecheck(Comprehension(h,qs))
-    val ztp = typecheck(zero)
-    val (se,el) = translate(h,qs)
+clean(h)
+clean(acc)
+println("+++ "+qs)
+    val ztp = typecheck(zero,global_env)
+    val (se,el) = translate(h,qs,global_env)
     val SQL(List(index,value),f,l,w,None,Nil) = se
     val rname = newvar
-    val update = Assign(Var("result"),Seq(List(Apply(acc,Tuple(List(Var("result"),Var("_x")))))))
-    val reducer = Def(rname,List(("s",SeqType(ztp))),ztp,
-                      Block(List(VarDecl("result",ztp,Seq(List(zero))),
-                                 flatMap(Lambda(VarPat("_x"),Seq(List(update))),
-                                         Var("s")),
-                                 Var("result"))))
+    val rv = newvar
+    val xv = newvar
+    val sv = newvar
+    val update = Assign(Var(rv),Seq(List(Apply(acc,Tuple(List(Var(rv),Var(xv)))))))
+    val reducer = Def(rname,List((sv,SeqType(ztp))),ztp,
+                      Block(List(VarDecl(rv,ztp,Seq(List(zero))),
+                                 flatMap(Lambda(VarPat(xv),Seq(List(update))),Var(sv)),
+                                 Var(rv))))
     val aggr = MethodCall(MethodCall(Var("spark"),"udf",null),
                           "register",
                           List(StringConst(rname),Call("udf",List(Var(rname)))))
     map match {
        case Some(Lambda(mp,mb))
          => val mname = newvar
-            val mtp = typecheck(mb,bindPattern(mp,unfold_storage_type(ztp),Map()))
+            val mtp = typecheck(mb,bindPattern(mp,unfold_storage_type(ztp),global_env))
             val mapper = Def(mname,List(("_x",ztp)),mtp,MatchE(Var("_x"),List(Case(mp,BoolConst(true),mb))))
             val mapr = MethodCall(MethodCall(Var("spark"),"udf",null),
                                   "register",
@@ -285,5 +313,22 @@ object SQLGenerator {
             Block( el:+reducer:+aggr
                    :+MethodCall(Var("spark"),"sql",List(StringConst(sql))) )
     }
+  }
+
+  def outerJoinSQL ( x: Expr, y: Expr, f: Lambda, tp: Type ): Expr = {
+      val Lambda(TuplePat(List(VarPat(vx),VarPat(vy))),b) = f
+      val fname = "f"+newvar
+      Block(List(MethodCall(x,"createOrReplaceTempView",List(StringConst("X"))),
+                 MethodCall(y,"createOrReplaceTempView",List(StringConst("Y"))),
+                 Def(fname,List((vx,tp),(vy,tp)),tp,b),
+                 MethodCall(MethodCall(Var("spark"),"udf",null),
+                            "register",
+                            List(StringConst("f"),Call("udf",List(Var(fname))))),
+                 MethodCall(Var("spark"),"sql",
+                            List(StringConst("""SELECT X._1 AS _1,
+                                                       CASE WHEN X._2 IS NULL THEN Y._2
+                                                            WHEN Y._2 IS NULL THEN X._2
+                                                            ELSE f(X._2,Y._2) END AS _2
+                                                FROM X FULL JOIN Y ON X._1 = Y._1""")))))
   }
 }

@@ -50,7 +50,7 @@ object TypeMappings {
 
     // A Spark Dataset collection
     typemap dataset[T] (): list[T] {
-       def view ( R: DiabloDataFrame[T] ) = ()
+       def view ( R: $datasetClass[T] ) = ()
        def store ( L: list[T] ) = ()
     }
 

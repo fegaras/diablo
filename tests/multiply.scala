@@ -156,7 +156,7 @@ object Multiply {
         val C = q("""
                   tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
                   """)
-        C._3.count()
+        C._3.cache().count
       } catch { case x: Throwable => println(x); return -1.0 }
       param(data_frames,false)
       (System.currentTimeMillis()-t)/1000.0
@@ -172,7 +172,7 @@ object Multiply {
         val C = q("""
                   tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- aDF, ((kk,j),b) <- bDF, k == kk, let c = a*b, group by (i,j) ]
                   """)
-        C._3.count()
+        C._3.cache().count
       } catch { case x: Throwable => println(x); return -1.0 }
       param(data_frames,false)
       (System.currentTimeMillis()-t)/1000.0
@@ -266,6 +266,26 @@ object Multiply {
                   CC;
                   """)
         validate(C)
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix multiplication of tiled matrices using loops in DataFrame
+    def testMultiplyDiabloLoopDF (): Double = {
+      param(data_frames,true)
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  var CC = tensor*(n,n)[ ((i,j),0.0) | i <- 0..n-1, j <- 0..n-1 ];
+
+                  for i = 0, n-1 do
+                     for k = 0, m-1 do
+                        for j = 0, n-1 do
+                           CC[i,j] += AA[i,k]*BB[k,j];
+                  CC;
+                  """)
+        param(data_frames,false)
+        C._3.cache().count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -428,7 +448,7 @@ object Multiply {
         //println(C.queryExecution)
         //val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
         //result.blocks.count()
-        C.count()
+        C.cache().count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -455,7 +475,7 @@ object Multiply {
         //println(C.queryExecution)
         //val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
         //result.blocks.count()
-        C.count()
+        C.cache().count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -495,6 +515,7 @@ object Multiply {
     test("DIABLO Multiply sparse-dense giving sparse",testMultiplyDiabloDACsparseDenseSparseOut)
     test("DIABLO Multiply sparse-sparse giving sparse",testMultiplyDiabloDACsparseSparseSparseOut)
     test("DIABLO loop Multiply",testMultiplyDiabloLoop)
+    test("DIABLO loop Multiply SQL",testMultiplyDiabloLoopDF)
     test("Hand-written groupByJoin Multiply",testMultiplyCodeGBJ)
     test("Hand-written groupBy Multiply",testMultiplyCode)
     test("Hand-written groupBy MLlib Multiply",testMultiplyMLlibCode)

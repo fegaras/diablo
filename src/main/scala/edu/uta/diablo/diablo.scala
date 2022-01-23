@@ -21,6 +21,7 @@ import diablo.Parser.parse
 import scala.reflect.macros.whitebox
 import scala.reflect.macros.whitebox.Context
 
+
 package object diablo extends diablo.ArrayFunctions {
   var trace = true               // print trace info
   var groupByJoin = false        // experimental SUMMA groupby-join
@@ -61,6 +62,7 @@ package object diablo extends diablo.ArrayFunctions {
       typeMapsLib = true
     }
     Typechecker.useStorageTypes = false
+    Typechecker.global_env = Map()
     val q = parse(s)
     if (trace) println("Imperative program:\n"+Pretty.print(q))
     Typechecker.typecheck(q)

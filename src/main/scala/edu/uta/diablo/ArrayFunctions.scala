@@ -22,7 +22,8 @@ import org.apache.spark.rdd.RDD
 trait ArrayFunctions {
 
   // An outer-join for 1-1 join relationship
-  def outerJoin[K:ClassTag,T:ClassTag] ( xrdd: RDD[(K,T)], yrdd: RDD[(K,T)], f: (T,T) => T ): RDD[(K,T)]
+  def outerJoin[K:ClassTag,T:ClassTag] ( xrdd: RDD[(K,T)], yrdd: RDD[(K,T)],
+                                         f: (T,T) => T ): RDD[(K,T)]
     = xrdd.cache.fullOuterJoin(yrdd.cache,number_of_partitions).map {
             case (k,(Some(x),Some(y)))
               => (k,f(x,y))
@@ -546,6 +547,8 @@ trait ArrayFunctions {
   def update_array[T] ( a: Object, u: T ): T = u
 
   def increment_array[T] ( a: Object, op: String, u: T ): T = u
+
+  def rangeVar ( x: Int ): Int = x
 
   import org.apache.spark.sql.expressions.Aggregator
   import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
