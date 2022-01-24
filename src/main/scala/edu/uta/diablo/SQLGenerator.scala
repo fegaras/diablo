@@ -135,20 +135,27 @@ object SQLGenerator {
 
   val sql_udafs = Map( "+"->"SUM", "*"->"PROD", "max"->"MAX", "min"->"MIN" )
 
+  def translate_non_local_var ( v: String, tp: Type ): (Expr,List[Expr]) = {
+    val fname = "f"+newvar
+    val rf = MethodCall(MethodCall(Var("spark"),"udf",null),
+                        "register",
+                        List(StringConst(fname),Call("udf",List(Var(fname)))))
+                       (Call(fname,Nil),
+                        List(Block(List(Def(fname,Nil,tp,Var(v)),rf))))
+  }
+
   def translate ( e: Expr, binds: Env, env: Environment ): (Expr,List[Expr])
     = e match {
         case Var(v)
           if binds.contains(v)
           => if (binds(v) == e) (e,Nil) else translate(binds(v),binds,env)
         case Var(v)
+          if env.contains(v)
+          => translate_non_local_var(v,env(v))
+        case Var(v)
           => typecheck_var(v) match {
                 case Some(tp)
-                  => val fname = "f"+newvar
-                     val rf = MethodCall(MethodCall(Var("spark"),"udf",null),
-                                         "register",
-                                         List(StringConst(fname),Call("udf",List(Var(fname)))))
-                     (Call(fname,Nil),
-                      List(Block(List(Def(fname,Nil,tp,e),rf))))
+                  => translate_non_local_var(v,tp)
                 case _ => (e,Nil)
              }
         case IntConst(n) => (e,Nil)
@@ -196,15 +203,16 @@ object SQLGenerator {
           => val (cu,ds) = translate(u,binds,env)
              (Call(f,List(cu)),ds)
         case _
-          => val fs = freevars(e).distinct.filter(v => env.contains(v))
+          => val fs = freevars(e,global_env.keys.toList).distinct.filter(v => env.contains(v))
              val fname = "f"+newvar
              val type_env = fs.map( v => (v,env(v)))
              val tp = typecheck(e,env)
-             val args = fs.map(x => env(x) match {
+             val args = fs.map(x => { val xc = if (binds.contains(x)) binds(x) else Var(x)
+                                      env(x) match {
                                          case SeqType(_)
-                                           => Call("collect_list",List(binds(x)))
-                                         case _ => binds(x)
-                                    })
+                                           => Call("collect_list",List(xc))
+                                         case _ => xc
+                                      } })
              val rf = MethodCall(MethodCall(Var("spark"),"udf",null),
                                  "register",
                                  List(StringConst(fname),Call("udf",List(Var(fname)))))
@@ -267,18 +275,25 @@ object SQLGenerator {
                "SELECT "+tss+" FROM "+fs+ls+ws+gs+hs
       }
 
+  def make_sql ( sql: String ): Expr = {
+    val rv = newvar
+    Block(List(VarDecl(rv,BasicType("DataFrame"),
+                       Seq(List(MethodCall(MethodCall(Var("spark"),"sql",List(StringConst(sql))),
+                                           "cache",null)))),
+               // clear cached tables
+               MethodCall(Var("spark"),"sql",List(StringConst("CLEAR CACHE"))),
+               Var(rv)))
+  }
+
   def translate_sql ( h: Expr, qs: List[Qualifier] ): Expr = {
-clean(h)
-println("+++ "+qs)
+    clean(h)   // clear cached types
     val (se,el) = translate(h,qs,global_env)
     val sql = toSQL(se)
     Block( el:+MethodCall(Var("spark"),"sql",List(StringConst(sql))) )
   }
 
   def translate_sql ( h: Expr, qs: List[Qualifier], acc: Lambda, zero: Expr, map: Option[Lambda] ): Expr = {
-clean(h)
-clean(acc)
-println("+++ "+qs)
+    clean(h); clean(acc)   // clear cached types
     val ztp = typecheck(zero,global_env)
     val (se,el) = translate(h,qs,global_env)
     val SQL(List(index,value),f,l,w,None,Nil) = se
@@ -305,13 +320,11 @@ println("+++ "+qs)
             val sql = toSQL(SQL(List(index,Call(mname,List(Call(rname,List(Call("collect_list",
                                                                                 List(value))))))),
                                 f,l,w,Some(index),Nil))
-            Block( el:+reducer:+aggr:+mapper:+mapr
-                   :+MethodCall(Var("spark"),"sql",List(StringConst(sql))) )
+            Block( el:+reducer:+aggr:+mapper:+mapr:+make_sql(sql) )
        case _
          => val sql = toSQL(SQL(List(index,Call(rname,List(Call("collect_list",List(value))))),
                                 f,l,w,Some(index),Nil))
-            Block( el:+reducer:+aggr
-                   :+MethodCall(Var("spark"),"sql",List(StringConst(sql))) )
+            Block( el:+reducer:+aggr:+make_sql(sql) )
     }
   }
 
@@ -324,11 +337,10 @@ println("+++ "+qs)
                  MethodCall(MethodCall(Var("spark"),"udf",null),
                             "register",
                             List(StringConst("f"),Call("udf",List(Var(fname))))),
-                 MethodCall(Var("spark"),"sql",
-                            List(StringConst("""SELECT X._1 AS _1,
-                                                       CASE WHEN X._2 IS NULL THEN Y._2
-                                                            WHEN Y._2 IS NULL THEN X._2
-                                                            ELSE f(X._2,Y._2) END AS _2
-                                                FROM X FULL JOIN Y ON X._1 = Y._1""")))))
+                 make_sql("""SELECT X._1 AS _1,
+                                    CASE WHEN X._2 IS NULL THEN Y._2
+                                         WHEN Y._2 IS NULL THEN X._2
+                                         ELSE f(X._2,Y._2) END AS _2
+                             FROM X FULL JOIN Y ON X._1 = Y._1""")))
   }
 }
