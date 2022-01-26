@@ -57,7 +57,7 @@ sealed abstract class Expr ( var tpe: Type = null ) extends Positional
     case class groupBy ( input: Expr ) extends Expr
     case class reduce ( op: String, input: Expr ) extends Expr
     case class Let ( pat: Pattern, value: Expr, body: Expr ) extends Expr
-    case class Call ( var name: String, args: List[Expr] ) extends Expr
+    case class Call ( var name: String, var args: List[Expr] ) extends Expr
     case class MethodCall ( obj: Expr, method: String, args: List[Expr] ) extends Expr
     case class Apply ( function: Expr, arg: Expr ) extends Expr
     case class Coerce ( arg: Expr, tp: Type ) extends Expr

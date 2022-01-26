@@ -37,7 +37,7 @@ object Test {
             };
     """)
 
-    val X = q("""
+    q("""
           var n = 100;
           var M = tensor*(n,n)[ ((i,j),random()) | i <- 0..n-1, j <- 0..n-1 ];
           var N = tensor*(n,n)[ ((i,j),random()) | i <- 0..n-1, j <- 0..n-1 ];
@@ -60,27 +60,23 @@ object Test {
           R;
         """)
 
-    q("""
+    var t = System.currentTimeMillis()
+
+    val (p,s) = q("""
       var n = 100; var m = n; var l = 10;
-      var R = tensor*(n,m)[ ((i,j),random()) | i <- 0..n-1, j <- 0..m-1 ];
-      var P = tensor*(n,l)[ ((i,j),random()) | i <- 0..n-1, j <- 0..l-1 ];
-      var Q = tensor*(l,m)[ ((i,j),random()) | i <- 0..l-1, j <- 0..m-1 ];
-      var pq = R
-      var E = R;
 
       var a = 0.002;
       var b = 0.02;
 
-      for i = 0, n-1 do
-          for k = 0, l-1 do
-              P[i,k] = random();
-
-      for k = 0, l-1 do
-          for j = 0, m-1 do
-              Q[k,j] = random();
+      var R = tensor*(n,m)[ ((i,j),random()) | i <- 0..n-1, j <- 0..m-1 ];
+      var P = tensor*(n,l)[ ((i,j),random()) | i <- 0..n-1, j <- 0..l-1 ];
+      var Q = tensor*(l,m)[ ((i,j),random()) | i <- 0..l-1, j <- 0..m-1 ];
+      cache(R);
+      var pq = R
+      var E = R;
 
       var steps = 0;
-      while ( steps < 10 ) {
+      while ( steps < 100 ) {
         steps += 1;
         for i = 0, n-1 do
             for j = 0, m-1 do {
@@ -93,9 +89,12 @@ object Test {
                     Q[k,j] += a*(2*E[i,j]*P[i,k]-b*Q[k,j]);
                 };
             };
+        cache(E); cache(P); cache(Q);
       };
       (P,Q);
     """)
 
+    println("@@@ "+p._3.count()+" "+s._3.count())
+    println("time: "+(System.currentTimeMillis()-t)/1000.0+" secs")
   }
 }

@@ -555,6 +555,11 @@ trait ArrayFunctions {
   import org.apache.spark.sql.Encoder
   import scala.reflect.runtime.universe.TypeTag
 
+  def cache[T] ( x: RDD[T] ): RDD[T] = { x.cache; x }
+
+  def cache[T] ( x: DiabloDataFrame[T] ): DiabloDataFrame[T]
+    = { x.rdd.cache; x }
+
   def reducer[T] ( mergeT: (T,T) => T, zeroT: T ) ( implicit tag: TypeTag[T] ): Aggregator[T,T,T]
     = new Aggregator[T,T,T] {
         def zero: T = zeroT

@@ -127,6 +127,7 @@ object LinearRegression extends Serializable {
         val A = q("tensor*(n,m)[((i,j),v) | ((i,j),v) <- input]")
 	val B = q("tensor*(n)[(i,v) | (i,v) <- output]")
 	var W = q("tensor*(m)[(i,v) | (i,v) <- theta]")
+        A._3.cache; B._2.cache; W._2.cache
     	val t = System.currentTimeMillis()
     	val theta1 = q("""
 			var itr = 0;
@@ -136,6 +137,7 @@ object LinearRegression extends Serializable {
 				var d_theta = tensor*(m)[(j,+/v) | ((i,j),a) <- A, (ii,b) <- x_theta_minus_y, i==ii, let v=a*b, group by j];
 				W = tensor*(m)[(i,a-(1.0/n)*lrate*b) | (i,a) <- W, (ii,b) <- d_theta, i==ii];
 			  	itr += 1;
+                                cache(W);
 			};
 			W;
 		""")

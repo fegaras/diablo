@@ -22,6 +22,8 @@ object SQLGenerator {
 
   type Env = Map[String,Expr]
 
+  var sql_tables: List[String] = Nil
+
   case class SQL ( select: List[Expr], from: Env, lateralView: Env,
                    where: List[Expr], groupBy: Option[Expr], having: List[Expr] )
 
@@ -71,6 +73,7 @@ object SQLGenerator {
                       => val v = newvar
                          val nu = translate_domain(u)
                          val view = MethodCall(nu,"createOrReplaceTempView",List(StringConst(v)))
+                         sql_tables = sql_tables:+v
                          (es:+view,
                           SQL(s,f+(v->Var(v)),l,w,g,h),
                           bind(p,Var(v),binds+(v->Var(v))),
@@ -80,6 +83,7 @@ object SQLGenerator {
                          val nu = translate_domain(u)
                          val view = MethodCall(MethodCall(nu,"toDF",null),
                                                "createOrReplaceTempView",List(StringConst(v)))
+                         sql_tables = sql_tables:+v
                          (es:+view,
                           SQL(s,f+(v->Var(v)),l,w,g,h),
                           bind(p,Var(v),binds+(v->Var(v))),
@@ -277,27 +281,40 @@ object SQLGenerator {
 
   def make_sql ( sql: String ): Expr = {
     val rv = newvar
-    Block(List(VarDecl(rv,BasicType("DataFrame"),
-                       Seq(List(MethodCall(MethodCall(Var("spark"),"sql",List(StringConst(sql))),
-                                           "cache",null)))),
-               // clear cached tables
-               MethodCall(Var("spark"),"sql",List(StringConst("CLEAR CACHE"))),
-               Var(rv)))
+    Block((VarDecl(rv,BasicType("DataFrame"),
+                       Seq(List(MethodCall(Var("spark"),"sql",List(StringConst(sql))))))
+           ::sql_tables.distinct.map(v => MethodCall(MethodCall(Var("spark"),"catalog",null),
+                                                     "dropTempView",
+                                                     List(StringConst(v)))))
+          :+Var(rv))
   }
+
+  def make_sql2 ( sql: String ): Expr
+    = MethodCall(Var("spark"),"sql",List(StringConst(sql)))
 
   def translate_sql ( h: Expr, qs: List[Qualifier] ): Expr = {
     clean(h)   // clear cached types
+    sql_tables = Nil
     val (se,el) = translate(h,qs,global_env)
     val sql = toSQL(se)
-    Block( el:+MethodCall(Var("spark"),"sql",List(StringConst(sql))) )
+    Block( el:+make_sql(sql) )
+  }
+
+  def translate_sql ( h: Expr, qs: List[Qualifier], op: String ): Expr = {
+    clean(h)   // clear cached types
+    sql_tables = Nil
+    val (SQL(ts,f,l,w,g,hv),el) = translate(h,qs,global_env)
+    val sql = toSQL(SQL(List(Call(sql_udafs(op),ts)),f,l,w,g,hv))
+    Block( el:+make_sql(sql) )
   }
 
   def translate_sql ( h: Expr, qs: List[Qualifier], acc: Lambda, zero: Expr, map: Option[Lambda] ): Expr = {
     clean(h); clean(acc)   // clear cached types
+    sql_tables = Nil
     val ztp = typecheck(zero,global_env)
     val (se,el) = translate(h,qs,global_env)
     val SQL(List(index,value),f,l,w,None,Nil) = se
-    val rname = newvar
+    val rname = "f"+newvar
     val rv = newvar
     val xv = newvar
     val sv = newvar
@@ -311,7 +328,7 @@ object SQLGenerator {
                           List(StringConst(rname),Call("udf",List(Var(rname)))))
     map match {
        case Some(Lambda(mp,mb))
-         => val mname = newvar
+         => val mname = "f"+newvar
             val mtp = typecheck(mb,bindPattern(mp,unfold_storage_type(ztp),global_env))
             val mapper = Def(mname,List(("_x",ztp)),mtp,MatchE(Var("_x"),List(Case(mp,BoolConst(true),mb))))
             val mapr = MethodCall(MethodCall(Var("spark"),"udf",null),
@@ -331,6 +348,7 @@ object SQLGenerator {
   def outerJoinSQL ( x: Expr, y: Expr, f: Lambda, tp: Type ): Expr = {
       val Lambda(TuplePat(List(VarPat(vx),VarPat(vy))),b) = f
       val fname = "f"+newvar
+      sql_tables = List("X","Y")
       Block(List(MethodCall(x,"createOrReplaceTempView",List(StringConst("X"))),
                  MethodCall(y,"createOrReplaceTempView",List(StringConst("Y"))),
                  Def(fname,List((vx,tp),(vy,tp)),tp,b),

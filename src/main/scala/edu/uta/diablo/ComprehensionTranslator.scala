@@ -1674,13 +1674,15 @@ object ComprehensionTranslator {
       case reduce(op,x@Comprehension(h,qs))
         if is_tiled_comprehension(qs)
         // total aggregation on tiled comprehensions
-        => val tile_value = reduce(op,Comprehension(h,tile_qualifiers(qs,vars)))
+        => val tile_value = translate(reduce(op,Comprehension(h,tile_qualifiers(qs,vars))),vars)
            val nq = rdd_qualifiers(qs,vars)
            val Comprehension(nhs,nqs) = optimize(Comprehension(tile_value,nq))
-           MethodCall(translate_rdd(nhs,nqs,vars),
-                      "reduce",
-                      List(Lambda(TuplePat(List(VarPat("_x"),VarPat("_y"))),
-                                  MethodCall(Var("_x"),op,List(Var("_y"))))))
+           if (data_frames)
+             translate_sql(nhs,nqs,op)
+           else MethodCall(translate_rdd(nhs,nqs,vars),
+                           "reduce",
+                           List(Lambda(TuplePat(List(VarPat("_x"),VarPat("_y"))),
+                                       MethodCall(Var("_x"),op,List(Var("_y"))))))
       case reduce(op,Comprehension(h,qs))
         if is_rdd_comprehension(qs)
         // total RDD aggregation

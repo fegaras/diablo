@@ -250,6 +250,7 @@ object Typechecker {
 
     val tpat: Regex = """(full_|)tensor_(\d+)_(\d+)""".r
     val btpat: Regex = """(full_|)(rdd|dataset)_block_tensor_(\d+)_(\d+)""".r
+    val gtpat: Regex = """(full_|)(rdd|dataset)_block_(bool_|)tensor_(\d+)_(\d+)""".r
 
     def typecheck ( e: Expr, env: Environment ): Type
       = if (e.tpe != null)
@@ -420,6 +421,13 @@ object Typechecker {
             => SeqType(typecheck(b,env+((i,intType))))
           case Call("unique_values",List(Lambda(TuplePat(ps),b)))
             => SeqType(typecheck(b,ps.foldLeft(env){ case (r,p) => bindPattern(p,intType,r) }))
+          case ce@Call("cache",List(u))
+            => typecheck(u,env) match {
+                  case tp@StorageType(gtpat(_,_,_,dn,sn),_,_)
+                    => ce.args = List(Nth(u,dn.toInt+sn.toInt+1))    // destructive
+                       tp
+                  case tp => tp
+               }
           case Call(f,args)
             if getTypeMap(f).isDefined
             => val Some(TypeMapS(_,tps,ps,at,st,lt,view,store)) = getTypeMap(f)
