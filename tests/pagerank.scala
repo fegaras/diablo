@@ -50,6 +50,7 @@ object PageRank {
 		        for j = 0, N-1 do
 		            P[i] += b*E[j,i]*Q[j];
 		  };
+                  P;
 		 """)
 		println(P._2.count)
 		val nt = (System.currentTimeMillis()-t)/1000.0
