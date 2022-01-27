@@ -28,18 +28,17 @@ object PageRank {
 	val numIter = 10;
 
     val G = spark_context.textFile("graph1.txt")
-              .map( line => { val a = line.split(" ").toList
+              .map( line => { val a = line.split(" ")
                               (a(0).toInt,a(1).toInt) } ).cache
 	
-	def testPageRankDiabloLoop(): Double = {
+    def testPageRankDiabloLoop(): Double = {
+		// count outgoing neighbors
+		val C = q("rdd[ (i,j.length) | (i,j) <- G, group by i ]")
+		// graph matrix is sparse
+		val E = q("tensor*(N)(N)[ ((i,j),1.0/c) | (i,j) <- G, (ii,c) <- C, ii == i ]")
+                C.cache; E._3.cache
 		val t = System.currentTimeMillis()
-		var X = q("""
-		  // count outgoing neighbors
-		  var C = rdd[ (i,j.length) | (i,j) <- G, group by i ];
-		  //var C = tensor*(N)[ (i,j.length) | (i,j) <- G, group by i ];
-		  // graph matrix is sparse
-		  var E = tensor*(N)(N)[ ((i,j),1.0/c) | (i,j) <- G, (ii,c) <- C, ii == i ];
-		  // pagerank
+		var P = q("""
 		  var P = tensor*(N)[ (i,1.0/N) | i <- 0..N-1 ];
 		  var k = 0;
 		  while (k < numIter) {
@@ -51,40 +50,42 @@ object PageRank {
 		        for j = 0, N-1 do
 		            P[i] += b*E[j,i]*Q[j];
 		  };
-		  // convert pageranks to a plain RDD
-		  rdd[ (i,v) | (i,v) <- P ];
 		 """)
+		println(P._2.count)
+		val nt = (System.currentTimeMillis()-t)/1000.0
+		// convert pageranks to a plain RDD
+		val X = q("rdd[ (i,v) | (i,v) <- P ]")
 		// print top-30 pageranks
+		println("Ranks:")
 		X.sortBy(x => x._2,false,1).take(30).foreach(println)
-		println(X.count)
-		(System.currentTimeMillis()-t)/1000.0
+                nt
 	}
 	
 	def testPageRankDiablo(): Double = {
+		// count outgoing neighbors
+		val C = q("rdd[ (i,j.length) | (i,j) <- G, group by i ]")
+		// graph matrix is sparse
+		val E = q("tensor*(N)(N)[ ((i,j),1.0/c) | (i,j) <- G, (ii,c) <- C, ii == i ]")
+                C.cache; E._3.cache
 		val t = System.currentTimeMillis()
-		val graph = G
-		var X = q("""
-		  // count outgoing neighbors
-		  var C = rdd[ (i,j.length) | (i,j) <- graph, group by i ];
-		  // graph matrix is sparse
-		  var E = tensor*(N)(N)[ ((i,j),1.0/c) | (i,j) <- graph, (ii,c) <- C, ii == i ];
+		val P = q("""
 		  // pagerank
 		  var P = tensor*(N)[ (i,1.0/N) | i <- 0..N-1 ];
 		  var k = 0;
 		  while (k < numIter) {
 		    k += 1;
-		    var Q = P;
-		    P = tensor*(N)[ (j,+/v + (1-b)/N) | ((i,j),e) <- E, (ii,q) <- Q, i==ii, let v = b*e*q, group by j ];
+		    P = tensor*(N)[ (j,+/v + (1-b)/N) | ((i,j),e) <- E, (ii,q) <- P, i==ii, let v = b*e*q, group by j ];
 		  };
-		  // convert pageranks to a plain RDD
-		  rdd[ (i,v) | (i,v) <- P ];
-
+                  P;
 		 """)
+		println(P._2.count)
+		val nt = (System.currentTimeMillis()-t)/1000.0
+		// convert pageranks to a plain RDD
+		val X = q("rdd[ (i,v) | (i,v) <- P ]")
 		// print top-30 pageranks
 		println("Ranks:")
 		X.sortBy(x => x._2,false,1).take(30).foreach(println)
-		println(X.count)
-		(System.currentTimeMillis()-t)/1000.0
+                nt
 	}
 	
 	def testGraphXIJV (): Double = {
@@ -99,10 +100,9 @@ object PageRank {
         }
 	
 	def testHandWrittenPageRank(): Double = {
+		var C = G.map{ case (i,j) => (i,1)}.reduceByKey(_+_).cache
+		var E = G.join(C).map{ case (i,(j,c)) => ((i,j),1.0/c) }.cache
 		val t = System.currentTimeMillis()
-		var C = G.map{ case (i,j) => (i,1)}.reduceByKey(_+_)
-		println(C.count)
-		var E = G.join(C).map{ case (i,(j,c)) => ((i,j),1.0/c) }
 		var P = spark_context.parallelize(0 to N-1).map(i => (i,1.0/N))
 		var k = 0
 		while(k < numIter) {
@@ -113,15 +113,15 @@ object PageRank {
                              .reduceByKey(_+_)
                              .map{case (i,p) => (i,p+(1-b)/N)}
 		}
+		println(P.count)
+		val nt = (System.currentTimeMillis()-t)/1000.0
 		// print top-30 pageranks
 		println("Ranks:")
 		P.sortBy(x => x._2,false,1).take(30).foreach(println)
-		println(P.count)
-		(System.currentTimeMillis()-t)/1000.0
+                nt
 	}
 	
 	def testMLlibDistPageRank(): Double = {
-		val t = System.currentTimeMillis()
 		var C = G.map{ case (i,j) => (i,1)}.reduceByKey(_+_)
 		var matrix = spark_context.parallelize(for(i <- 0 to N-1; j <- 0 to N-1) yield ((i,j), 0.0))
 		var tmp = G.join(C).map{ case (i,(j,c)) => ((i,j),1.0/c)}
@@ -129,8 +129,18 @@ object PageRank {
 		val coordMat = new CoordinateMatrix(matrix.map{ case ((i,j),v) => MatrixEntry(i,j,v)})
 		// Transform the CoordinateMatrix to a BlockMatrix
 		val E = coordMat.toBlockMatrix(bSize,bSize).cache()
+
+		val t = System.currentTimeMillis()
+
+                // E must be MLlib distributed block matrix and
+                // P and C must be MLlib distributed vectors. See testMultiplyMLlib
+                // DON'T coerce block matrices to coordinate matrices
+
+
+/*
 		var vector = spark_context.parallelize(for(i <- 0 to N-1) yield MatrixEntry(i,0, 1.0/N))
 		val coordVec = new CoordinateMatrix(vector)
+
 		var P = coordVec.toBlockMatrix(bSize,1)
 		var k = 0
 		while (k < numIter) {
@@ -145,48 +155,11 @@ object PageRank {
 		val vectors = P.toLocalMatrix()
 		val ranks = spark_context.parallelize( for(i <- 0 to N-1) yield(i,vectors(i,0)))
 		ranks.sortBy(x => x._2,false,1).take(30).foreach(println)
+*/
 		(System.currentTimeMillis()-t)/1000.0
-	}
+	}	
 	
-	def testMLlibLocalPageRank(): Double = {
-		val t = System.currentTimeMillis()
-		var C = G.map{ case (i,j) => (i,1)}.reduceByKey(_+_)
-		var arr = Array.tabulate(N*N){ i => 0.0 }
-		var tmp = G.join(C).map{ case (i,(j,c)) => ((i,j),1.0/c)}.collect
-		for(((i,j), t) <- tmp)
-			arr(i*N+j) += t
-		val E = new DenseMatrix(N,N,arr)
-		var P = new DenseVector(Array.tabulate(N){i => 1.0/N})
-		var k = 0
-		while(k < numIter) {
-			k += 1
-			var Q = new DenseVector(P.toArray.map(i => i*b))
-			P = new DenseVector(E.multiply(Q).toArray.map{i => i+(1-b)/N})
-		}
-		// print top-30 pageranks
-		val ranks = spark_context.parallelize( for(i <- 0 to N-1) yield (i,P(i)))
-		ranks.sortBy(x => x._2,false,1).take(30).foreach(println)
-		println(ranks.count)
-		(System.currentTimeMillis()-t)/1000.0
-	}
-	
-	def testSparkExample(): Double = {
-		val t = System.currentTimeMillis()
-		val links = G.distinct().groupByKey().cache()
-		var ranks = spark_context.parallelize(0 to N-1).map(i => (i,1.0/N))
-		for (i <- 1 to numIter) {
-			val contribs = links.join(ranks).values.flatMap{ case (urls, rank) =>
-				val size = urls.size
-				urls.map(url => (url, rank / size))
-			}
-			ranks = contribs.reduceByKey(_ + _).mapValues((1-b)/N + b * _)
-		}
-		ranks.sortBy(x => x._2,false,1).take(30).foreach(println)
-		println(ranks.count)
-		(System.currentTimeMillis()-t)/1000.0
-	}
-	
-	def test ( name: String, f: => Double ) {
+    def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()
       var i = 0
       var j = 0
@@ -209,8 +182,6 @@ object PageRank {
     test("Diablo PageRank",testPageRankDiablo)
     test("GraphX",testGraphXIJV)
     test("Hand-written PageRank",testHandWrittenPageRank)
-    test("MLlib Local",testMLlibLocalPageRank)
     test("MLlib Distributed",testMLlibDistPageRank)
-    test("SparkExample",testSparkExample)
   }
 }
