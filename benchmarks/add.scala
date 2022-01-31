@@ -12,15 +12,10 @@ import scala.util.Random
 import Math._
 
 object Add {
-  /* The size of any serializable object */
-  def sizeof ( x: Serializable ): Int = {
-    import java.io.{ByteArrayOutputStream,ObjectOutputStream}
-    val bs = new ByteArrayOutputStream()
-    val os = new ObjectOutputStream(bs)
-    os.writeObject(x)
-    os.flush()
-    os.close()
-    bs.toByteArray().length
+  /* The size of an object */
+  def sizeof ( x: AnyRef ): Long = {
+    import org.apache.spark.util.SizeEstimator.estimate
+    estimate(x)
   }
 
   def main ( args: Array[String] ) {
@@ -263,10 +258,12 @@ object Add {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    println("@@@@ IJV matrix size: %.2f GB".format(sizeof(((1,1),0.0D)).toDouble*n*m/(1024.0*1024.0*1024.0)))
     val tile_size = sizeof(((1,1),randomTile(N,N))).toDouble
-    println("@@@@ tile matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
-    println("@@@@ sparse partition sizes: "+Az._3.map{ case (_,(_,_,(_,a,_))) => a.length }.collect.toList)
+    println("@@@ number of tiles: "+(n/N)+"*"+(m/N)+" = "+((n/N)*(m/N)))
+    println("@@@@ dense matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
+    val sparse_tile = q("tensor(N)(N)[ ((i,j),random()) | i <- 0..(N-1), j <- 0..(N-1), random() > 9.9 ]")
+    val sparse_tile_size = sizeof(sparse_tile).toDouble
+    println("@@@@ sparse matrix size: %.2f MB".format(sparse_tile_size*(n/N)*(m/N)/(1024.0*1024.0)))
 
     def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()

@@ -16,15 +16,10 @@ import Math._
 
 
 object Multiply {
-  /* The size of any serializable object */
-  def sizeof ( x: Serializable ): Int = {
-    import java.io.{ByteArrayOutputStream,ObjectOutputStream}
-    val bs = new ByteArrayOutputStream()
-    val os = new ObjectOutputStream(bs)
-    os.writeObject(x)
-    os.flush()
-    os.close()
-    bs.toByteArray().length
+  /* The size of an object */
+  def sizeof ( x: AnyRef ): Long = {
+    import org.apache.spark.util.SizeEstimator.estimate
+    estimate(x)
   }
 
   def main ( args: Array[String] ) {
@@ -95,6 +90,8 @@ object Multiply {
     // dense block tensors
     val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
     val BB = (m,n,Bm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
+    AA._3.cache
+    BB._3.cache
 
     val rand = new Random()
     def random () = rand.nextDouble()*10
@@ -102,6 +99,8 @@ object Multiply {
     // sparse block tensors with 99% zeros
     val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
     val Bz = q("tensor*(m)(n)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
+    Az._3.cache
+    Bz._3.cache
 
     def validate ( M: tiled_matrix ) = {
       if (!validate_output)
@@ -119,6 +118,12 @@ object Multiply {
                      .format(ii,jj,i,j,a(i*md+j),C(ii*N+i,jj*N+j)))
         }
       }
+    }
+
+    // forces df to materialize in memory and evaluate all transformations
+    // (noop write format doesn't have much overhead)
+    def force ( df: DataFrame ) {
+      df.write.mode("overwrite").format("noop").save()
     }
 
     def map ( m: BlockMatrix, f: Double => Double ): BlockMatrix
@@ -156,7 +161,7 @@ object Multiply {
         val C = q("""
                   tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
                   """)
-        C._3.cache().count
+        force(C._3)
       } catch { case x: Throwable => println(x); return -1.0 }
       param(data_frames,false)
       (System.currentTimeMillis()-t)/1000.0
@@ -172,7 +177,7 @@ object Multiply {
         val C = q("""
                   tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- aDF, ((kk,j),b) <- bDF, k == kk, let c = a*b, group by (i,j) ]
                   """)
-        C._3.cache().count
+        force(C._3)
       } catch { case x: Throwable => println(x); return -1.0 }
       param(data_frames,false)
       (System.currentTimeMillis()-t)/1000.0
@@ -285,7 +290,7 @@ object Multiply {
                   CC;
                   """)
         param(data_frames,false)
-        C._3.cache().count
+        force(C._3)
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -445,10 +450,7 @@ object Multiply {
                               FROM A JOIN B ON A.J = B.I
                               GROUP BY A.I, B.J
                           """)
-        //println(C.queryExecution)
-        //val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
-        //result.blocks.count()
-        C.cache().count
+        force(C)
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -472,18 +474,18 @@ object Multiply {
                               FROM A JOIN B ON A.J = B.I
                               GROUP BY A.I, B.J
                           """)
-        //println(C.queryExecution)
-        //val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
-        //result.blocks.count()
-        C.cache().count
+        force(C)
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    println("@@@@ IJV matrix size: %.2f GB".format(sizeof(((1,1),0.0D)).toDouble*n*m/(1024.0*1024.0*1024.0)))
+    //println("@@@@ IJV matrix size: %.2f GB".format(sizeof(((1,1),0.0D)).toDouble*n*m/(1024.0*1024.0*1024.0)))
     val tile_size = sizeof(((1,1),randomTile(N,N))).toDouble
-    println("@@@@ tile matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
-    println("@@@@ sparse partition sizes: "+Az._3.map{ case (_,(_,_,(_,a,_))) => a.length }.collect.toList)
+    println("@@@ number of tiles: "+(n/N)+"*"+(m/N)+" = "+((n/N)*(m/N)))
+    println("@@@@ dense matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
+    val sparse_tile = q("tensor(N)(N)[ ((i,j),random()) | i <- 0..(N-1), j <- 0..(N-1), random() > 9.9 ]")
+    val sparse_tile_size = sizeof(sparse_tile).toDouble
+    println("@@@@ sparse matrix size: %.2f MB".format(sparse_tile_size*(n/N)*(m/N)/(1024.0*1024.0)))
 
     def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()
@@ -516,10 +518,10 @@ object Multiply {
     test("DIABLO Multiply sparse-sparse giving sparse",testMultiplyDiabloDACsparseSparseSparseOut)
     test("DIABLO loop Multiply",testMultiplyDiabloLoop)
     test("DIABLO loop Multiply SQL",testMultiplyDiabloLoopDF)
-    test("Hand-written groupByJoin Multiply",testMultiplyCodeGBJ)
+    //test("Hand-written groupByJoin Multiply",testMultiplyCodeGBJ)
     test("Hand-written groupBy Multiply",testMultiplyCode)
     test("Hand-written groupBy MLlib Multiply",testMultiplyMLlibCode)
-    test("Hand-written groupBy Breeze Multiply",testMultiplyBreezeCode)
+    //test("Hand-written groupBy Breeze Multiply",testMultiplyBreezeCode)
     test("SQL Multiply UDAF",testMultiplySQL)
     test("SQL Multiply UDF",testMultiplySQL2)
 

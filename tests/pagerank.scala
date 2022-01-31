@@ -24,8 +24,8 @@ object PageRank {
     val bSize = 1024
     val repeats = 1
     var N = 1024;  // # of graph nodes
-	var b = 0.85;
-	val numIter = 10;
+    var b = 0.85;
+    val numIter = 10;
 
     val G = spark_context.textFile("graph1.txt")
               .map( line => { val a = line.split(" ")
@@ -49,6 +49,7 @@ object PageRank {
 		    for i = 0, N-1 do
 		        for j = 0, N-1 do
 		            P[i] += b*E[j,i]*Q[j];
+                    cache(P);
 		  };
                   P;
 		 """)
@@ -76,6 +77,7 @@ object PageRank {
 		  while (k < numIter) {
 		    k += 1;
 		    P = tensor*(N)[ (j,+/v + (1-b)/N) | ((i,j),e) <- E, (ii,q) <- P, i==ii, let v = b*e*q, group by j ];
+                    cache(P);
 		  };
                   P;
 		 """)
@@ -113,6 +115,7 @@ object PageRank {
                              .map{ case (i,((j,e),p)) => (j, b*e*p) }
                              .reduceByKey(_+_)
                              .map{case (i,p) => (i,p+(1-b)/N)}
+                        P.cache
 		}
 		println(P.count)
 		val nt = (System.currentTimeMillis()-t)/1000.0

@@ -19,7 +19,7 @@ echo "Number of nodes = " $nodes
 executors=$((nodes*10-1))
 echo "Number of executors = " $executors
 
-SPARK_OPTIONS="--driver-memory 24G --num-executors $executors --executor-cores 12 --executor-memory 24G --supervise"
+SPARK_OPTIONS="--driver-memory 24G --num-executors $executors --executor-cores 12 --executor-memory 24G --conf spark.executor.extraJavaOptions=-Xss512m --driver-java-options '-Xss512m' --supervise"
 
 export HADOOP_CONF_DIR=$HOME/expansecluster
 module load openjdk

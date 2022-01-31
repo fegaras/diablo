@@ -16,15 +16,10 @@ import Math._
 
 
 object LinearRegression extends Serializable {
-  /* The size of any serializable object */
-  def sizeof ( x: Serializable ): Int = {
-    import java.io.{ByteArrayOutputStream,ObjectOutputStream}
-    val bs = new ByteArrayOutputStream()
-    val os = new ObjectOutputStream(bs)
-    os.writeObject(x)
-    os.flush()
-    os.close()
-    bs.toByteArray().length
+  /* The size of an object */
+  def sizeof ( x: AnyRef ): Long = {
+    import org.apache.spark.util.SizeEstimator.estimate
+    estimate(x)
   }
 
   def main ( args: Array[String] ) {

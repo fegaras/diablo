@@ -493,6 +493,11 @@ abstract class CodeGeneration {
            if (zero == Var("Nil"))
                q"merge_tensors($xc,$yc,_++_,$zc)"
            else q"merge_tensors($xc,$yc,($nx:$tp,$ny:$tp) => $bc,$zc)"
+      case Call("cache",List(x,IntConst(n)))  // need to replace x
+        => val xc = codeGen(x,env)
+           val nc = TermName("_"+n)
+           val ac = 1.to(n-1).map(i => TermName("_"+i)).map(ic => q"$xc.$ic")
+           q"$xc = (..$ac,cache($xc.$nc))"
       case Call("unique_values",List(Lambda(p@VarPat(v),b)))
         => val bc = codeGen(b,add(p,tq"Int",env))
            val vc = TermName(v)

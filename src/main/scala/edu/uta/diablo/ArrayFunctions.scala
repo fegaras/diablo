@@ -555,10 +555,19 @@ trait ArrayFunctions {
   import org.apache.spark.sql.Encoder
   import scala.reflect.runtime.universe.TypeTag
 
-  def cache[T] ( x: RDD[T] ): RDD[T] = { x.cache; x }
+  // caching is eager for RDDs but lazy for DataFrames
+  def cache[T] ( x: RDD[T] ): RDD[T] = x.cache
 
-  def cache[T] ( x: DiabloDataFrame[T] ): DiabloDataFrame[T]
-    = { x.rdd.cache; x }
+  // forces df to materialize in memory and evaluate all transformations
+  // (noop write format doesn't have much overhead)
+  def cache[T] ( x: DiabloDataFrame[T] ): DiabloDataFrame[T] = x.cache
+
+  def cache2[T] ( x: DiabloDataFrame[T] ): DiabloDataFrame[T] = {
+     val pdir = spark_context.getCheckpointDir.getOrElse("/tmp/cache/")
+     val i = AST.newvar
+     x.write.mode("overwrite").parquet(pdir+i)
+     x.sparkSession.read.parquet(pdir+i)
+  }
 
   def reducer[T] ( mergeT: (T,T) => T, zeroT: T ) ( implicit tag: TypeTag[T] ): Aggregator[T,T,T]
     = new Aggregator[T,T,T] {

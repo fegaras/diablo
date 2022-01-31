@@ -424,7 +424,7 @@ object Typechecker {
           case ce@Call("cache",List(u))
             => typecheck(u,env) match {
                   case tp@StorageType(gtpat(_,_,_,dn,sn),_,_)
-                    => ce.args = List(Nth(u,dn.toInt+sn.toInt+1))    // destructive
+                    => ce.args = List(u,IntConst(dn.toInt+sn.toInt+1))    // destructive
                        tp
                   case tp => tp
                }

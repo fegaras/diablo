@@ -354,11 +354,11 @@ object SQLGenerator {
                  Def(fname,List((vx,tp),(vy,tp)),tp,b),
                  MethodCall(MethodCall(Var("spark"),"udf",null),
                             "register",
-                            List(StringConst("f"),Call("udf",List(Var(fname))))),
-                 make_sql("""SELECT X._1 AS _1,
-                                    CASE WHEN X._2 IS NULL THEN Y._2
-                                         WHEN Y._2 IS NULL THEN X._2
-                                         ELSE f(X._2,Y._2) END AS _2
-                             FROM X FULL JOIN Y ON X._1 = Y._1""")))
+                            List(StringConst(fname),Call("udf",List(Var(fname))))),
+                 make_sql(s"""SELECT X._1 AS _1,
+                                     CASE WHEN X._2 IS NULL THEN Y._2
+                                          WHEN Y._2 IS NULL THEN X._2
+                                          ELSE $fname(X._2,Y._2) END AS _2
+                              FROM X FULL JOIN Y ON X._1 = Y._1""")))
   }
 }
