@@ -3,55 +3,21 @@
 #SBATCH --job-name="diablo"
 #SBATCH --output="run.log"
 #SBATCH --partition=compute
-#SBATCH --nodes=2
-#SBATCH --ntasks-per-node=128
-#SBATCH --mem=248G
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=8
+#SBATCH --mem=16G
 #SBATCH --export=ALL
-#SBATCH --time=60    # time limit in minutes
+#SBATCH --time=10    # time limit in minutes
 
-nodes=$SLURM_NNODES
-echo "Number of nodes = " $nodes
-
-# Expanse node: 128 cores (126 available), 256 GB RAM
-#   executor-cores = 12   (10 executors/node)
-#   executor-memory = 24GB
-#   num-executors = nodes*10-1
-executors=$((nodes*10-1))
-echo "Number of executors = " $executors
-
-SPARK_OPTIONS="--driver-memory 24G --num-executors $executors --executor-cores 12 --executor-memory 24G --supervise"
-
-export HADOOP_CONF_DIR=$HOME/expansecluster
 module load openjdk
 
 SW=/expanse/lustre/projects/uot166/fegaras
 
 export DIABLO_HOME=$SW/diablo
 export SCALA_HOME=$SW/scala-2.12.3
-export HADOOP_HOME=$SW/hadoop-3.2.2
-export MYHADOOP_HOME=$SW/myhadoop
 export SPARK_HOME=$SW/spark-3.1.2-bin-hadoop3.2
 
-PATH="$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$SPARK_HOME/bin:$MYHADOOP_HOME/bin:$SCALA_HOME/bin:$PATH"
-
-# location of scratch space
-scratch=/scratch/$USER/job_$SLURM_JOB_ID
-
-myhadoop-configure.sh -s $scratch
-echo "export TMP=$scratch" >> $HADOOP_CONF_DIR/spark/spark-env.sh
-echo "export TMPDIR=$scratch" >> $HADOOP_CONF_DIR/spark/spark-env.sh
-echo "export SPARK_MASTER_HOST=$SPARK_MASTER_IP" >> $HADOOP_CONF_DIR/spark/spark-env.sh
-export SPARK_MASTER_HOST=$SPARK_MASTER_IP
-source $HADOOP_CONF_DIR/spark/spark-env.sh
-
-export SPARK_LOCAL_DIRS=$scratch
-export TMPDIR=$scratch/tmp
-export _JAVA_OPTIONS=-Djava.io.tmpdir=$TMPDIR
-
-# start HDFS
-start-dfs.sh
-# start Spark
-myspark start
+PATH="$SPARK_HOME/bin:$SCALA_HOME/bin:$PATH"
 
 JARS=.
 for I in `ls $SPARK_HOME/jars/*.jar -I *unsafe*`; do
@@ -68,7 +34,3 @@ for f in $scala_files; do
 done
 echo compilation complete...
 jar cf test.jar -C classes .
-
-myspark stop
-stop-dfs.sh
-myhadoop-cleanup.sh

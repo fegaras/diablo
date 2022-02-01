@@ -25,6 +25,7 @@ object Factorization extends Serializable {
     val m = args(2).toInt
     val d = args(3).toInt  // number of attributes
     parami(block_dim_size,1000)  // size of each dimension in a block
+    parami(number_of_partitions, 10)
     val validate_output = false
     val N = 1000
 
@@ -56,16 +57,23 @@ object Factorization extends Serializable {
     val Pinit = new BlockMatrix(Pm,N,N)
     val Qinit = new BlockMatrix(Qm,N,N)
 
-    val RR = (n,m,Rm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
+    /*val RR = (n,m,Rm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
     val PPinit = (n,d,Pm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
-    val QQinit = (d,m,Qm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
+    val QQinit = (d,m,Qm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })*/
 
     val rand = new Random()
     def random () = rand.nextDouble()*10
 
-    val RSparse = q("tensor*(n)(m)[ ((i,j),RR[i,j]) | i <- 0..(n-1), j <- 0..(m-1) ]")
+    val RR = q("tensor*(n,m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1) ]")
+    val PPinit = q("tensor*(n,d)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(d-1) ]")
+    val QQinit = q("tensor*(d,m)[ ((i,j),random()) | i <- 0..(d-1), j <- 0..(m-1) ]")
+
+    /*val RSparse = q("tensor*(n)(m)[ ((i,j),RR[i,j]) | i <- 0..(n-1), j <- 0..(m-1) ]")
     val PinitSparse = q("tensor*(n)(d)[ ((i,j),PPinit[i,j]) | i <- 0..(n-1), j <- 0..(d-1) ]")
-    val QinitSparse = q("tensor*(d)(m)[ ((i,j),QQinit[i,j]) | i <- 0..(d-1), j <- 0..(m-1) ]")
+    val QinitSparse = q("tensor*(d)(m)[ ((i,j),QQinit[i,j]) | i <- 0..(d-1), j <- 0..(m-1) ]")*/
+    val RSparse = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.0 ]")
+    val PinitSparse = q("tensor*(n)(d)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(d-1), random() > 9.0 ]")
+    val QinitSparse = q("tensor*(d)(m)[ ((i,j),random()) | i <- 0..(d-1), j <- 0..(m-1), random() > 9.0 ]")
 
     def map ( m: BlockMatrix, f: Double => Double ): BlockMatrix
       = new BlockMatrix(m.blocks.map{ case (i,a) => (i,new DenseMatrix(a.numRows,a.numCols,a.toArray.map(f))) },
@@ -121,9 +129,9 @@ object Factorization extends Serializable {
       var Q = QQinit
       try {
         q("""
-          var E1 = tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
+          var E1 = tensor*(n)(m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
                                    kk == k, let v = p*q, group by (i,j) ];
-          var E2 = tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <= E, ((ii,jj),v) <- E1,
+          var E2 = tensor*(n)(m)[ ((i,j),r-v) | ((i,j),r) <= E, ((ii,jj),v) <- E1,
                                           ii == i, jj == j];
           var P1 = tensor*(n,d)[ ((i,k),+/v)
                           | ((i,j),e) <- E2, ((k,jj),q) <- Q, jj == j,
@@ -150,20 +158,20 @@ object Factorization extends Serializable {
       var Q = QinitSparse
       try {
         q("""
-          var E1 = tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
+          var E1 = tensor*(n)(m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
                                                kk == k, let v = p*q, group by (i,j) ];
-          var E2 = tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <= E, ((ii,jj),v) <= E1,
+          var E2 = tensor*(n)(m)[ ((i,j),r-v) | ((i,j),r) <= E, ((ii,jj),v) <= E1,
                                           ii == i, jj == j];
-          var P1 = tensor*(n,d)[ ((i,k),+/v)
+          var P1 = tensor*(n)(d)[ ((i,k),+/v)
                           | ((i,j),e) <- E2, ((k,jj),q) <- Q, jj == j,
                             let v = 2*a*e*q, group by (i,k) ];
-          var P2 = tensor*(n,d)[ ((i,k),p1+p-a*b*p)
+          var P2 = tensor*(n)(d)[ ((i,k),p1+p-a*b*p)
                           | ((i,k),p1) <= P1, ((ii,kk),p) <= P, ii==i,kk==k ];
           P = P2;
-          var Q1 = tensor*(d,m)[ ((k,j),+/v)
+          var Q1 = tensor*(d)(m)[ ((k,j),+/v)
                           | ((i,j),e) <- E2, ((ii,k),p) <- P, ii == i,
                             let v = 2*a*e*p, group by (k,j) ];
-          var Q2 = tensor*(d,m)[ ((k,j),q1+q-a*b*q)
+          var Q2 = tensor*(d)(m)[ ((k,j),q1+q-a*b*q)
                           | ((k,j),q1) <= Q1, ((kk,jj),q) <= Q, jj==j,kk==k ];
           Q = Q2;
           """)
@@ -179,14 +187,14 @@ object Factorization extends Serializable {
       var Q = QQinit
       try {
         q("""
-          var E1 = tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
+          var E1 = tensor*(n)(m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
                                                kk == k, let v = p*q, group by (i,j) ];
-          var E2 = tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <= E, ((ii,jj),v) <= E1,
+          var E2 = tensor*(n)(m)[ ((i,j),r-v) | ((i,j),r) <= E, ((ii,jj),v) <= E1,
                                           ii == i, jj == j];
-          var P1 = tensor*(n,d)[ ((i,k),+/v)
+          var P1 = tensor*(n)(d)[ ((i,k),+/v)
                           | ((i,j),e) <- E2, ((k,jj),q) <- Q, jj == j,
                             let v = 2*a*e*q, group by (i,k) ];
-          var P2 = tensor*(n,d)[ ((i,k),p1+p-a*b*p)
+          var P2 = tensor*(n)(d)[ ((i,k),p1+p-a*b*p)
                           | ((i,k),p1) <- P1, ((ii,kk),p) <= P, ii==i,kk==k ];
           P = P2;
           var Q1 = tensor*(d,m)[ ((k,j),+/v)
@@ -231,30 +239,37 @@ object Factorization extends Serializable {
     type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
 
     def validate ( M1: tiled_matrix, M2: tiled_matrix ) = {
-		if (!validate_output)
-			M1._3.count()+M2._3.count()
-		else {
-			var P = Pinit
-			var Q = Qinit
-			var E = R.subtract(P.multiply(Q))
-			P = P.add(map(map(E.multiply(Q.transpose),2*_).subtract(map(P,b*_)),a*_))
-			Q = Q.add(map(map(E.transpose.multiply(P),2*_).transpose.subtract(map(Q,b*_)),a*_))
+      if (!validate_output)
+        M1._3.count()+M2._3.count()
+      else {
+        var P = Pinit
+        var Q = Qinit
+        var E = R.subtract(P.multiply(Q))
+        P = P.add(map(map(E.multiply(Q.transpose),2*_).subtract(map(P,b*_)),a*_))
+        Q = Q.add(map(map(E.transpose.multiply(P),2*_).transpose.subtract(map(Q,b*_)),a*_))
 
-			println("Validating ...")
-			compareMatrix(M1, P.toLocalMatrix())
-			compareMatrix(M2, Q.toLocalMatrix())
-			def compareMatrix(A: tiled_matrix, B: Matrix) {
-				var C = A._3.collect
-				for { ((ii,jj),(nd,md,a)) <- C
-					i <- 0 until nd
-					j <- 0 until md } {
-					val ci = ii*N+nd
-					if (Math.abs(a(i*md+j)-B(ii*N+i,jj*N+j)) > 0.3)
-						println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f".format(ii,jj,i,j,a(i*md+j),B(ii*N+i,jj*N+j)))
-				}
-			}
-		}
-	}
+        println("Validating ...")
+        compareMatrix(M1, P.toLocalMatrix())
+        compareMatrix(M2, Q.toLocalMatrix())
+        def compareMatrix(A: tiled_matrix, B: Matrix) {
+          var C = A._3.collect
+          for { ((ii,jj),(nd,md,a)) <- C
+            i <- 0 until nd
+            j <- 0 until md } {
+            val ci = ii*N+nd
+            if (Math.abs(a(i*md+j)-B(ii*N+i,jj*N+j)) > 0.3)
+              println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f".format(ii,jj,i,j,a(i*md+j),B(ii*N+i,jj*N+j)))
+          }
+        }
+      }
+    }
+
+    val tile_size = sizeof(((1,1),randomTile(N,N))).toDouble
+    println("@@@ number of tiles: "+(n/N)+"*"+(m/N)+" = "+((n/N)*(m/N)))
+    println("@@@@ dense matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
+    val sparse_tile = q("tensor(N)(N)[ ((i,j),random()) | i <- 0..(N-1), j <- 0..(N-1), random() > 9.9 ]")
+    val sparse_tile_size = sizeof(sparse_tile).toDouble
+    println("@@@@ sparse matrix size: %.2f MB".format(sparse_tile_size*(n/N)*(m/N)/(1024.0*1024.0)))
 
     def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()
@@ -271,8 +286,7 @@ object Factorization extends Serializable {
         }
       }
       if (i > 0) s = s/i
-      print("*** %s cores=%d n=%d m=%d d=%d N=%d %.2f GB ".format(name,cores,n,m,d,N,
-                                               (8.0*n.toDouble*n)/(1024.0*1024.0*1024.0)))
+      print("*** %s cores=%d n=%d m=%d d=%d N=%d ".format(name,cores,n,m,d,N))
       println("tries=%d %.3f secs".format(i,s))
     }
 

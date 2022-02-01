@@ -36,6 +36,8 @@ PATH="$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$SPARK_HOME/bin:$MYHADOOP_HOME/bin:$SCA
 
 # location of scratch space
 scratch=/scratch/$USER/job_$SLURM_JOB_ID
+export SPARK_JAVA_OPTS="-Dspark.local.dir=$scratch"
+export MH_SCRATCH_DIR=$scratch
 
 myhadoop-configure.sh -s $scratch
 echo "export TMP=$scratch" >> $HADOOP_CONF_DIR/spark/spark-env.sh
@@ -49,25 +51,14 @@ export TMPDIR=$scratch/tmp
 export _JAVA_OPTIONS=-Djava.io.tmpdir=$TMPDIR
 
 # start HDFS
-start-dfs.sh
+$HADOOP_HOME/sbin/start-dfs.sh
 # start Spark
-myspark start
+$SPARK_HOME/sbin/start-all.sh -h $SPARK_MASTER_HOST
 
 JARS=.
 for I in `ls $SPARK_HOME/jars/*.jar -I *unsafe*`; do
     JARS=$JARS:$I
 done
-
-rm -rf classes
-mkdir -p classes
-
-scala_files="add.scala multiply.scala factorization.scala"
-for f in $scala_files; do
-    echo compiling $f ...
-    scalac -d classes -cp classes:${JARS}:${DIABLO_HOME}/lib/diablo.jar $f >/dev/null
-done
-
-jar cf test.jar -C classes .
 
 scale=100        # scale of datasets
 ns=5             # number of datasets per experiment
@@ -82,16 +73,37 @@ for ((i=1; i<=$ns; i++)); do   # for each different dataset
       spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master $MASTER $SPARK_OPTIONS test.jar $repeat $n
 
    j=$(echo "scale=3;sqrt($i/$ns)*200*$scale" | bc); n=${j%.*}
-      spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master $MASTER $SPARK_OPTIONS test.jar $repeat $n 1
+      spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master $MASTER $SPARK_OPTIONS test.jar $repeat $n
 
    j=$(echo "scale=3;sqrt($i/$ns)*200*$scale" | bc); n=${j%.*}
-      spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Factorization --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $n 1000 0
+      spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Factorization --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $n 10
 
    j=$(echo "scale=3;sqrt($i/$ns)*200*$scale" | bc); n=${j%.*}
-      spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Factorization --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $n 1000 1
+      spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Factorization --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $n 10
 
 done
 
-myspark stop
-stop-dfs.sh
-myhadoop-cleanup.sh
+spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Add --master $MASTER $SPARK_OPTIONS test.jar 2 12000
+spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master $MASTER $SPARK_OPTIONS test.jar 2 10000 1000
+
+hdfs dfs -mkdir -p /user/$USER
+hdfs dfs -put page-rank2.txt /user/$USER/page-rank.txt
+spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class PageRank --master $MASTER $SPARK_OPTIONS test.jar 2 20000 page-rank2.txt
+
+spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Factorization --master $MASTER $SPARK_OPTIONS test.jar 2 20000 20000 10
+
+hdfs dfs -put data_10000/lr_input1.txt /user/$USER/lr_input1.txt
+hdfs dfs -put data_10000/lr_output1.txt /user/$USER/lr_output1.txt
+hdfs dfs -put data_10000/lr_input2.txt /user/$USER/lr_input2.txt
+hdfs dfs -put data_10000/lr_output2.txt /user/$USER/lr_output2.txt
+spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class LinearRegression --master $MASTER $SPARK_OPTIONS test.jar 1000 10 /user/$USER/lr_input1.txt /user/$USER/lr_output1.txt /user/$USER/lr_input2.txt /user/$USER/lr_output2.txt
+
+hdfs dfs -put X_train.txt /user/$USER/X_train.txt
+hdfs dfs -put y_train.txt /user/$USER/y_train.txt
+hdfs dfs -put X_test.txt /user/$USER/X_test.txt
+hdfs dfs -put y_test.txt /user/$USER/y_test.txt
+spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class NeuralNetwork --master $MASTER $SPARK_OPTIONS test.jar 10000 10 /user/$USER/X_train.txt /user/$USER/y_train.txt /user/$USER/X_test.txt /user/$USER/y_test.txt
+
+$SPARK_HOME/sbin/stop-all.sh
+$HADOOP_HOME/sbin/stop-dfs.sh
+$MYHADOOP_HOME/bin/myhadoop-cleanup.sh

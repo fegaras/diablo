@@ -11,7 +11,7 @@ import org.apache.spark.mllib.linalg._
 
 object PageRank {
   def main ( args: Array[String] ) {
-    val conf = new SparkConf().setAppName("PageRank")
+	val conf = new SparkConf().setAppName("PageRank")
     spark_context = new SparkContext(conf)
     conf.set("spark.logConf","false")
     conf.set("spark.eventLog.enabled","false")
@@ -20,14 +20,14 @@ object PageRank {
     import spark.implicits._
 
     parami(number_of_partitions,10)
-    parami(block_dim_size,1024)
-    val bSize = 1024
-    val repeats = 1
-    var N = args(0).toInt  // # of graph nodes
+    parami(block_dim_size,1000)
+    val bSize = 1000
+    val repeats = args(0).toInt
+	var N = args(1).toInt  // # of graph nodes
 	var b = 0.85
 	val numIter = 10
 
-    val G = spark_context.textFile(args(1))
+    val G = spark_context.textFile(args(2))
               .map( line => { val a = line.split(" ").toList
                               (a(0).toInt,a(1).toInt) } ).cache
 	
@@ -88,20 +88,50 @@ object PageRank {
 	}
 	
 	def testGraphXIJV (): Double = {
-          val t = System.currentTimeMillis()
-          try {
-                val graph = GraphLoader.edgeListFile(spark_context, args(1))
-		val ranks = graph.pageRank(0.0001).vertices
-		ranks.sortBy(x => x._2,false,1).take(30).map(println)
-		println(ranks.count)
-          } catch { case x: Throwable => println(x); return -1.0 }
-          (System.currentTimeMillis()-t)/1000.0
-        }
+        val t = System.currentTimeMillis()
+        try {
+            val graph = GraphLoader.edgeListFile(spark_context, args(2))
+			val ranks = graph.pageRank(0.0001).vertices
+			ranks.sortBy(x => x._2,false,1).take(30).map(println)
+			println(ranks.count)
+        } catch { case x: Throwable => println(x); return -1.0 }
+        (System.currentTimeMillis()-t)/1000.0
+    }
+
+	def testGraphXPregel (): Double = {
+		val t = System.currentTimeMillis()
+		try {
+		val graph = GraphLoader.edgeListFile(spark_context, args(2))
+		val pagerankGraph: Graph[(Double, Double), Double] = graph
+			// Associate the degree with each vertex
+			.outerJoinVertices(graph.outDegrees) {
+			(vid, vdata, deg) => deg.getOrElse(0)
+			}
+			// Set the weight on the edges based on the degree
+			.mapTriplets( e => 1.0 / e.srcAttr )
+			// Set the vertex attributes to (initialPR, delta = 0)
+			.mapVertices { (id, attr) => (0.0, 0.0)}
+			.cache()
+		val ranks = pagerankGraph.pregel((1-b)/b,numIter)(
+			(id, attr, msgSum) => {
+			val (oldPR, lastDelta) = attr
+			val newPR = oldPR + b * msgSum
+			(newPR, newPR - oldPR)
+			},
+			triplet => {
+				Iterator((triplet.dstId, triplet.srcAttr._2*triplet.attr))
+			},
+			(m,n) => m+n
+		)
+		ranks.vertices.sortBy(x => x._2,false,1).take(30).map(println)
+		println(ranks.vertices.count)
+		} catch { case x: Throwable => println(x); return -1.0 }
+		(System.currentTimeMillis()-t)/1000.0
+    }
 	
 	def testHandWrittenPageRank(): Double = {
 		val t = System.currentTimeMillis()
 		var C = G.map{ case (i,j) => (i,1)}.reduceByKey(_+_)
-		println(C.count)
 		var E = G.join(C).map{ case (i,(j,c)) => ((i,j),1.0/c) }
 		var P = spark_context.parallelize(0 to N-1).map(i => (i,1.0/N))
 		var k = 0
@@ -207,7 +237,7 @@ object PageRank {
     
     test("Diablo loop PageRank",testPageRankDiabloLoop)
     test("Diablo PageRank",testPageRankDiablo)
-    test("GraphX",testGraphXIJV)
+    test("GraphX",testGraphXPregel)
     test("Hand-written PageRank",testHandWrittenPageRank)
     test("MLlib Local",testMLlibLocalPageRank)
     test("MLlib Distributed",testMLlibDistPageRank)

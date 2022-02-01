@@ -51,11 +51,31 @@ object Add {
                                                          if ((j+1)*N > cols) cols%N else N)) }
     }
 
+    def randomTileSparse ( nd: Int, md: Int ): DenseMatrix = {
+      val max = 10
+      val rand = new Random()
+      new DenseMatrix(nd,md,Array.tabulate(nd*md){ i => if(rand.nextDouble() > 0.01) 0.0 else rand.nextDouble()*max })
+    }
+
+    def randomSparseMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
+      val l = Random.shuffle((0 until (rows+N-1)/N).toList)
+      val r = Random.shuffle((0 until (cols+N-1)/N).toList)
+      spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
+            .map{ case (i,j) => ((i,j),randomTileSparse(if ((i+1)*N > rows) rows%N else N,
+                              if ((j+1)*N > cols) cols%N else N)) }
+    }
+
     val Am = randomMatrix(n,m).cache()
     val Bm = randomMatrix(n,m).cache()
 
     val A = new BlockMatrix(Am,N,N)
     val B = new BlockMatrix(Bm,N,N)
+
+    val AS = randomSparseMatrix(n,m).cache()
+    val BS = randomSparseMatrix(m,n).cache()
+
+    val ASparse = new BlockMatrix(AS,N,N)
+    val BSparse = new BlockMatrix(BS,N,N)
 
     type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
 
@@ -89,12 +109,32 @@ object Add {
       }
     }
 
-    // matrix addition of tiled matrices in MLlib.linalg
-    def testAddMLlib: Double = {
+    // matrix addition of Dense-Dense tiled matrices in MLlib.linalg
+    def testAddMLlibDenseDense: Double = {
       val t = System.currentTimeMillis()
       try {
-        val C = A.add(B)
-        val x = C.blocks.count
+      val C = A.add(B)
+      val x = C.blocks.count
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix addition of Sparse-Dense tiled matrices in MLlib.linalg
+    def testAddMLlibSparseDense: Double = {
+      val t = System.currentTimeMillis()
+      try {
+      val C = ASparse.add(B)
+      val x = C.blocks.count
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix addition of Sparse-Sparse tiled matrices in MLlib.linalg
+    def testAddMLlibSparseSparse: Double = {
+      val t = System.currentTimeMillis()
+      try {
+      val C = ASparse.add(BSparse)
+      val x = C.blocks.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -119,7 +159,33 @@ object Add {
         val C = q("""
                   tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <- AA, ((ii,jj),b) <- BB, ii == i, jj == j ];
                   """)
-        C._3.count()
+        C._3.rdd.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      param(data_frames,false)
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    def testAddDiabloDFsparseDense: Double = {
+      param(data_frames,true)
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <= Az, ((ii,jj),b) <- BB, ii == i, jj == j ];
+                  """)
+        C._3.rdd.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      param(data_frames,false)
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    def testAddDiabloDFsparse: Double = {
+      param(data_frames,true)
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <= Az, ((ii,jj),b) <= Bz, ii == i, jj == j ];
+                  """)
+        C._3.rdd.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       param(data_frames,false)
       (System.currentTimeMillis()-t)/1000.0
@@ -284,11 +350,15 @@ object Add {
       println("tries=%d %.3f secs".format(i,s))
     }
 
-    test("MLlib Add",testAddMLlib)
+    test("MLlib Add dense-dense",testAddMLlibDenseDense)
+    test("MLlib Add sparse-dense",testAddMLlibSparseDense)
+    test("MLlib Add sparse-sparse",testAddMLlibSparseSparse)
+    test("DIABLO Add SQL dense-dense",testAddDiabloDF)
+    test("DIABLO Add SQL sparse-dense",testAddDiabloDFsparseDense)
+    test("DIABLO Add SQL sparse-sparse",testAddDiabloDFsparse)
     test("DIABLO Add",testAddDiabloDAC)
-    test("DIABLO Add SQL",testAddDiabloDF)
-    test("DIABLO Add sparse-sparse",testAddDiabloDACsparse)
     test("DIABLO Add sparse-dense",testAddDiabloDACsparseDense)
+    test("DIABLO Add sparse-sparse",testAddDiabloDACsparse)
     test("DIABLO Add dense-dense giving sparse",testAddDiabloDACdenseSparseOut)
     test("DIABLO Add sparse-dense giving sparse",testAddDiabloDACsparseDenseSparseOut)
     test("DIABLO Add sparse-sparse giving sparse",testAddDiabloDACsparseSparseSparseOut)

@@ -7,6 +7,9 @@ import org.apache.spark.sql.expressions.Aggregator
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.mllib.linalg.distributed._
 import org.apache.spark.mllib.linalg._
+import org.apache.spark.ml.regression.LinearRegression
+import org.apache.spark.ml.feature.LabeledPoint
+import org.apache.spark.ml.linalg.Vectors
 //import com.github.fommil.netlib.NativeSystemBLAS
 import org.apache.log4j._
 import org.apache.hadoop.fs._
@@ -29,14 +32,15 @@ object LinearRegression extends Serializable {
     conf.set("spark.eventLog.enabled","false")
     LogManager.getRootLogger().setLevel(Level.WARN)
 	
-	parami(number_of_partitions,10)
+    parami(number_of_partitions,100)
     parami(block_dim_size,1000)
-	val repeats = args(0).toInt
-	val N = 1000
+    val repeats = 1
+    val N = 1000
 	
-	val lrate = 0.0005
-    val n = 900000
-    val test_size = 100000
+    val lrate = 0.0005
+    val total_size = args(0).toInt
+    val n = (0.8*total_size).toInt
+    val test_size = total_size-n
     val m = 100
     val numIter = args(1).toInt
     val rand = new Random()
@@ -64,18 +68,19 @@ object LinearRegression extends Serializable {
 			output(i) = v
 		var theta = Array.tabulate(m){i => 1.0}
 		for (itr <- 0 until numIter) {
-			var dev_sum = Array.tabulate(m){i => 0.0}
-			for (i <- 0 until m) {
-				for (j <- 0 until n) {
-					var xt = 0.0
-					for (k <- 0 until m) {
-						xt += theta(k) * input(j*m+k)
-					}
-					dev_sum(i) += (xt - output(j)) * input(j*m+i)
+			var x_theta = Array.tabulate(n){i => 0.0}
+			var d_theta = Array.tabulate(m){i => 0.0}
+			for (i <- 0 until n) {
+				for (j <- 0 until m) {
+					x_theta(i) += theta(j) * input(i*m+j)
 				}
+				x_theta(i) -= output(i)
 			}
 			for (i <- 0 until m) {
-				theta(i) -= (1.0 / n) * lrate * dev_sum(i)
+				for (j <- 0 until n) {
+					d_theta(i) += x_theta(j) * input(j*m+i)
+				}
+				theta(i) -= (1.0 / n) * lrate * d_theta(i)
 			}
 		}
 		val test_input = Array.tabulate(test_size*m){i => 0.0}
@@ -84,15 +89,14 @@ object LinearRegression extends Serializable {
 		val test_output = Array.tabulate(test_size){i => 0.0}
 		for ((i,v) <- y_test.collect)
 			test_output(i) = v
+		var x_theta = Array.tabulate(test_size){i => 0.0}
 		var cost = 0.0
-		for (i <- 0 until m) {
-			for (j <- 0 until test_size) {
-				var xt = 0.0
-				for (k <- 0 until m) {
-					xt += theta(k) * test_input(j*m+k)
-				}
-				cost += (0.5/test_size)*(xt - test_output(j)) * (xt - test_output(j))
+		for (i <- 0 until test_size) {
+			for (j <- 0 until m) {
+				x_theta(i) += theta(j) * test_input(i*m+j)
 			}
+			x_theta(i) -= test_output(i)
+			cost += (0.5/test_size) * x_theta(i) * x_theta(i)
 		}
 		println("Cost: "+cost)
 		(System.currentTimeMillis()-t)/1000.0
@@ -106,7 +110,7 @@ object LinearRegression extends Serializable {
     	val input2 = X_test
     	val output2 = y_test
     	val cost = q("""
-			var A = tensor*(n)(m)[((i,j),v) | ((i,j),v) <- input1];
+			var A = tensor*(n,m)[((i,j),v) | ((i,j),v) <- input1];
 			var B = tensor*(n)[(i,v) | (i,v) <- output1];
 			var W = tensor*(m)[(i,v) | (i,v) <- theta];
 			var itr = 0;
@@ -127,11 +131,10 @@ object LinearRegression extends Serializable {
 				}
 				itr += 1;
 			}
-			var A1 = tensor*(test_size)(m)[((i,j),v) | ((i,j),v) <- input2];
+			var A1 = tensor*(test_size,m)[((i,j),v) | ((i,j),v) <- input2];
 			var B1 = tensor*(test_size)[(i,v) | (i,v) <- output2];
 			var cost_val = 0.0;
 			var x_theta = tensor*(test_size)[(i,0.0) | (i,v) <- output2];
-			var d_theta = tensor*(m)[(i,0.0) | (i,v) <- theta];
 			for i = 0, test_size-1 do {
 				for j = 0, m-1 do {
 					x_theta[i] += W[j]*A1[i,j];
@@ -153,7 +156,7 @@ object LinearRegression extends Serializable {
     	val input2 = X_test
     	val output2 = y_test
     	val cost = q("""
-			var A = tensor*(n)(m)[((i,j),v) | ((i,j),v) <- input1];
+			var A = tensor*(n,m)[((i,j),v) | ((i,j),v) <- input1 ];
 			var B = tensor*(n)[(i,v) | (i,v) <- output1];
 			var W = tensor*(m)[(i,v) | (i,v) <- theta];
 			var itr = 0;
@@ -164,7 +167,7 @@ object LinearRegression extends Serializable {
 				W = tensor*(m)[(i,a-(1.0/n)*lrate*b) | (i,a) <- W, (ii,b) <- d_theta, i==ii];
 			  	itr += 1;
 			};
-			var A1 = tensor*(test_size)(m)[((i,j),v) | ((i,j),v) <- input2];
+			var A1 = tensor*(test_size,m)[((i,j),v) | ((i,j),v) <- input2];
 			var B1 = tensor*(test_size)[(i,v) | (i,v) <- output2];
 			var x_theta = tensor*(test_size)[(i,+/v) | ((i,j),a) <- A1, (jj,w) <- W, j==jj, let v=w*a, group by i];
 			var x_theta_minus_y = tensor*(test_size)[(i,a-b) | (i,a) <- x_theta, (ii,b) <- B1, i==ii];
@@ -175,7 +178,7 @@ object LinearRegression extends Serializable {
 	  	(System.currentTimeMillis()-t)/1000.0
     }
     
-    def testMLlibLR(): Double = {
+    def testMLlibHandWrittenLR(): Double = {
     	val t = System.currentTimeMillis()
     	var theta = new CoordinateMatrix(sc.parallelize(0 to m-1).map(i => MatrixEntry(i,0,1.0))).toBlockMatrix(N,1).cache
     	val input1 = new CoordinateMatrix(X_train.map{ case ((i,j),v) => MatrixEntry(i,j,v)}).toBlockMatrix(N,N).cache
@@ -191,13 +194,57 @@ object LinearRegression extends Serializable {
 		val output2 = new CoordinateMatrix(y_test.map{ case (i,v) => MatrixEntry(i,0,v)}).toBlockMatrix(N,1).cache
 		val x_theta_minus_y = input2.multiply(theta).subtract(output2)
 		val cost = x_theta_minus_y.toCoordinateMatrix().entries
-						.map(e => (0.5/n)*e.value*e.value).reduce(_+_)
+						.map(e => (0.5/test_size)*e.value*e.value).reduce(_+_)
 	  	println("Cost: "+cost)
 	  	(System.currentTimeMillis()-t)/1000.0
     }
 
     val spark = SparkSession.builder().config(conf).getOrCreate()
     import spark.implicits._
+
+    def testMLlibLR(): Double = {
+    	val t = System.currentTimeMillis()
+    	
+    	def vect ( a: Iterable[Double] ): org.apache.spark.ml.linalg.Vector = {
+		  val s = Array.ofDim[Double](n*m)
+		  var count = 0
+		  for(x <- a) {
+			s(count) = x
+			count += 1
+		  }
+		  Vectors.dense(s)
+		}
+
+		// Load training data
+		X_train.map{case ((i,j),v) => (i,v)}.groupByKey()
+				.map{case (i,v) => (i, vect(v))}.toDF.createOrReplaceTempView("X_d")
+		y_train.toDF.createOrReplaceTempView("Y_d")
+		X_test.map{case ((i,j),v) => (i,v)}.groupByKey()
+				.map{case (i,v) => (i, vect(v))}.toDF.createOrReplaceTempView("X_test_d")
+		y_test.toDF.createOrReplaceTempView("Y_test_d")
+
+		val training_data = spark.sql("select Y_d._2 as label, X_d._2 as features from X_d join Y_d on X_d._1=Y_d._1")
+			.rdd.map{row => LabeledPoint(
+		  	row.getAs[Double]("label"),
+		  	row.getAs[org.apache.spark.ml.linalg.Vector]("features")
+		)}.toDF.cache()
+
+		val lr = new LinearRegression()
+          .setMaxIter(numIter)
+          .setFitIntercept(false)
+          .setRegParam(1.0)
+
+        val lrModel = lr.fit(training_data)
+
+		val test_data = spark.sql("select Y_test_d._2 as label, X_test_d._2 as features from X_test_d join Y_test_d on X_test_d._1=Y_test_d._1")
+			.rdd.map{row => LabeledPoint(
+		  	row.getAs[Double]("label"),
+		  	row.getAs[org.apache.spark.ml.linalg.Vector]("features")
+		)}.toDF.cache()
+		val predictions = lrModel.transform(test_data)
+		predictions.rdd.count()
+	  	(System.currentTimeMillis()-t)/1000.0
+    }
 
 	def test ( name: String, f: => Double ) {
 		val cores = Runtime.getRuntime().availableProcessors()
@@ -221,6 +268,7 @@ object LinearRegression extends Serializable {
     test("Handwritten-Loop Linear Regression",testHandWrittenLoopLR)
     test("Diablo loop Linear Regression",testDiabloLoopLR)
     test("Diablo Linear Regression",testDiabloLR)
+    test("MLlib Handwritten Linear Regression",testMLlibHandWrittenLR)
     test("MLlib Linear Regression",testMLlibLR)
     
     sc.stop()

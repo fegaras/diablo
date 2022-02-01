@@ -79,11 +79,31 @@ object Multiply {
                                                          if ((j+1)*N > cols) cols%N else N)) }
     }
 
+    def randomTileSparse ( nd: Int, md: Int ): DenseMatrix = {
+      val max = 10
+      val rand = new Random()
+      new DenseMatrix(nd,md,Array.tabulate(nd*md){ i => if(rand.nextDouble() > 0.01) 0.0 else rand.nextDouble()*max })
+    }
+
+    def randomSparseMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
+      val l = Random.shuffle((0 until (rows+N-1)/N).toList)
+      val r = Random.shuffle((0 until (cols+N-1)/N).toList)
+      spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
+            .map{ case (i,j) => ((i,j),randomTileSparse(if ((i+1)*N > rows) rows%N else N,
+                              if ((j+1)*N > cols) cols%N else N)) }
+    }
+
     val Am = randomMatrix(n,m).cache()
     val Bm = randomMatrix(m,n).cache()
 
     val A = new BlockMatrix(Am,N,N)
     val B = new BlockMatrix(Bm,N,N)
+
+    val AS = randomSparseMatrix(n,m).cache()
+    val BS = randomSparseMatrix(m,n).cache()
+
+    val ASparse = new BlockMatrix(AS,N,N)
+    val BSparse = new BlockMatrix(BS,N,N)
 
     type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
 
@@ -120,11 +140,31 @@ object Multiply {
       = new BlockMatrix(m.blocks.map{ case (i,a) => (i,new DenseMatrix(N,N,a.toArray.map(f))) },
                         m.rowsPerBlock,m.colsPerBlock)
 
-    // matrix multiplication of tiled matrices in MLlib.linalg
-    def testMultiplyMLlib (): Double = {
+    // matrix multiplication of Dense-Dense tiled matrices in MLlib.linalg
+    def testMultiplyMLlibDenseDense (): Double = {
       val t = System.currentTimeMillis()
       try {
-        val C = A.multiply(B)
+      val C = A.multiply(B)
+      val x = C.blocks.count
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix multiplication of Sparse-Dense tiled matrices in MLlib.linalg
+    def testMultiplyMLlibSparseDense (): Double = {
+      val t = System.currentTimeMillis()
+      try {
+      val C = ASparse.multiply(B)
+      val x = C.blocks.count
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix multiplication of Sparse-Sparse tiled matrices in MLlib.linalg
+    def testMultiplyMLlibSparseSparse (): Double = {
+     val t = System.currentTimeMillis()
+      try {
+        val C = ASparse.multiply(BSparse)
         val x = C.blocks.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
@@ -151,6 +191,32 @@ object Multiply {
                   tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
                   """)
         C._3.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      param(data_frames,false)
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    def testMultiplyDiabloDFsparse (): Double = {
+      val t = System.currentTimeMillis()
+      param(data_frames,true)
+      try {
+        val C = q("""
+                  tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- Az, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
+                  """)
+        C._3.rdd.count()
+      } catch { case x: Throwable => println(x); return -1.0 }
+      param(data_frames,false)
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    def testMultiplyDiabloDFsparseDense (): Double = {
+      val t = System.currentTimeMillis()
+      param(data_frames,true)
+      try {
+        val C = q("""
+                  tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- Az, ((kk,j),b) <- Bz, k == kk, let c = a*b, group by (i,j) ]
+                  """)
+        C._3.rdd.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       param(data_frames,false)
       (System.currentTimeMillis()-t)/1000.0
@@ -466,7 +532,12 @@ object Multiply {
     }
 
     //test("DIABLO IJV Multiply",testMultiplyIJV)
-    test("MLlib Multiply",testMultiplyMLlib)
+    test("MLlib Multiply dense-dense",testMultiplyMLlibDenseDense)
+    test("MLlib Multiply sparse-dense",testMultiplyMLlibSparseDense)
+    test("MLlib Multiply sparse-sparse",testMultiplyMLlibSparseSparse)
+    test("DIABLO Multiply SQL dense-dense",testMultiplyDiabloDF)
+    test("DIABLO Multiply SQL sparse-dense",testMultiplyDiabloDFsparseDense)
+    test("DIABLO Multiply SQL sparse-sparse",testMultiplyDiabloDFsparse)
     test("DIABLO Multiply dense-dense giving dense",testMultiplyDiabloDAC)
     test("DIABLO Multiply SQL",testMultiplyDiabloDF)
     test("DIABLO Multiply sparse-dense giving dense",testMultiplyDiabloDACsparseDense)
