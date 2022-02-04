@@ -55,7 +55,7 @@ object Lifting {
                                      liftedType,Lambda(nvp,vb),Lambda(nsp,nsb))
   }
 
-  val pat: Regex = """(full_|)(block_|)(bool_|)tensor_(\d+)_(\d+)""".r
+  val pat: Regex = """(full_|)(rdd_block_|dataset_block_|)(bool_|)tensor_(\d+)_(\d+)""".r
   val btpat: Regex = """(full_|)bool_tensor_(\d+)_(\d+)""".r
   val tpat: Regex = """(full_|)tensor_(\d+)_(\d+)""".r
   val bpat: Regex = """(full_|)(rdd|dataset)_block_tensor_(\d+)_(\d+)""".r

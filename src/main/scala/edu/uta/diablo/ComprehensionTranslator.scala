@@ -1010,12 +1010,14 @@ object ComprehensionTranslator {
           case LetBinding(p,e)
             if local_expr(e,local_vars)
             => List(q)
+/*
           case Predicate(p@MethodCall(x,"==",List(y)))
             if local_expr(x,block_vars) && local_expr(y,block_vars)
             // index equality on tiles become equality on tile indices since tile coordinates are equal
             => List(Predicate(block_vars.foldLeft[Expr](p) {
                                 case (r,v) => subst(Var(v),Var(prefix("tile",v)),r)
-                              }),q)
+                              }))
+*/
           case Predicate(e)
             if local_expr(e,local_vars)
             => List(q)

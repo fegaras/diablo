@@ -57,7 +57,7 @@ trait ArrayFunctions {
                   }
                   j += 1
               }
-              if (ni < dn)
+              if (i < split_size-1)
                 dense(ni+1) = sparseV(s).length
               i += 1
            }
@@ -66,6 +66,11 @@ trait ArrayFunctions {
     var len = 0
     for ( s <- 0 until splits ) {
       sizes(s) = len
+      var i = 0
+      while ( i < split_size && s*split_size+i < dn ) {
+        dense(s*split_size+i) += len
+        i += 1
+      }
       len += sparseV(s).length
     }
     val sparse = Array.ofDim[Int](len)
@@ -74,6 +79,7 @@ trait ArrayFunctions {
       s => sparseV(s).copyToArray(sparse,sizes(s))
            valuesV(s).copyToArray(values,sizes(s))
     }
+    dense(dn) = sparse.length
     (dense,sparse,values)
   }
 
@@ -95,7 +101,7 @@ trait ArrayFunctions {
                      sparseV(s) += j
                   j += 1
               }
-              if (ni < dn)
+              if (ni < split_size-1)
                 dense(ni+1) = sparseV(s).length
               i += 1
            }
@@ -104,12 +110,18 @@ trait ArrayFunctions {
     var len = 0
     for ( s <- 0 until splits ) {
       sizes(s) = len
+      var i = 0
+      while ( i < split_size && s*split_size+i < dn ) {
+        dense(s*split_size+i) += len
+        i += 1
+      }
       len += sparseV(s).length
     }
     val sparse = Array.ofDim[Int](len)
     (0 until splits).par.foreach {
       s => sparseV(s).copyToArray(sparse,sizes(s))
     }
+    dense(dn) = sparse.length
     (dense,sparse)
   }
 

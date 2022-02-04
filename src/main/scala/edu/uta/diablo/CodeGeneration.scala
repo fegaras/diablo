@@ -148,6 +148,8 @@ abstract class CodeGeneration {
         => get_type_name(n)
       case TypeParameter(v)
         => tq"String"
+      case AnyType()
+        => tq"String"
       case _ => tq""
     }
 

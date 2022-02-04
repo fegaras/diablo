@@ -231,6 +231,12 @@ object Typechecker {
                  StorageType("tensor_"+is.length+"_0",List(etp),
                              (1 to is.length).map(i => Nth(Var(vname),i)).toList)
                else ArrayType(is.length,etp)
+          case TupleType(is:+TupleType(List(ArrayType(1,ct),ArrayType(1,rt),ArrayType(1,etp))))
+            if is.forall(_ == intType) && ct == intType && rt == intType
+            => if (useStorageTypes)
+                 StorageType("tensor_"+(is.length-1)+"_1",List(etp),
+                             (1 to is.length).map(i => Nth(Var(vname),i)).toList)
+               else ArrayType(is.length,etp)
           case ParametricType(rdd,List(etp))
             if rdd == rddClass || rdd == datasetClass
             => val cm = if (rdd == rddClass) "rdd" else "dataset"
