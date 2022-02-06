@@ -69,7 +69,9 @@ object Add {
 
     // sparse block tensors with 99% zeros
     val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
+    Az._3.cache
     val Bz = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
+    Bz._3.cache
 
     def validate ( M: tiled_matrix ) = {
       if (!validate_output)
@@ -154,7 +156,7 @@ object Add {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n)(m)[ ((i,j),a+b) | ((i,j),a) <= AA, ((ii,jj),b) <- BB, ii == i, jj == j ];
+                  tensor*(n)(m)[ ((i,j),a+b) | ((i,j),a) <- AA, ((ii,jj),b) <- BB, ii == i, jj == j ];
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -178,7 +180,7 @@ object Add {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n)(m)[ ((i,j),a+b) | ((i,j),a) <= Az, ((ii,jj),b) <- Bz, ii == i, jj == j ];
+                  tensor*(n)(m)[ ((i,j),a+b) | ((i,j),a) <= Az, ((ii,jj),b) <= Bz, ii == i, jj == j ];
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }

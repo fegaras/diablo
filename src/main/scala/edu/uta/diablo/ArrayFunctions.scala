@@ -57,7 +57,7 @@ trait ArrayFunctions {
                   }
                   j += 1
               }
-              if (i < split_size-1)
+              if (i < split_size-1 && ni < dn)
                 dense(ni+1) = sparseV(s).length
               i += 1
            }

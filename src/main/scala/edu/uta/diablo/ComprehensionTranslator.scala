@@ -924,6 +924,7 @@ object ComprehensionTranslator {
             if unique_is.contains(i) && unique_is.contains(j)
             => List(Predicate(MethodCall(Var(prefix("coord",i)),
                                          "==",List(Var(prefix("coord",j))))))
+/*
           case Predicate(MethodCall(Var(i),"==",List(e)))
             if unique_is.contains(i) && freevars(e,Nil).intersect(unique_is).isEmpty
             => List(Predicate(MethodCall(Var(prefix("coord",i)),
@@ -932,6 +933,7 @@ object ComprehensionTranslator {
             if unique_is.contains(i) && freevars(e,Nil).intersect(unique_is).isEmpty
             => List(Predicate(MethodCall(Var(prefix("coord",i)),
                           "==",List(MethodCall(e,"/",List(IntConst(block_dim_size)))))))
+*/
           case _ => Nil
       })
   }
