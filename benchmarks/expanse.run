@@ -3,25 +3,31 @@
 #SBATCH --job-name="diablo"
 #SBATCH --output="run.log"
 #SBATCH --partition=compute
-#SBATCH --nodes=4
+#SBATCH --nodes=5
 #SBATCH --ntasks-per-node=128
-#SBATCH --mem=248G
+#SBATCH --mem=240G
 #SBATCH --export=ALL
-#SBATCH --time=60    # time limit in minutes
+#SBATCH --time=30    # time limit in minutes
 
 nodes=$SLURM_NNODES
 echo "Number of nodes = " $nodes
 
+### Make some local directories
+srun -n 5 --nodes=5 --ntasks-per-node=1 mkdir /scratch/$USER/job_$SLURM_JOBID/local
+srun -n 5 --nodes=5 --ntasks-per-node=1 mkdir /scratch/$USER/job_$SLURM_JOBID/locals
+srun -n 5 --nodes=5 --ntasks-per-node=1 mkdir /scratch/$USER/job_$SLURM_JOBID/tmp
+
 # Expanse node: 128 cores (126 available), 256 GB RAM
 #   executor-cores = 12   (10 executors/node)
-#   executor-memory = 24GB
+#   executor-memory = 20GB
 #   num-executors = nodes*10-1
 executors=$((nodes*10-1))
 echo "Number of executors = " $executors
 
-SPARK_OPTIONS="--driver-memory 24G --num-executors $executors --executor-cores 12 --executor-memory 24G --conf spark.executor.extraJavaOptions=-Xss512m --driver-java-options '-Xss512m' --supervise"
+SPARK_OPTIONS="--driver-memory 24G --driver-cores 16 --num-executors $executors --executor-cores 12 --executor-memory 20G --conf spark.executor.extraJavaOptions=-Xss512m --driver-java-options '-Xss512m' --supervise"
 
 export HADOOP_CONF_DIR=$HOME/expansecluster
+export SPARK_CONF_DIR=$HADOOP_CONF_DIR/spark
 module load openjdk
 
 SW=/expanse/lustre/projects/uot166/fegaras
@@ -36,16 +42,17 @@ PATH="$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$SPARK_HOME/bin:$MYHADOOP_HOME/bin:$SCA
 
 # location of scratch space
 scratch=/scratch/$USER/job_$SLURM_JOB_ID
-export SPARK_JAVA_OPTS="-Dspark.local.dir=$scratch"
+export SPARK_JAVA_OPTS="-Djava.io.tmpdir=$scratch -Dspark.local.dir=$scratch"
 export MH_SCRATCH_DIR=$scratch
 
 myhadoop-configure.sh -s $scratch
+cp $HADOOP_CONF_DIR/slaves $HADOOP_CONF_DIR/spark/workers
 echo "export TMP=$scratch" >> $HADOOP_CONF_DIR/spark/spark-env.sh
 echo "export TMPDIR=$scratch" >> $HADOOP_CONF_DIR/spark/spark-env.sh
-echo "export SPARK_MASTER_HOST=$SPARK_MASTER_IP" >> $HADOOP_CONF_DIR/spark/spark-env.sh
-export SPARK_MASTER_HOST=$SPARK_MASTER_IP
+echo "export SPARK_JAVA_OPTS='-Djava.io.tmpdir=$scratch -Dspark.local.dir=$scratch'" >> $HADOOP_CONF_DIR/spark/spark-env.sh
+#echo "export SPARK_MASTER_HOST=$SPARK_MASTER_IP" >> $HADOOP_CONF_DIR/spark/spark-env.sh
+#export SPARK_MASTER_HOST=$SPARK_MASTER_IP
 source $HADOOP_CONF_DIR/spark/spark-env.sh
-
 export SPARK_LOCAL_DIRS=$scratch
 export TMPDIR=$scratch/tmp
 export _JAVA_OPTIONS=-Djava.io.tmpdir=$TMPDIR
@@ -53,7 +60,7 @@ export _JAVA_OPTIONS=-Djava.io.tmpdir=$TMPDIR
 # start HDFS
 $HADOOP_HOME/sbin/start-dfs.sh
 # start Spark
-$SPARK_HOME/sbin/start-all.sh -h $SPARK_MASTER_HOST
+myspark start
 
 JARS=.
 for I in `ls $SPARK_HOME/jars/*.jar -I *unsafe*`; do
@@ -61,7 +68,8 @@ for I in `ls $SPARK_HOME/jars/*.jar -I *unsafe*`; do
 done
 
 #spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Add --master $MASTER $SPARK_OPTIONS test.jar 2 12000
-spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master $MASTER $SPARK_OPTIONS test.jar 2 20000 20000
+
+spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply $SPARK_OPTIONS test.jar 2 30000 30000
 
 #hdfs dfs -mkdir -p /user/$USER
 #hdfs dfs -put page-rank2.txt /user/$USER/page-rank.txt
@@ -81,6 +89,6 @@ spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master $MAS
 #hdfs dfs -put y_test.txt /user/$USER/y_test.txt
 #spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class NeuralNetwork --master $MASTER $SPARK_OPTIONS test.jar 10000 10 /user/$USER/X_train.txt /user/$USER/y_train.txt /user/$USER/X_test.txt /user/$USER/y_test.txt
 
-$SPARK_HOME/sbin/stop-all.sh
+myspark stop
 $HADOOP_HOME/sbin/stop-dfs.sh
 $MYHADOOP_HOME/bin/myhadoop-cleanup.sh
