@@ -88,6 +88,8 @@ abstract class CodeGeneration {
         => SeqType(Tree2Type(et))
       case tq"$n[..$cs]" if cs.nonEmpty
         => ParametricType(n.toString,cs.map(Tree2Type))
+      case tq"Unit"
+        => TupleType(Nil)
       case tq"Any"
         => AnyType()
       case tq"Nothing"
@@ -118,7 +120,10 @@ abstract class CodeGeneration {
         => Type2Tree(Typechecker.unfold_storage_type(tp))
       case TupleType(List(t))
         => Type2Tree(t)
-      case TupleType(cs) if cs.nonEmpty
+      case TupleType(Nil)
+        // silly Spark DataFrame can't encode () or Unit in schema
+        => tq"EmptyTuple"
+      case TupleType(cs)
         => val tcs = cs.map(Type2Tree)
            tq"(..$tcs)"
       case RecordType(cs) if cs.nonEmpty
@@ -265,6 +270,9 @@ abstract class CodeGeneration {
   def code ( p: Pattern ): c.Tree = {
     import c.universe._
     p match {
+      case TuplePat(Nil)
+        // silly Spark DataFrame can't encode () or Unit in schema
+        => pq"EmptyTuple()"
       case TuplePat(ps)
         => val psc = ps.map(code)
            pq"(..$psc)"
@@ -393,14 +401,21 @@ abstract class CodeGeneration {
          case BasicType("Double") => q"0.0"
          case BasicType("Boolean") => q"false"
          case SeqType(_) => q"Nil"
+         case TupleType(Nil)
+           => q"EmptyTuple()"
          case TupleType(ts)
            => val tts = ts.map(zero)
               q"(..$tts)"
+         case ArrayType(n,t)
+           => val zc = zero(t)
+              q"Array.tabulate($n)( i => $zc )"
          case ParametricType(ab,List(etp))
            if ab == TypeMappings.arrayBuffer
            => val tab = get_type_name(ab)
               val etc = Type2Tree(etp)
               q"new $tab[$etc]()"
+         case StorageType(_,_,_)
+           => zero(Typechecker.unfold_storage_type(tp))
          case _ => q"null"
       }
 
@@ -495,11 +510,6 @@ abstract class CodeGeneration {
            if (zero == Var("Nil"))
                q"merge_tensors($xc,$yc,_++_,$zc)"
            else q"merge_tensors($xc,$yc,($nx:$tp,$ny:$tp) => $bc,$zc)"
-      case Call("cache",List(x,IntConst(n)))  // need to replace x
-        => val xc = codeGen(x,env)
-           val nc = TermName("_"+n)
-           val ac = 1.to(n-1).map(i => TermName("_"+i)).map(ic => q"$xc.$ic")
-           q"$xc = (..$ac,cache($xc.$nc))"
       case Call("unique_values",List(Lambda(p@VarPat(v),b)))
         => val bc = codeGen(b,add(p,tq"Int",env))
            val vc = TermName(v)
@@ -530,6 +540,9 @@ abstract class CodeGeneration {
         => val uc = codeGen(u,env)
            val isc = is.map(i => codeGen(i,env))
            isc.foldLeft(uc){ case (r,i) => q"$r($i)" }
+      case Tuple(Nil)
+        // silly Spark DataFrame can't encode () or Unit in schema
+        => q"EmptyTuple()"
       case Tuple(es)
         => codeList(es,cs => q"(..$cs)",env)
       case Record(es)
@@ -551,25 +564,15 @@ abstract class CodeGeneration {
            val nc3 = codeGen(n3,env)
            q"$ic >= $nc1 && $ic <= $nc2 && ($ic-$nc1) % $nc3 == 0"
       case Call("zero",List(v))
-        => val (tp,vc) = typedCode(v,env)
-           tp match {
-             case tq"Int" => q"0"
-             case tq"Long" => q"0L"
-             case tq"Double" => q"0.0"
-             case _ => q"null"
-           }
+        => val (tp,_) = typedCode(v,env)
+           zero(Tree2Type(tp))
       case Call("binarySearch",s:+v)
         if s.length == 4
         => // add a zero to the arguments
            val sc = s.map(codeGen(_,env))
            val (tp,vc) = typedCode(v,env)
-           val zero = tp match {
-                         case tq"Int" => q"0"
-                         case tq"Long" => q"0L"
-                         case tq"Double" => q"0.0"
-                         case _ => q"null"
-                      }
-           q"binarySearch(..$sc,$vc,$zero)"
+           val zc = zero(Tree2Type(tp))
+           q"binarySearch(..$sc,$vc,$zc)"
       case Block(List(d,Call("udf",List(Var(f)))))
         // the declaration d of f must be compiled before the macro udf
         => val fm = TermName(method_name(f))
@@ -619,14 +622,20 @@ abstract class CodeGeneration {
         if List("length","rows","cols","dims").contains(m)
         => val xc = codeGen(x,env)
            getOptionalType(xc,env) match {
-             case Left(tq"(..$ts)") if ts.length>1
-               => m match {
-                    case "length" => q"$xc._1"
-                    case "rows" => q"$xc._1"
-                    case "cols" => q"$xc._2"
-                    case _
-                      => val es = (1 until ts.length).map(i => q"$xc.${TermName("_"+i)}")
-                         q"(..$es)"
+             case Left(tq"($d,$s,$a)")
+               => def dimensions ( x: c.Tree, tp: c.Tree ): List[c.Tree]
+                    = tp match { case tq"(..$ts)"
+                                   => 1.to(ts.length).map(i => q"$x.${TermName("_"+i)}").toList
+                                 case tq"EmptyTuple" => Nil
+                                 case _ => List(x)
+                               }
+                  val dims = dimensions(q"$xc._1",d)++dimensions(q"$xc._2",s)
+                  m match {
+                    case "length" => dims(0)
+                    case "rows" => dims(0)
+                    case "cols" => dims(1)
+                    case _   // "dims"
+                      => q"(..$dims)"
                   }
              case _
                => val fm = TermName(method_name(m))
@@ -770,14 +779,9 @@ abstract class CodeGeneration {
            q"var $vc:$tc = $init"
       case VarDecl(v,_,Seq(List(Call("zero",List(u)))))
         => val (tp,_) = typedCode(u,env)
-           val zero = tp match {
-                        case tq"Int" => q"0"
-                        case tq"Long" => q"0L"
-                        case tq"Double" => q"0.0"
-                        case _ => q"null"
-                      }
+           val zc = zero(Tree2Type(tp))
            val vc = TermName(v)
-           q"val $vc: $tp = $zero"
+           q"val $vc: $tp = $zc"
       case VarDecl(v,tp,Seq(List(Call("map",Nil))))
         => val vc = TermName(v)
            val tq"Map[$kt,$vt]" = Type2Tree(tp)

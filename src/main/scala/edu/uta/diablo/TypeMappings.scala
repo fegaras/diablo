@@ -85,21 +85,24 @@ object TypeMappings {
   /* generate a typemap for a tensor with dn dense and sn sparse dimensions */
   def tensor ( dn: Int, sn: Int, boolean_values: Boolean = false ): String = {
     assert(sn+dn > 0)
-    val dims = "( "+(1.to(dn).map(k => s"d$k: Int")
-                     ++1.to(sn).map(k => s"s$k: Int")).mkString(", ")+" )"
+    val dims = "( d: ("+1.to(dn).map(i => "Int").mkString(",")+
+               "), s: ("+1.to(sn).map(i => "Int").mkString(",")+") )"
     val ldims = "("+1.to(dn+sn).map(i => "Int").mkString(",")+")"
-    val dsize = 1.to(dn).map("d"+_).mkString("*")
-    val ssize = 1.to(sn).map("s"+_).mkString("*")
-    val drange = 1.to(dn).map(i => s"i$i <- 0..(d$i-1)").mkString(", ")
-    val srange = 1.to(sn).map(i => s"j$i <- 0..(s$i-1)").mkString(", ")
+    val dsize = if (dn==1) "d" else 1.to(dn).map(i => "d._"+i).mkString("*")
+    val ssize = if (sn==1) "s" else 1.to(sn).map(i => "s._"+i).mkString("*")
+    val drange = if (dn==1) "i1 <- 0..(d-1)"
+                 else 1.to(dn).map(i => s"i$i <- 0..(d._$i-1)").mkString(", ")
+    val srange = if (sn==1) "i1 <- 0..(s-1)"
+                 else 1.to(sn).map(i => s"j$i <- 0..(s._$i-1)").mkString(", ")
     val dvars = 1.to(dn).map("i"+_).mkString(",")
     val dvars2 = 1.to(dn).map("ii"+_).mkString(",")
     val svars = 1.to(sn).map("j"+_).mkString(",")
     val deq = 1.to(dn).map(i => s"ii$i == i$i").mkString(", ")
-    val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d$i+i$i)" }
-    val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s$i+j$i)" }
-    val svarset = (1 to sn).map{ k => s"let j$k = "+("sparse[col]"::(sn.to(k+1,-1))
-                      .map(i => s"s$i").toList).mkString("/")+s"%s$k" }.mkString(", ")
+    val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d._$i+i$i)" }
+    val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s._$i+j$i)" }
+    val svarset = if (sn==1) "let j1 = sparse[col]%s"
+                  else (1 to sn).map{ k => s"let j$k = "+("sparse[col]"::(sn.to(k+1,-1))
+                            .map(i => s"s._$i").toList).mkString("/")+s"%s._$k" }.mkString(", ")
     if (sn == 0)   // a dense tensor
       s"""
        typemap tensor_${dn}_0[T] $dims: array$dn[T] {
@@ -185,15 +188,17 @@ object TypeMappings {
   /* generate a typemap for a full sparse tensor with dn dense and sn sparse dimensions */
   def full_tensor ( dn: Int, sn: Int, boolean_values: Boolean = false ): String = {
     assert(sn > 0)
-    val dims = "( "+(1.to(dn).map(k => s"d$k: Int")
-                     ++1.to(sn).map(k => s"s$k: Int")).mkString(", ")+" )"
+    val dims = "( d: ("+1.to(dn).map(i => "Int").mkString(",")+
+               "), s: ("+1.to(sn).map(i => "Int").mkString(",")+") )"
     val ldims = "("+1.to(dn+sn).map(i => "Int").mkString(",")+")"
-    val drange = 1.to(dn).map(i => s"i$i <- 0..(d$i-1)").mkString(", ")
-    val srange = 1.to(sn).map(i => s"j$i <- 0..(s$i-1)").mkString(", ")
+    val drange = if (dn==1) "i1 <- 0..(d-1)"
+                 else 1.to(dn).map(i => s"i$i <- 0..(d._$i-1)").mkString(", ")
+    val srange = if (sn==1) "j1 <- 0..(s-1)"
+                 else 1.to(sn).map(i => s"j$i <- 0..(s._$i-1)").mkString(", ")
     val dvars = 1.to(dn).map("i"+_).mkString(",")
     val svars = 1.to(sn).map("j"+_).mkString(",")
-    val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d$i+i$i)" }
-    val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s$i+j$i)" }
+    val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d._$i+i$i)" }
+    val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s._$i+j$i)" }
     if (dn == 0 && boolean_values) // a boolean sparse tensor
       s"""
        typemap full_bool_tensor_0_$sn $dims: array$sn[Boolean] {
@@ -239,26 +244,33 @@ object TypeMappings {
     assert(sn+dn > 0)
     def rep ( f: Int => String, sep: String = "," ): String = 1.to(dn+sn).map(f).mkString(sep)
     val N = block_dim_size
+    val dims = "( d: ("+1.to(dn).map(i => "Int").mkString(",")+
+               "), s: ("+1.to(sn).map(i => "Int").mkString(",")+") )"
     val ldims = rep(i => "Int")
     // the last tile size is dim % block_dim_size
-    val ndims = rep(k => s"if ((ii$k+1)*$N > d$k) (d$k % $N) else $N")
-    val dims = rep(k => s"d$k: Int")
+    val ddims = if (dn==1) s"if ((ii1+1)*$N > d) (d % $N) else $N"
+                else 1.to(dn).map(k => s"if ((ii$k+1)*$N > d._$k) (d._$k % $N) else $N").mkString(",")
+    val sdims = if (sn==1) s"if ((ii${dn+1}+1)*$N > s) (s % $N) else $N"
+                else 1.to(sn).map(k => s"if ((ii${k+dn}+1)*$N > s._$k) (s._$k % $N) else $N").mkString(",")
     val vars = rep("i"+_)
     val vars2 = rep("ii"+_)
     val div_vars = rep(k => s"let ii$k = i$k / $N")
     val mod_vars = rep(k => s"i$k % $N")
     val idx = rep(k => s"ii$k * $N + i$k")
-    val ranges = rep(k => s"ii$k * $N + i$k < d$k")
+    val ranges = ((if (dn==1) List(s"ii1 * $N + i1 < d")
+                   else 1.to(dn).map(k => s"ii$k * $N + i$k < d._$k"))
+                  ++(if (sn==1) List(s"ii${dn+1} * $N + i${dn+1} < s")
+                     else 1.to(sn).map(k => s"ii${k+dn} * $N + i${k+dn} < s._$k"))).mkString(", ")
     if (boolean_values) {
-      s"""   // needs boolean tensor tiles
-       typemap ${full}${cm}_block_bool_tensor_${dn}_$sn ($dims): array${dn+sn}[Boolean] {
+      s"""
+       typemap ${full}${cm}_block_bool_tensor_${dn}_$sn $dims: array${dn+sn}[Boolean] {
           def view ( x: $cm[(($ldims),bool_tensor_${dn}_$sn)] )
             = [ (($idx),v) |
                 (($vars2),a) <- lift($cm,x),
                 (($vars),v) <- lift(${full}bool_tensor_${dn}_$sn,a),
                 $ranges ]
           def store ( L: list[(($ldims),Boolean)] )
-            = $cm[ (($vars2),bool_tensor_${dn}_$sn($ndims,w)) |
+            = $cm[ (($vars2),bool_tensor_${dn}_$sn(($ddims),($sdims),w)) |
                    (($vars),v) <- L, v,
                    $div_vars,
                    let w = (($mod_vars),v),
@@ -266,14 +278,14 @@ object TypeMappings {
        }
     """
     } else s"""
-       typemap ${full}${cm}_block_tensor_${dn}_$sn[T] ($dims): array${dn+sn}[T] {
+       typemap ${full}${cm}_block_tensor_${dn}_$sn[T] $dims: array${dn+sn}[T] {
           def view ( x: $cm[(($ldims),tensor_${dn}_$sn[T])] )
             = [ (($idx),v) |
                 (($vars2),a) <- lift($cm,x),
                 (($vars),v) <- lift(${full}tensor_${dn}_$sn,a),
                 $ranges ]
           def store ( L: list[(($ldims),T)] )
-            = $cm[ (($vars2),tensor_${dn}_$sn($ndims,w)) |
+            = $cm[ (($vars2),tensor_${dn}_$sn(($ddims),($sdims),w)) |
                    (($vars),v) <- L,
                    $div_vars,
                    let w = (($mod_vars),v),
@@ -282,16 +294,12 @@ object TypeMappings {
     """
   }
 
-  // retrieve the tiles from a block tensor
-  def block_tensor_tiles ( dn: Int, sn: Int, e: Expr ): Expr
-    = Nth(e,dn+sn+1)
-
   def init () {
     Typechecker.typecheck(Parser.parse(inits))
   }
 
   def main ( args: Array[String] ) {
-     println(tensor(args(0).toInt,args(1).toInt,args(3).toInt == 1))
+     println(tensor(args(0).toInt,args(1).toInt,args(2).toInt == 1))
      println(block_tensor(args(0).toInt,args(1).toInt,"rdd",args(2).toInt == 1))
   }
 }

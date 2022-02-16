@@ -24,7 +24,7 @@ trait ArrayFunctions {
   // An outer-join for 1-1 join relationship
   def outerJoin[K:ClassTag,T:ClassTag] ( xrdd: RDD[(K,T)], yrdd: RDD[(K,T)],
                                          f: (T,T) => T ): RDD[(K,T)]
-    = xrdd.cache.fullOuterJoin(yrdd.cache,number_of_partitions).map {
+    = xrdd.fullOuterJoin(yrdd,number_of_partitions).map {
             case (k,(Some(x),Some(y)))
               => (k,f(x,y))
             case (k,(Some(x),None))
@@ -562,11 +562,6 @@ trait ArrayFunctions {
 
   def rangeVar ( x: Int ): Int = x
 
-  import org.apache.spark.sql.expressions.Aggregator
-  import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-  import org.apache.spark.sql.Encoder
-  import scala.reflect.runtime.universe.TypeTag
-
   // caching is eager for RDDs but lazy for DataFrames
   def cache[T] ( x: RDD[T] ): RDD[T] = x.cache
 
@@ -580,14 +575,4 @@ trait ArrayFunctions {
      x.write.mode("overwrite").parquet(pdir+i)
      x.sparkSession.read.parquet(pdir+i)
   }
-
-  def reducer[T] ( mergeT: (T,T) => T, zeroT: T ) ( implicit tag: TypeTag[T] ): Aggregator[T,T,T]
-    = new Aggregator[T,T,T] {
-        def zero: T = zeroT
-        def merge ( x: T, y: T ): T = merge(x,y)
-        def reduce ( x: T, y: T ): T = merge(x,y)
-        def finish ( x: T ): T = x
-        def bufferEncoder: Encoder[T] = ExpressionEncoder[T]()
-        def outputEncoder: Encoder[T] = ExpressionEncoder[T]()
-      }
 }

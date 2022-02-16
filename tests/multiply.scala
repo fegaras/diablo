@@ -85,11 +85,13 @@ object Multiply {
     val A = new BlockMatrix(Am,N,N)
     val B = new BlockMatrix(Bm,N,N)
 
-    type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
+    type tiled_matrix = ((Int,Int),EmptyTuple,RDD[((Int,Int),((Int,Int),EmptyTuple,Array[Double]))])
+
+    val et = EmptyTuple()
 
     // dense block tensors
-    val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
-    val BB = (m,n,Bm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
+    val AA = ((n,m),et,Am.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
+    val BB = ((m,n),et,Bm.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
     AA._3.cache
     BB._3.cache
 
@@ -109,7 +111,7 @@ object Multiply {
         val C = A.multiply(B).toLocalMatrix()
         val CC = M._3.collect
         println("Validating ...")
-        for { ((ii,jj),(nd,md,a)) <- CC
+        for { ((ii,jj),((nd,md),_,a)) <- CC
               i <- 0 until nd
               j <- 0 until md } {
            val ci = ii*N+nd
@@ -168,8 +170,8 @@ object Multiply {
     }
 
     def testMultiplyDiabloDF2 (): Double = {
-      val aDF = (AA._1,AA._2,AA._3.toDF.asInstanceOf[DiabloDataFrame[((Int,Int),(Int,Int,Array[Double]))]])
-      val bDF = (BB._1,BB._2,BB._3.toDF.asInstanceOf[DiabloDataFrame[((Int,Int),(Int,Int,Array[Double]))]])
+      val aDF = (AA._1,AA._2,AA._3.toDF.asInstanceOf[DiabloDataFrame[((Int,Int),((Int,Int),EmptyTuple,Array[Double]))]])
+      val bDF = (BB._1,BB._2,BB._3.toDF.asInstanceOf[DiabloDataFrame[((Int,Int),((Int,Int),EmptyTuple,Array[Double]))]])
       param(data_frames,true)
       val t = System.currentTimeMillis()
       // generate DataFrame tiles from DataFrame tiles
@@ -299,9 +301,10 @@ object Multiply {
     def testMultiplyCode (): Double = {
       val t: Long = System.currentTimeMillis()
       try {
-        val C = (n,m,AA._3.map{ case ((i,k),a) => (k,(i,a)) }
+        val C = ((n,m),et,
+                 AA._3.map{ case ((i,k),a) => (k,(i,a)) }
                        .join( BB._3.map{ case ((kk,j),b) => (kk,(j,b)) } )
-                       .map{ case (_,((i,(na,ma,a)),(j,(nb,mb,b))))
+                       .map{ case (_,((i,((na,ma),_,a)),(j,((nb,mb),_,b))))
                                => val V = Array.ofDim[Double](na*mb)
                                   for { i <- (0 until na).par } {
                                      var k = 0
@@ -314,9 +317,9 @@ object Multiply {
                                        k += 1
                                      }
                                   }
-                                  ((i,j),(na,mb,V))
+                                  ((i,j),((na,mb),et,V))
                            }
-                       .reduceByKey{ case ((nx,mx,x),(_,_,y))
+                       .reduceByKey{ case (((nx,mx),_,x),(_,_,y))
                                        => val V = Array.ofDim[Double](nx*mx)
                                           for { i <- (0 until nx).par } {
                                              var j = 0
@@ -325,7 +328,7 @@ object Multiply {
                                                j += 1
                                              }
                                           }
-                                          (nx,mx,V)
+                                          ((nx,mx),et,V)
                                    })
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -336,7 +339,8 @@ object Multiply {
     def testMultiplyMLlibCode (): Double = {
       val t: Long = System.currentTimeMillis()
       try {
-        val C = (n,n,Am.map{ case ((i,k),a) => (k,(i,a)) }
+        val C = ((n,n),et,
+                 Am.map{ case ((i,k),a) => (k,(i,a)) }
                        .join( Bm.map{ case ((kk,j),b) => (kk,(j,b)) } )
                        .map{ case (_,((i,a),(j,b)))
                                => ((i,j),a.multiply(b.asInstanceOf[DenseMatrix])) }
@@ -370,7 +374,8 @@ object Multiply {
       val Bm = randomMatrix(m,n).cache()
       val t: Long = System.currentTimeMillis()
       try {
-        val C = (n,n,Am.map{ case ((i,k),a) => (k,(i,a)) }
+        val C = ((n,n),et,
+                 Am.map{ case ((i,k),a) => (k,(i,a)) }
                        .join( Bm.map{ case ((kk,j),b) => (kk,(j,b)) } )
                        .map{ case (_,((i,a),(j,b)))
                                => ((i,j),a*b) }
@@ -384,13 +389,14 @@ object Multiply {
     def testMultiplyCodeGBJ (): Double = {
       val t = System.currentTimeMillis()
       try {
-        val C = (n,n,AA._3.flatMap{ case ((i,k),a) => (0 to n/N).map(j => ((i,j),(k,a))) }
+        val C = ((n,n),et,
+                 AA._3.flatMap{ case ((i,k),a) => (0 to n/N).map(j => ((i,j),(k,a))) }
                           .cogroup( BB._3.flatMap{ case ((k,j),b) => (0 to m/N).map(i => ((i,j),(k,b))) } )
                           .mapValues{ case (as,bs)
                                      => val c = Array.ofDim[Double](N*N)
                                         var ns = 0; var ms = 0
-                                        for { (k1,(na,ma,a)) <- as
-                                              (k2,(nb,mb,b)) <- bs if k2 == k1
+                                        for { (k1,((na,ma),_,a)) <- as
+                                              (k2,((nb,mb),_,b)) <- bs if k2 == k1
                                               i <- (0 until na).par } {
                                            var k = 0
                                            ns = na
@@ -404,7 +410,7 @@ object Multiply {
                                              k += 1
                                            }
                                         }
-                                        (ns,ms,Array.tabulate(ns*ms){ i => c(i) })
+                                        ((ns,ms),et,Array.tabulate(ns*ms){ i => c(i) })
                                     })
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -479,7 +485,6 @@ object Multiply {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    //println("@@@@ IJV matrix size: %.2f GB".format(sizeof(((1,1),0.0D)).toDouble*n*m/(1024.0*1024.0*1024.0)))
     val tile_size = sizeof(((1,1),randomTile(N,N))).toDouble
     println("@@@ number of tiles: "+(n/N)+"*"+(m/N)+" = "+((n/N)*(m/N)))
     println("@@@@ dense matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))

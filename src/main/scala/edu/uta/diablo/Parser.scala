@@ -202,16 +202,20 @@ object Parser extends StandardTokenParsers {
         | "tensor" ~ opt("*") ~ "(" ~ repsep( expr, "," ) ~ ")"
               ~ "(" ~ repsep( expr, "," ) ~ ")" ~ term ^^
           { case _~None~_~ds~_~_~ss~_~e
-              => Call(s"tensor_${ds.length}_${ss.length}",ds++ss:+e)
+              => Call(s"tensor_${ds.length}_${ss.length}",
+                      List(tuple(ds),tuple(ss),e))
             case _~_~_~ds~_~_~ss~_~e
               => val cm = if (data_frames) "dataset" else "rdd"
-                 Call(s"${cm}_block_tensor_${ds.length}_${ss.length}",ds++ss:+e) }
+                 Call(s"${cm}_block_tensor_${ds.length}_${ss.length}",
+                      List(tuple(ds),tuple(ss),e)) }
         | "tensor" ~ opt("*") ~ "(" ~ repsep( expr, "," ) ~ ")" ~ term ^^
           { case _~None~_~ds~_~e
-              => Call(s"tensor_${ds.length}_0",ds:+e)
+              => Call(s"tensor_${ds.length}_0",
+                      List(tuple(ds),Tuple(Nil),e))
             case _~_~_~ds~_~e
               => val cm = if (data_frames) "dataset" else "rdd"
-                 Call(s"${cm}_block_tensor_${ds.length}_0",ds:+e) }
+                 Call(s"${cm}_block_tensor_${ds.length}_0",
+                      List(tuple(ds),tuple(Nil),e)) }
         | ident ~ "*" ~ expr ^?
           { case "map"~_~e => Call("block_map",List(e)) }
         | ident ~ "(" ~ repsep( expr, "," ) ~ ")" ~ opt( compr ) ^^
@@ -366,8 +370,9 @@ object Parser extends StandardTokenParsers {
   val block_tensor_pat = """(rdd_block_|dataset_block|)tensor_(\d+)_(\d+)""".r
 
   def simpleType: Parser[Type]
-      = ( "(" ~ rep1sep( stype, "," ) ~ ")" ^^
-          { case _~ts~_ => if (ts.length==1) ts.head else TupleType(ts) }
+      = ( "(" ~ repsep( stype, "," ) ~ ")" ^^
+          { case _~List(tp)~_ => tp
+            case _~ts~_ => TupleType(ts) }
         | "<" ~ rep1sep( ident ~ ":" ~ stype, "," ) ~ ">" ^^
           { case _~cs~_ => RecordType(cs.map{ case n~_~t => (n,t)}.toMap) }
         | ident ~ "[" ~ stype ~ "]" ^^
@@ -376,12 +381,14 @@ object Parser extends StandardTokenParsers {
             case "matrix"~_~t~_ => ArrayType(2,t)
             case array_pat(n)~_~t~_ => ArrayType(n.toInt,t)
             case (n@block_tensor_pat(_,dn,sn))~_~t~_
-              => StorageType(n,List(t),1.to(dn.toInt+sn.toInt).map(i => IntConst(block_dim_size)).toList)
+              => StorageType(n,List(t),List(tuple(1.to(dn.toInt).map(i => IntConst(block_dim_size)).toList),
+                                            tuple(1.to(dn.toInt).map(i => IntConst(block_dim_size)).toList)))
             case n~_~t~_ => ParametricType(n,List(t)) }
         | ident ~ "*" ~ "[" ~ stype ~ "]" ^^
           { case (n@tensor_pat(dn,sn))~_~_~t~_
               => StorageType("block_"+n,List(t),
-                             1.to(dn.toInt+sn.toInt).map(i => IntConst(block_dim_size)).toList)
+                             List(tuple(1.to(dn.toInt).map(i => IntConst(block_dim_size)).toList),
+                                  tuple(1.to(dn.toInt).map(i => IntConst(block_dim_size)).toList)))
             case n~_~_~t~_ => ParametricType(n+"*",List(t)) }
         | ident ~ "*" ~ "[" ~ stype ~ "," ~ stype ~ "]" ^?
           { case "map"~_~_~k~_~v~_ => StorageType("block_map",List(k,v),Nil) }

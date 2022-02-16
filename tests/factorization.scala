@@ -56,9 +56,13 @@ object Factorization extends Serializable {
     val Pinit = new BlockMatrix(Pm,N,N)
     val Qinit = new BlockMatrix(Qm,N,N)
 
-    val RR = (n,m,Rm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
-    val PPinit = (n,d,Pm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
-    val QQinit = (d,m,Qm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
+    type tiled_matrix = ((Int,Int),EmptyTuple,RDD[((Int,Int),((Int,Int),EmptyTuple,Array[Double]))])
+
+    val et = EmptyTuple()
+
+    val RR = ((n,m),et,Rm.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
+    val PPinit = ((n,d),et,Pm.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
+    val QQinit = ((d,m),et,Qm.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
 
     val rand = new Random()
     def random () = rand.nextDouble()*10
@@ -120,25 +124,24 @@ object Factorization extends Serializable {
       var P = PPinit
       var Q = QQinit
       try {
-        q("""
+        val (p2,q2) = q("""
           var E1 = tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
-                                   kk == k, let v = p*q, group by (i,j) ];
+                                               kk == k, let v = p*q, group by (i,j) ];
           var E2 = tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <= E, ((ii,jj),v) <- E1,
-                                          ii == i, jj == j];
+                                               ii == i, jj == j];
           var P1 = tensor*(n,d)[ ((i,k),+/v)
-                          | ((i,j),e) <- E2, ((k,jj),q) <- Q, jj == j,
-                            let v = 2*a*e*q, group by (i,k) ];
+                               | ((i,j),e) <- E2, ((k,jj),q) <- Q, jj == j,
+                                 let v = 2*a*e*q, group by (i,k) ];
           var P2 = tensor*(n,d)[ ((i,k),p1+p-a*b*p)
-                          | ((i,k),p1) <- P1, ((ii,kk),p) <-P, ii==i,kk==k ];
-          P = P2;
+                               | ((i,k),p1) <- P1, ((ii,kk),p) <-P, ii==i,kk==k ];
           var Q1 = tensor*(d,m)[ ((k,j),+/v)
-                          | ((i,j),e) <- E2, ((ii,k),p) <- P, ii == i,
-                            let v = 2*a*e*p, group by (k,j) ];
+                               | ((i,j),e) <- E2, ((ii,k),p) <- P, ii == i,
+                                 let v = 2*a*e*p, group by (k,j) ];
           var Q2 = tensor*(d,m)[ ((k,j),q1+q-a*b*q)
-                          | ((k,j),q1) <- Q1, ((kk,jj),q) <-Q, jj==j,kk==k ];
-          Q = Q2;
+                               | ((k,j),q1) <- Q1, ((kk,jj),q) <-Q, jj==j,kk==k ];
+          (P2,Q2)
           """)
-        val x = E._3.count+P._3.count+Q._3.count
+        val x = p2._3.count+q2._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -149,25 +152,24 @@ object Factorization extends Serializable {
       var P = PinitSparse
       var Q = QinitSparse
       try {
-        q("""
+        val (p2,q2) = q("""
           var E1 = tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
                                                kk == k, let v = p*q, group by (i,j) ];
           var E2 = tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <= E, ((ii,jj),v) <= E1,
-                                          ii == i, jj == j];
+                                               ii == i, jj == j];
           var P1 = tensor*(n,d)[ ((i,k),+/v)
-                          | ((i,j),e) <- E2, ((k,jj),q) <- Q, jj == j,
-                            let v = 2*a*e*q, group by (i,k) ];
+                               | ((i,j),e) <- E2, ((k,jj),q) <- Q, jj == j,
+                                 let v = 2*a*e*q, group by (i,k) ];
           var P2 = tensor*(n,d)[ ((i,k),p1+p-a*b*p)
-                          | ((i,k),p1) <= P1, ((ii,kk),p) <= P, ii==i,kk==k ];
-          P = P2;
+                               | ((i,k),p1) <= P1, ((ii,kk),p) <= P, ii==i,kk==k ];
           var Q1 = tensor*(d,m)[ ((k,j),+/v)
-                          | ((i,j),e) <- E2, ((ii,k),p) <- P, ii == i,
-                            let v = 2*a*e*p, group by (k,j) ];
+                               | ((i,j),e) <- E2, ((ii,k),p) <- P, ii == i,
+                                 let v = 2*a*e*p, group by (k,j) ];
           var Q2 = tensor*(d,m)[ ((k,j),q1+q-a*b*q)
-                          | ((k,j),q1) <= Q1, ((kk,jj),q) <= Q, jj==j,kk==k ];
-          Q = Q2;
+                               | ((k,j),q1) <= Q1, ((kk,jj),q) <= Q, jj==j,kk==k ];
+          (P2,Q2)
           """)
-        val x = E._3.count+P._3.count+Q._3.count
+        val x = p2._3.count+q2._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -178,25 +180,24 @@ object Factorization extends Serializable {
       var P = PinitSparse
       var Q = QQinit
       try {
-        q("""
+        val (p2,q2) = q("""
           var E1 = tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
                                                kk == k, let v = p*q, group by (i,j) ];
           var E2 = tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <= E, ((ii,jj),v) <= E1,
-                                          ii == i, jj == j];
+                                               ii == i, jj == j];
           var P1 = tensor*(n,d)[ ((i,k),+/v)
-                          | ((i,j),e) <- E2, ((k,jj),q) <- Q, jj == j,
-                            let v = 2*a*e*q, group by (i,k) ];
+                               | ((i,j),e) <- E2, ((k,jj),q) <- Q, jj == j,
+                                 let v = 2*a*e*q, group by (i,k) ];
           var P2 = tensor*(n,d)[ ((i,k),p1+p-a*b*p)
-                          | ((i,k),p1) <- P1, ((ii,kk),p) <= P, ii==i,kk==k ];
-          P = P2;
+                               | ((i,k),p1) <- P1, ((ii,kk),p) <= P, ii==i,kk==k ];
           var Q1 = tensor*(d,m)[ ((k,j),+/v)
-                          | ((i,j),e) <- E2, ((ii,k),p) <- P, ii == i,
-                            let v = 2*a*e*p, group by (k,j) ];
+                               | ((i,j),e) <- E2, ((ii,k),p) <- P, ii == i,
+                                 let v = 2*a*e*p, group by (k,j) ];
           var Q2 = tensor*(d,m)[ ((k,j),q1+q-a*b*q)
-                          | ((k,j),q1) <= Q1, ((kk,jj),q) <- Q, jj==j,kk==k ];
-          Q = Q2;
+                               | ((k,j),q1) <= Q1, ((kk,jj),q) <- Q, jj==j,kk==k ];
+          (P2,Q2)
           """)
-        val x = E._3.count+P._3.count+Q._3.count
+        val x = p2._3.count+q2._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -228,33 +229,30 @@ object Factorization extends Serializable {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
-
     def validate ( M1: tiled_matrix, M2: tiled_matrix ) = {
-		if (!validate_output)
-			M1._3.count()+M2._3.count()
-		else {
-			var P = Pinit
-			var Q = Qinit
-			var E = R.subtract(P.multiply(Q))
-			P = P.add(map(map(E.multiply(Q.transpose),2*_).subtract(map(P,b*_)),a*_))
-			Q = Q.add(map(map(E.transpose.multiply(P),2*_).transpose.subtract(map(Q,b*_)),a*_))
-
-			println("Validating ...")
-			compareMatrix(M1, P.toLocalMatrix())
-			compareMatrix(M2, Q.toLocalMatrix())
-			def compareMatrix(A: tiled_matrix, B: Matrix) {
-				var C = A._3.collect
-				for { ((ii,jj),(nd,md,a)) <- C
-					i <- 0 until nd
-					j <- 0 until md } {
-					val ci = ii*N+nd
-					if (Math.abs(a(i*md+j)-B(ii*N+i,jj*N+j)) > 0.3)
-						println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f".format(ii,jj,i,j,a(i*md+j),B(ii*N+i,jj*N+j)))
-				}
-			}
-		}
+      if (!validate_output)
+	M1._3.count()+M2._3.count()
+      else {
+	var P = Pinit
+	var Q = Qinit
+	var E = R.subtract(P.multiply(Q))
+	P = P.add(map(map(E.multiply(Q.transpose),2*_).subtract(map(P,b*_)),a*_))
+	Q = Q.add(map(map(E.transpose.multiply(P),2*_).transpose.subtract(map(Q,b*_)),a*_))
+	println("Validating ...")
+	compareMatrix(M1, P.toLocalMatrix())
+	compareMatrix(M2, Q.toLocalMatrix())
+	def compareMatrix(A: tiled_matrix, B: Matrix) {
+	  var C = A._3.collect
+	  for { ((ii,jj),((nd,md),_,a)) <- C
+		i <- 0 until nd
+		j <- 0 until md } {
+	    val ci = ii*N+nd
+	    if (Math.abs(a(i*md+j)-B(ii*N+i,jj*N+j)) > 0.3)
+	      println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f".format(ii,jj,i,j,a(i*md+j),B(ii*N+i,jj*N+j)))
+	  }
 	}
+      }
+    }
 
     def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()

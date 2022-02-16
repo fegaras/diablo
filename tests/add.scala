@@ -57,12 +57,15 @@ object Add {
     val A = new BlockMatrix(Am,N,N)
     val B = new BlockMatrix(Bm,N,N)
 
-    type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
+    type tiled_matrix = ((Int,Int),EmptyTuple,RDD[((Int,Int),((Int,Int),EmptyTuple,Array[Double]))])
+
+    val et = EmptyTuple()
 
     // dense block tensors
-    val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
-    val BB = (n,m,Bm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
-    var CC = AA
+    val AA = ((n,m),et,Am.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
+    val BB = ((m,n),et,Bm.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
+    AA._3.cache
+    BB._3.cache
 
     val rand = new Random()
     def random () = rand.nextDouble()*10
@@ -80,7 +83,7 @@ object Add {
         val C = A.add(B).toLocalMatrix()
         val CC = M._3.collect
         println("Validating ...")
-        for { ((ii,jj),(nd,md,a)) <- CC
+        for { ((ii,jj),((nd,md),_,a)) <- CC
               i <- 0 until nd
               j <- 0 until md } {
            val ci = ii*N+nd
@@ -89,6 +92,12 @@ object Add {
                      .format(ii,jj,i,j,a(i*md+j),C(ii*N+i,jj*N+j)))
         }
       }
+    }
+
+    // forces df to materialize in memory and evaluate all transformations
+    // (noop write format doesn't have much overhead)
+    def force ( df: DataFrame ) {
+      df.write.mode("overwrite").format("noop").save()
     }
 
     // matrix addition of tiled matrices in MLlib.linalg
@@ -121,7 +130,7 @@ object Add {
         val C = q("""
                   tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <- AA, ((ii,jj),b) <- BB, ii == i, jj == j ];
                   """)
-        C._3.count()
+        force(C._3)
       } catch { case x: Throwable => println(x); return -1.0 }
       param(data_frames,false)
       (System.currentTimeMillis()-t)/1000.0
@@ -192,6 +201,8 @@ object Add {
       val t = System.currentTimeMillis()
       try {
         val C = q("""
+                  var CC = tensor*(n,m)[ ((i,j),0.0) | i <- 0..n-1, j <- 0..n-1 ];
+
                   for i = 0, n-1 do
                      for j = 0, m-1 do
                         CC[i,j] = AA[i,j]+BB[i,j];
@@ -219,13 +230,14 @@ object Add {
     def testAddCode (): Double = {
       val t = System.currentTimeMillis()
       try {
-        val C = (n,m,AA._3.join(BB._3)
-                       .mapValues{ case ((nd,md,a),(_,_,b))
+        val C = ((n,m),et,
+                 AA._3.join(BB._3)
+                       .mapValues{ case (((nd,md),_,a),(_,_,b))
                                      => val c = Array.ofDim[Double](nd*md)
                                         for { i <- (0 until nd).par
                                               j <- 0 until md
                                             } c(i*md+j) = a(i*md+j)+b(i*md+j)
-                                        (nd,md,c)
+                                        ((nd,md),et,c)
                                  })
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -253,15 +265,11 @@ object Add {
         val C = spark.sql(""" SELECT A.I, A.J, add_tiles(A.TILE,B.TILE) AS TILE
                               FROM A JOIN B ON A.I = B.I AND A.J = B.J
                           """)
-        //println(C.queryExecution)
-        //val result = new BlockMatrix(C.rdd.map{ case Row( i:Int, j: Int, m: DenseMatrix ) => ((i,j),m) },N,N)
-        //result.blocks.count()
-        C.rdd.count
+        force(C)
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    //println("@@@@ IJV matrix size: %.2f GB".format(sizeof(((1,1),0.0D)).toDouble*n*m/(1024.0*1024.0*1024.0)))
     val tile_size = sizeof(((1,1),randomTile(N,N))).toDouble
     println("@@@ number of tiles: "+(n/N)+"*"+(m/N)+" = "+((n/N)*(m/N)))
     println("@@@@ dense matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))

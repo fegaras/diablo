@@ -233,7 +233,7 @@ object Lifting {
                                  ( bindPattern(p,elemType(tp),r),
                                    s ++ patvars(p),
                                    n:+Generator(p,Lift(f,lu)) )
-                            case _
+                            case tp
                               => ( bindPattern(p,elemType(typecheck(lu,r)),r),
                                    s ++ patvars(p),
                                    n:+Generator(p,lu) )

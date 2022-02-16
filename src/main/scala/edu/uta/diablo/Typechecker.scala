@@ -30,6 +30,7 @@ object Typechecker {
     val boolType: Type = BasicType("Boolean")
     val doubleType: Type = BasicType("Double")
     val stringType: Type = BasicType("String")
+    val emptyTupleType: Type = BasicType("edu.uta.diablo.EmptyTuple")
 
     // hooks to the Scala compiler; set at v_impl in Diablo.scala
     var typecheck_call: ( String, List[Type] ) => Option[Type] = _
@@ -108,6 +109,12 @@ object Typechecker {
            => Some(Map(n->tp))
          case (tp,TypeParameter(n))
            => Some(Map(n->tp))
+         case (TupleType(Nil),tp)
+           if tp == emptyTupleType
+           => Some(Map())
+         case (tp,TupleType(Nil))
+           if tp == emptyTupleType
+           => Some(Map())
          case (TupleType(ts1),TupleType(ts2))
            if ts1.length == ts2.length
            => (ts1 zip ts2).map{ case (x,y) => tmatch(x,y) }.reduce[Env](merge)
@@ -161,82 +168,71 @@ object Typechecker {
           case t => throw new Error("Type "+tp+" is not a collection (found "+t+")")
       }
 
-    def import_type ( tp: Type, vname: String ): Type
-      = tp match {
-          case TupleType(List(itp,ParametricType(rdd,List(TupleType(List(ktp,
-                                       TupleType(List(jtp,ArrayType(1,etp)))))))))
-            // imported dense block tensor variable
+    def import_type ( tp: Type, vname: String ): Type = {
+        def isIntTuple ( tp: Type ): Boolean
+          = tp match {
+               case TupleType(ts) => ts.forall(_ == intType)
+               case _ => tp == intType || tp == emptyTupleType
+            }
+        def tupleSize ( tp: Type ): Int
+          = tp match {
+               case TupleType(ts) => ts.length
+               case _ if tp == emptyTupleType => 0
+               case _ => 1
+            }
+        tp match {
+          // imported block tensor variable
+          case TupleType(List(dt,st,ParametricType(rdd,List(TupleType(List(coords,etp))))))
             if (rdd == rddClass || rdd == datasetClass)
-               && itp == intType && ktp == intType && jtp == intType
-            => val cm = if (rdd == rddClass) "rdd" else "dataset"
-               if (useStorageTypes)
-                 StorageType(cm+"_block_tensor_1_0",List(etp),List(Nth(Var(vname),0)))
-               else ArrayType(1,etp)
-          case TupleType(List(itp,ParametricType(rdd,List(TupleType(List(ktp,
-                     TupleType(List(jtp,TupleType(List(ArrayType(1,ct),ArrayType(1,rt),ArrayType(1,etp)))))))))))
-            // imported sparse block tensor variable
-            if (rdd == rddClass || rdd == datasetClass)
-               && itp == intType && ktp == intType && jtp == intType
-               && ct == intType && rt == intType
-            => val cm = if (rdd == rddClass) "rdd" else "dataset"
-               if (useStorageTypes)
-                 StorageType(cm+"_block_tensor_0_1",List(etp),List(Nth(Var(vname),0)))
-               else ArrayType(1,etp)
-          case TupleType(List(itp,ParametricType(rdd,List(TupleType(List(ktp,
-                     TupleType(List(jtp,TupleType(List(ArrayType(1,ct),ArrayType(1,rt)))))))))))
-            // imported boolean sparse block tensor variable
-            if (rdd == rddClass || rdd == datasetClass)
-               && itp == intType && ktp == intType && jtp == intType
-               && ct == intType && rt == intType
-            => val cm = if (rdd == rddClass) "rdd" else "dataset"
-               if (useStorageTypes)
-                 StorageType(cm+"_block_tensor_0_1",List(boolType),List(Nth(Var(vname),0)))
-               else ArrayType(1,boolType)
-          case TupleType(is:+ParametricType(rdd,List(TupleType(List(TupleType(ks),
-                                       TupleType(js:+ArrayType(1,etp)))))))
-            // imported dense block tensor variable
-            if (rdd == rddClass || rdd == datasetClass)
-               && is.length == js.length && is.length == ks.length
-               && (is++ks++js).forall(_ == intType)
-            => val cm = if (rdd == rddClass) "rdd" else "dataset"
-               if (useStorageTypes)
-                 StorageType(cm+"_block_tensor_"+is.length+"_0",List(etp),
-                             (1 to is.length).map(i => Nth(Var(vname),i)).toList)
-               else ArrayType(is.length,etp)
-          case TupleType(is:+ParametricType(rdd,List(TupleType(List(TupleType(ks),
-                     TupleType(js:+TupleType(List(ArrayType(1,ct),ArrayType(1,rt),ArrayType(1,etp)))))))))
-            // imported sparse block tensor variable
-            if (rdd == rddClass || rdd == datasetClass)
-               && is.length == js.length && is.length == ks.length
-               && (ct::rt::is++ks++js).forall(_ == intType)
-            => val cm = if (rdd == rddClass) "rdd" else "dataset"
-               if (useStorageTypes)
-                 StorageType(cm+"_block_tensor_"+(is.length-1)+"_1",List(etp),
-                             (1 to is.length).map(i => Nth(Var(vname),i)).toList)
-               else ArrayType(is.length,etp)
-          case TupleType(is:+ParametricType(rdd,List(TupleType(List(TupleType(ks),
-                     TupleType(js:+TupleType(List(ArrayType(1,ct),ArrayType(1,rt)))))))))
-            // imported boolean sparse block tensor variable
-            if (rdd == rddClass || rdd == datasetClass)
-               && is.length == js.length && is.length == ks.length
-               && (ct::rt::is++ks++js).forall(_ == intType)
-            => val cm = if (rdd == rddClass) "rdd" else "dataset"
-               if (useStorageTypes)
-                 StorageType(cm+"_block_tensor_"+(is.length-1)+"_1",List(boolType),
-                             (1 to is.length).map(i => Nth(Var(vname),i)).toList)
-               else ArrayType(is.length,boolType)
-          case TupleType(is:+ArrayType(1,etp))     // imported tensor variable
-            if is.forall(_ == intType)
+               && isIntTuple(dt) && isIntTuple(st) && isIntTuple(coords)
+               && tupleSize(dt)+tupleSize(st) == tupleSize(coords)
+            => import_type(etp,vname) match {
+                 case StorageType(tpat(full,bool,dn,sn),List(ctp),_)
+                   if useStorageTypes
+                   => val cm = if (rdd == rddClass) "rdd" else "dataset"
+                      StorageType(s"$full${cm}_block_${bool}tensor_${dn}_$sn",
+                                  List(ctp),
+                                  List(Nth(Var(vname),1),Nth(Var(vname),2)))
+                 case ArrayType(n,ctp)
+                   if n == tupleSize(dt)+tupleSize(st)
+                   => ArrayType(n,ctp)
+                 case _ => tp
+               }
+          // imported tensor variable
+          case TupleType(List(di,ntp,ArrayType(1,etp)))
+            if isIntTuple(di) && ntp == emptyTupleType
             => if (useStorageTypes)
-                 StorageType("tensor_"+is.length+"_0",List(etp),
-                             (1 to is.length).map(i => Nth(Var(vname),i)).toList)
-               else ArrayType(is.length,etp)
-          case TupleType(is:+TupleType(List(ArrayType(1,ct),ArrayType(1,rt),ArrayType(1,etp))))
-            if is.forall(_ == intType) && ct == intType && rt == intType
+                 StorageType("tensor_"+tupleSize(di)+"_0",List(etp),
+                             List(Nth(Var(vname),1),Nth(Var(vname),2)))
+               else ArrayType(tupleSize(di),etp)
+          case TupleType(List(ntp,si,TupleType(List(ArrayType(1,ct),ArrayType(1,etp)))))
+            if isIntTuple(si) && ntp == emptyTupleType && ct == intType
             => if (useStorageTypes)
-                 StorageType("tensor_"+(is.length-1)+"_1",List(etp),
-                             (1 to is.length).map(i => Nth(Var(vname),i)).toList)
-               else ArrayType(is.length,etp)
+                 StorageType("tensor_0_"+tupleSize(si),List(etp),
+                             List(Nth(Var(vname),1),Nth(Var(vname),2)))
+               else ArrayType(tupleSize(si),etp)
+          case TupleType(List(di,si,TupleType(List(ArrayType(1,ct),ArrayType(1,rt),ArrayType(1,etp)))))
+            if isIntTuple(di) && isIntTuple(si) && ct == intType && rt == intType
+            => if (useStorageTypes)
+                 StorageType("tensor_"+tupleSize(di)+"_"+tupleSize(si),List(etp),
+                             List(Nth(Var(vname),1),Nth(Var(vname),2)))
+               else ArrayType(tupleSize(di)+tupleSize(si),etp)
+          // imported boolean tensor variable
+          case TupleType(List(di,si,ArrayType(1,ct)))
+            if isIntTuple(di) && isIntTuple(si) && ct == intType
+               && (tupleSize(di) == 0 || tupleSize(si) == 0)
+            => if (useStorageTypes)
+                 StorageType("bool_tensor_"+tupleSize(di)+"_"+tupleSize(si),Nil,
+                             List(Nth(Var(vname),1),Nth(Var(vname),2)))
+               else ArrayType(tupleSize(di)+tupleSize(si),boolType)
+          case TupleType(List(di,si,TupleType(List(ArrayType(1,ct),ArrayType(1,rt)))))
+            if isIntTuple(di) && isIntTuple(si) && ct == intType  && rt == intType
+               && tupleSize(di) > 0 && tupleSize(si) > 0
+            => if (useStorageTypes)
+                 StorageType("bool_tensor_"+tupleSize(di)+"_"+tupleSize(si),Nil,
+                             List(Nth(Var(vname),1),Nth(Var(vname),2)))
+               else ArrayType(tupleSize(di)+tupleSize(si),boolType)
+          // imported RDD variable
           case ParametricType(rdd,List(etp))
             if rdd == rddClass || rdd == datasetClass
             => val cm = if (rdd == rddClass) "rdd" else "dataset"
@@ -244,7 +240,8 @@ object Typechecker {
                  StorageType(cm,List(etp),Nil)
                else SeqType(etp)
           case _ => tp
-      }
+        }
+    }
 
     def is_reduction ( op: String, tp: Type ): Boolean = {
       tp match {
@@ -254,7 +251,7 @@ object Typechecker {
       }
     }
 
-    val tpat: Regex = """(full_|)tensor_(\d+)_(\d+)""".r
+    val tpat: Regex = """(full_|)(bool_|)tensor_(\d+)_(\d+)""".r
     val btpat: Regex = """(full_|)(rdd|dataset)_block_tensor_(\d+)_(\d+)""".r
     val gtpat: Regex = """(full_|)(rdd|dataset)_block_(bool_|)tensor_(\d+)_(\d+)""".r
 
@@ -375,9 +372,9 @@ object Typechecker {
             => tps match {
                  case List(BasicType("Boolean"))
                    => f match {
-                        case tpat(full,dn,sn) if sn.toInt > 0
+                        case tpat(full,_,dn,sn) if sn.toInt > 0
                           => // change tensor_*_* to bool_tensor_*_*
-                             x.mapping = full+"bool_"+f                         // destructive
+                             x.mapping = s"${full}bool_tensor_${dn}_$sn"                // destructive
                         case btpat(full,cn,dn,sn) if sn.toInt > 0
                           => // change block_tensor_*_* to block_bool_tensor_*_*
                              x.mapping = s"${full}${cn}_block_bool_tensor_${dn}_$sn"    // destructive
@@ -390,13 +387,13 @@ object Typechecker {
                typecheck(u,env)
                StorageType(x.mapping,tps,args)
           case x@Call(f,args@(_:+l))
-            if (f match { case tpat(_,_,_) => true; case btpat(_,_,_,_) => true; case _ => false })
+            if (f match { case tpat(_,_,_,_) => true; case btpat(_,_,_,_) => true; case _ => false })
             => typecheck(l,env) match {
                   case SeqType(TupleType(List(_, BasicType("Boolean"))))
                     => f match {
-                        case tpat(full,dn,sn) if sn.toInt > 0
+                        case tpat(full,_,dn,sn) if sn.toInt > 0
                           => // change tensor_*_* to bool_tensor_*_*
-                             x.name = full+"bool_"+f                         // destructive
+                             x.name = s"${full}bool_tensor_${dn}_$sn"                // destructive
                         case btpat(full,cn,dn,sn) if sn.toInt > 0
                           => // change block_tensor_*_* to block_bool_tensor_*_*
                              x.name = s"${full}${cn}_block_bool_tensor_${dn}_$sn"    // destructive
@@ -415,7 +412,7 @@ object Typechecker {
                else substType(at,ev)
           case Call("_full",List(e))
             => typecheck(e,env) match {
-                  case StorageType(f@tpat(_,dn,sn),tps,args)
+                  case StorageType(f@tpat(_,_,dn,sn),tps,args)
                     if sn.toInt > 0       // full sparse tensor scan
                     => StorageType("full_"+f,tps,args)
                   case StorageType(f@btpat(_,_,dn,sn),tps,args)
@@ -430,7 +427,7 @@ object Typechecker {
           case ce@Call("cache",List(u))
             => typecheck(u,env) match {
                   case tp@StorageType(gtpat(_,_,_,dn,sn),_,_)
-                    => ce.args = List(u,IntConst(dn.toInt+sn.toInt+1))    // destructive
+                    => ce.args = List(Nth(u,3))    // destructive
                        tp
                   case tp => tp
                }

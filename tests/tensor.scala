@@ -2,7 +2,7 @@ import edu.uta.diablo._
 
 object Test {
   def main ( args: Array[String] ) {
-    val N = 200
+    val N = 20
 
     def f ( i: Int, j: Int = 1 ): Double = (i*11)%3+j*1.1
 

@@ -33,12 +33,12 @@ object LinearRegression extends Serializable {
 
     parami(number_of_partitions,10)
     parami(block_dim_size,1000)
-    param(data_frames,true)
+    param(data_frames,false)
 
-	val repeats = args(0).toInt
-	val N = 1000
+    val repeats = args(0).toInt
+    val N = 1000
 	
-	val lrate = 0.0005
+    val lrate = 0.0005
     val n = args(1).toInt
     val m = args(2).toInt
     val numIter = args(3).toInt
@@ -122,7 +122,7 @@ object LinearRegression extends Serializable {
         val A = q("tensor*(n,m)[((i,j),v) | ((i,j),v) <- input]")
 	val B = q("tensor*(n)[(i,v) | (i,v) <- output]")
 	var W = q("tensor*(m)[(i,v) | (i,v) <- theta]")
-        A._3.cache; B._2.cache; W._2.cache
+        A._3.cache; B._3.cache; W._3.cache
     	val t = System.currentTimeMillis()
     	val theta1 = q("""
 			var itr = 0;
@@ -137,7 +137,7 @@ object LinearRegression extends Serializable {
 			W;
 		""")
 	  //println("Theta: ")
-	  theta1._2.rdd.count()
+	  theta1._3.count()
 	  (System.currentTimeMillis()-t)/1000.0
     }
     

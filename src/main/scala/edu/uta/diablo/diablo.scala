@@ -33,6 +33,9 @@ package object diablo extends diablo.ArrayFunctions {
   val rddClass = "org.apache.spark.rdd.RDD"
   val datasetClass = "edu.uta.diablo.DiabloDataFrame"
 
+  // silly Spark DataFrame can't encode () or Unit in schema
+  case class EmptyTuple ()
+
   // a Spark DataFrame with type information at compile-time
   type DiabloDataFrame[T] = org.apache.spark.sql.DataFrame
 
