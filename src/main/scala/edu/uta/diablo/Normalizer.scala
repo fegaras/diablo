@@ -116,24 +116,31 @@ object Normalizer {
   def renameVars ( e: Comprehension ): Comprehension
     = e match {
         case Comprehension(h,qs)
-          => val vs = comprVars(qs)
-             val env = vs.map(_ -> newvar).toMap
-             val enve = env.map{ case (v,w) => (v,Var(w)) }
-             val nqs = qs.map {
-                          case Generator(p,u)
-                            => Generator(substP(p,env),substE(u,enve))
-                          case LetBinding(p,u)
-                            => LetBinding(substP(p,env),substE(u,enve))
-                          case GroupByQual(p,k)
-                            => GroupByQual(substP(p,env),substE(k,enve))
-                          case Predicate(u)
-                            => Predicate(substE(u,enve))
-                          case VarDef(v,t,u)
-                            => VarDef(if (env.contains(v)) env(v) else v,t,substE(u,enve))
-                          case AssignQual(d,v)
-                            => AssignQual(substE(d,enve),substE(v,enve))
-                       }
-             Comprehension(substE(h,enve),nqs)
+          => def fresh ( p: Pattern): Map[String,String]
+               = p match { case VarPat(v) => Map(v->newvar)
+                           case TuplePat(ps) => ps.map(fresh).reduce(_++_)
+                           case _ => Map() }
+             def substE ( e: Expr, env: Map[String,String] ): Expr
+               = env.foldLeft[Expr](e) { case (r,(v,u)) => subst(v,Var(u),r) }
+             val (env,nqs)
+               = qs.foldLeft[(Map[String,String],List[Qualifier])] ((Map(),Nil)) {
+                    case ((r,s),Generator(p,u))
+                      => val nr = fresh(p)++r
+                         (nr,s:+Generator(substP(p,nr),substE(u,r)))
+                    case ((r,s),LetBinding(p,u))
+                      => val nr = fresh(p)++r
+                         (nr,s:+LetBinding(substP(p,nr),substE(u,r)))
+                    case ((r,s),GroupByQual(p,k))
+                      => val nr = fresh(p)++r
+                         (nr,s:+GroupByQual(substP(p,nr),substE(k,r)))
+                    case ((r,s),Predicate(u))
+                      => (r,s:+Predicate(substE(u,r)))
+                    case ((r,s),VarDef(v,t,u))
+                      => (r,s:+VarDef(if (r.contains(v)) r(v) else v,t,substE(u,r)))
+                    case ((r,s),AssignQual(d,v))
+                      => (r,s:+AssignQual(substE(d,r),substE(v,r)))
+                 }
+             Comprehension(substE(h,env),nqs)
       }
 
   /** Normalize a comprehension */

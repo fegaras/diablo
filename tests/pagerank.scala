@@ -53,7 +53,7 @@ object PageRank {
 		  };
                   P;
 		 """)
-		println(P._2.count)
+		println(P._3.count)
 		val nt = (System.currentTimeMillis()-t)/1000.0
 		// convert pageranks to a plain RDD
 		val X = q("rdd[ (i,v) | (i,v) <- P ]")
@@ -81,7 +81,7 @@ object PageRank {
 		  };
                   P;
 		 """)
-		println(P._2.count)
+		println(P._3.count)
 		val nt = (System.currentTimeMillis()-t)/1000.0
 		// convert pageranks to a plain RDD
 		val X = q("rdd[ (i,v) | (i,v) <- P ]")
@@ -90,6 +90,38 @@ object PageRank {
 		X.sortBy(x => x._2,false,1).take(30).foreach(println)
                 nt
 	}
+
+	def testPageRankDiablo2(): Double = {
+          // count outgoing neighbors
+          val C = q("rdd[ (i,j.length) | (i,j) <- G, group by i ]")
+          // graph matrix: each vertex is (node,(count,array-of-neighbors))
+          val E = q("""tensor*(N)[ (j,(+/c,i))
+                                 | (i,j) <- G, (jj,c) <- C, jj == j, group by j ]""")
+          E._3.cache
+          val t = System.currentTimeMillis()
+          val P = q("""
+	      // pagerank
+	      var P = tensor*(N)[ (i,1.0/N) | i <- 0..N-1 ];
+	      var k = 0;
+	      while (k < numIter) {
+	          k += 1;
+	          P = tensor*(N)[ ( j, b*(+/v) + (1-b)/N )
+                                | (i,(c,a)) <- E, j <- a,
+                                  (ii,p) <- P, ii == i, let v = p/c, group by j ];
+                  cache(P);
+	      };
+              P;
+	      """)
+          println(P._3.count)
+          val nt = (System.currentTimeMillis()-t)/1000.0
+          // convert pageranks to a plain RDD
+          val X = q("rdd[ (i,v) | (i,v) <- P ]")
+          // print top-30 pageranks
+          println("Ranks:")
+          X.sortBy(x => x._2,false,1).take(30).foreach(println)
+          println("Time: "+nt+" secs")
+          nt
+        }
 	
 	def testGraphXIJV (): Double = {
           val t = System.currentTimeMillis()
@@ -184,6 +216,7 @@ object PageRank {
     
     test("Diablo loop PageRank",testPageRankDiabloLoop)
     test("Diablo PageRank",testPageRankDiablo)
+    test("Diablo PageRank #2",testPageRankDiablo2)
     test("GraphX",testGraphXIJV)
     test("Hand-written PageRank",testHandWrittenPageRank)
     test("MLlib Distributed",testMLlibDistPageRank)

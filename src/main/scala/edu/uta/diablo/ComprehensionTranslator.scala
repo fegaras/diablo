@@ -545,36 +545,29 @@ object ComprehensionTranslator {
         case _ => e
       }
 
-  def block_arrays_to_rdds ( qs: List[Qualifier] ): List[Qualifier]
-    = qs.flatMap {
-               case Generator(p,Lift(f@block_tensor_pat(_,_,dn,sn),x))
-                 => List(Generator(p,lift(f,x)))
-               case Generator(p,Lift(f@block_bool_tensor_pat(_,_,dn,sn),x))
-                 => List(Generator(p,lift(f,x)))
-               case q => List(q)
-             }
+  /* does e depend on vars in s? */
+  def is_dependent ( s: Set[String], e: Expr ): Boolean
+    = freevars(e).toSet.subsetOf(s)
 
-  /* finds a sequence of predicates in qs that refer to the pattern variables xs */
-  def findFilterPred ( xs: Set[String], qs: List[Qualifier] ): Option[List[Qualifier]] = {
-    val qvars = qual_vars(qs)
-    matchQ(qs,{ case Predicate(e)
-                    => contains(e,xs,qvars)
-                  case _ => false },
-                { case (p::s)
-                    => findFilterPred(xs,s) match {
-                          case None => Some(List(p))
-                          case Some(r) => Some(p::r)
-                       }
-                  case _ => None })
-  }
+  /* find all Let qualifiers in qs that depend on the variables in p */
+  def dependencies ( p: Pattern, qs: List[Qualifier] ): (Set[String],List[Qualifier])
+    = qs.foldLeft[(Set[String],List[Qualifier])] ((patvars(p).toSet,Nil)) {
+         case ((s,r),q@LetBinding(pp,e))
+           if is_dependent(s,e)
+           => ( patvars(pp).toSet++s, q::r )
+         case ((s,r),_) => (s,r)
+      }
 
-  def findFilter ( qs: List[Qualifier] ): Option[List[Qualifier]]
+  /* find a dependent join ...,p1 <-e1,...,p2<-e2,... where e2 depends on p1 vars */
+  def findDependentJoin ( qs: List[Qualifier] ): Option[List[Qualifier]]
     = matchQ(qs,{ case Generator(_,e) if isRDD(e) => true; case _ => false },
-                { case (Generator(p,e))::r
-                    => findFilterPred(patvars(p).toSet,r) match {
-                         case Some(ps)
-                           => Some(Generator(p,get_rdd(e))::ps)
-                         case _ => None }
+                { case (x@Generator(p1,e1))::r1
+                    => val ds = patvars(p1).toSet
+                       matchQ(r1,{ case Generator(_,e) if is_dependent(ds,e) => true; case _ => false },
+                                 { case (y@Generator(p2,e2))::r2
+                                     => val lets = dependencies(p1,r1.takeWhile(_!=y))._2
+                                        Some(x::y::lets)
+                                   case _ => None })
                   case _ => None })
 
   /* finds a sequence of predicates in qs that imply x=y */
@@ -583,36 +576,48 @@ object ComprehensionTranslator {
     matchQ(qs,{ case Predicate(MethodCall(e1,"==",List(e2)))
                     => ((contains(e1,xs,qvars) && contains(e2,ys,qvars))
                         || (contains(e2,xs,qvars) && contains(e1,ys,qvars)))
-                  case _ => false },
-                { case (p::s)
-                    => findEqPred(xs,ys,s) match {
+                case _ => false },
+              { case (p::s)
+                  => findEqPred(xs,ys,s) match {
                           case None => Some(List(p))
                           case Some(r) => Some(p::r)
-                       }
-                  case _ => None })
+                     }
+                case _ => None })
   }
+
+  /* find the let-qualifiers that define some vars */
+  def let_bindings ( vars: Set[String], qs: List[Qualifier] ): List[Qualifier]
+    = qs.foldRight[(Set[String],List[Qualifier])] (vars,Nil) {
+        case (q@LetBinding(p,e),(s,r))
+          if !patvars(p).toSet.intersect(s).isEmpty
+          => (s++freevars(e),q::r)
+        case (_,(s,r)) => (s,r)
+      }._2
 
   /* matches the equi-join ...,p1 <- e1,...,p2 <- e2,...,e3 == e4,...   */
   def findJoin ( qs: List[Qualifier] ): Option[List[Qualifier]]
     = matchQ(qs,{ case Generator(_,e) if isRDD(e) => true; case _ => false },
-                { case Generator(p1,e1)::r1
+                { case (x@Generator(p1,e1))::r1
                     => matchQ(r1,{ case Generator(_,e) if isRDD(e) => true; case _ => false },
-                                 { case (Generator(p2,e2))::r2
-                                     => for { c <- findEqPred(patvars(p1).toSet,
+                                 { case (y@Generator(p2,e2))::r2
+                                     => val lets = let_bindings(freevars(e2).toSet,
+                                                                r1.takeWhile(_ != y))
+                                        for { c <- findEqPred(patvars(p1).toSet,
                                                               patvars(p2).toSet,r2)
-                                            } yield Generator(p1,e1)::Generator(p2,e2)::c
-                                  case _ => None })
+                                            } yield x::y::(c++lets)
+                                   case _ => None })
                   case _ => None })
 
   /* matches the cross product ...,p1 <- e1,...,p2 <- e2,...   */
   def findCross ( qs: List[Qualifier] ): Option[List[Qualifier]]
     = matchQ(qs,{ case Generator(_,e) if isRDD(e) => true; case _ => false },
-                { case Generator(p1,Lift(_,e1))::r1
+                { case (x@Generator(p1,e1))::r1
                     => matchQ(r1,{ case Generator(_,e) if isRDD(e) => true; case _ => false },
-                                 { case Generator(p2,Lift(_,e2))::r2
-                                     => Some(List(Generator(p1,e1),
-                                                  Generator(p2,e2)))
-                                  case _ => None })
+                                 { case (y@Generator(p2,e2))::r2
+                                     => val lets = let_bindings(freevars(e2).toSet,
+                                                                r1.takeWhile(_ != y))
+                                        Some(x::y::lets)
+                                   case _ => None })
                   case _ => None })
 
   /* matches an RDD traversal */
@@ -666,9 +671,28 @@ object ComprehensionTranslator {
                    translate_rdd(nh,Generator(TuplePat(List(p,tuple(env.map(x => VarPat(x._2))))),
                                               red)::ns,vars)
               case _
+                => findDependentJoin(qs) match {     // dependent join
+                     case Some(qqs@(Generator(p1,d1)::Generator(p2,d2)::lets))
+                       => val b = Seq(List(tuple(qual_vars(qqs).map(Var).toList)))
+                          val pout = tuple(qual_vars(qqs).map(VarPat).toList)
+                          val lb = lets.foldLeft[Expr](flatMap(Lambda(p2,b),d2)) {
+                                      case (r,LetBinding(p,e)) => Let(p,e,r)
+                                      case (r,_) => r
+                                   }
+                          val z = Generator(pout,
+                                            Lift("rdd",
+                                                 flatMap(Lambda(p1,lb),get_rdd(d1))))
+                          val nqs = qs.flatMap {
+                                      case Generator(p,_) if p==p1 => List(z) // replace 1st generator with the join
+                                      case Generator(p,_) if p==p2 => Nil     // remove 2nd generator
+                                      case x => List(x)
+                                    }
+                          translate_rdd(hs,nqs,vars)
+              case _
                 => findJoin(qs) match {      // RDD join
-                     case Some((Generator(p1,d1))::(Generator(p2,d2))::cs)
+                     case Some(Generator(p1,d1)::Generator(p2,d2)::rest)
                        => val qvars = qual_vars(qs)
+                          val (cs,lets) = rest.span(_.isInstanceOf[Predicate])
                           val jt1 = tuple(cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
                                                     => if (contains(e1,patvars(p1).toSet,qvars)) e1 else e2 })
                           val jt2 = tuple(cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
@@ -677,11 +701,16 @@ object ComprehensionTranslator {
                                              get_rdd(d1))
                           val right = flatMap(Lambda(p2,Seq(List(Tuple(List(jt2,toExpr(p2)))))),
                                               get_rdd(d2))
+                          val nright = lets.foldLeft[Expr](right) {
+                                          case (r,LetBinding(p,e)) => Let(p,e,r)
+                                          case (r,_) => r
+                                       }
                           val z = Generator(TuplePat(List(p1,p2)),
                                             Lift("rdd",
                                                  flatMap(Lambda(TuplePat(List(VarPat("_k"),VarPat("_x"))),
                                                                 Seq(List(Var("_x")))),
-                                                         MethodCall(left,"join",List(right,IntConst(number_of_partitions))))))
+                                                         MethodCall(left,"join",List(nright,
+                                                                         IntConst(number_of_partitions))))))
                           translate_rdd(hs,qs.flatMap {
                                case Generator(p,_) if p==p1 => List(z) // replace 1st generator with the join
                                case Generator(p,_) if p==p2 => Nil     // remove 2nd generator
@@ -689,36 +718,43 @@ object ComprehensionTranslator {
                               },vars)
               case _
                 => findCross(qs) match {     // RDD cross product
-                     case Some(List(Generator(p1,d1),Generator(p2,d2)))
-                       => val z = Generator(TuplePat(List(p1,p2)),
+                     case Some(Generator(p1,d1)::Generator(p2,d2)::lets)
+                       => val nright = lets.foldLeft[Expr](get_rdd(d2)) {
+                                          case (r,LetBinding(p,e)) => Let(p,e,r)
+                                          case (r,_) => r
+                                       }
+                          val z = Generator(TuplePat(List(p1,p2)),
                                             Lift("rdd",
                                                  MethodCall(get_rdd(d1),
                                                             "cartesian",
-                                                            List(get_rdd(d2)))))
+                                                            List(nright))))
                           translate_rdd(hs,qs.flatMap {
                                case Generator(p,_) if p==p1 => List(z) // replace 1st generator with the cross
                                case Generator(p,_) if p==p2 => Nil     // remove 2nd generator
                                case x => List(x)
                               },vars)
-              case _
-                => findTraversal(qs) match {    // an RDD traversal
+             case _
+               => findTraversal(qs) match {    // an RDD traversal
                      case Some(Generator(p,e)::nqs)
                        => flatMap(Lambda(p,translate_rdd(hs,nqs,patvars(p)++vars)),
                                   get_rdd(e))
-                     case _ 
-                       => qs.foldRight[(Expr,List[String])]((Seq(List(translate(hs,vars))),vars)) {
-                             case (Generator(p,u),(r,s))
-                               => (flatMap(Lambda(p,r),get_rdd(u)),
-                                   patvars(p)++s)
-                             case (LetBinding(p,u),(r,s))
-                               => (Let(p,translate(u,vars),r),
-                                   patvars(p)++s)
-                             case (Predicate(p),(r,s))
-                               => (IfE(translate(p,s),r,Seq(Nil)),s)
-                             case (_,(r,s)) => (r,s)
-                          }._1
-                   }
-              }
+             case _ 
+                => qs.foldRight[(Expr,List[String])]((Seq(List(translate(hs,vars))),vars)) {
+                      case (Generator(p,u),(r,s))
+                        if isRDD(u)
+                        => (flatMap(Lambda(p,r),get_rdd(u)),
+                            patvars(p)++s)
+                      case (Generator(p,u),(r,s))
+                        => (flatMap(Lambda(p,r),u),
+                            patvars(p)++s)
+                      case (LetBinding(p,u),(r,s))
+                        => (Let(p,translate(u,vars),r),
+                            patvars(p)++s)
+                      case (Predicate(p),(r,s))
+                        => (IfE(translate(p,s),r,Seq(Nil)),s)
+                      case (_,(r,s)) => (r,s)
+                   }._1
+              } } }
           }
     }
 
@@ -1465,48 +1501,7 @@ object ComprehensionTranslator {
 
 /* -------------------- translate block tensor comprehensions -----------------------------------------*/
 
-  /* matches the equi-join ...,p1 <- e1,...,p2 <- e2,...,e3 == e4,...   */
-  def findTileJoin ( qs: List[Qualifier] ): Option[List[Qualifier]]
-    = matchQ(qs,{ case Generator(_,e) if isTiled(e) => true; case _ => false },
-                { case (Generator(p1,e1))::r1
-                    => matchQ(r1,{ case Generator(_,e) if isTiled(e) => true; case _ => false },
-                                 { case (Generator(p2,e2))::r2
-                                     => for { c <- findEqPred(patvars(p1).toSet,patvars(p2).toSet,r2)
-                                            } yield Generator(p1,e1)::Generator(p2,e2)::c
-                                  case _ => None })
-                  case _ => None })
-
-  /* matches the cross product ...,p1 <- e1,...,p2 <- e2,...   */
-  def findTileCross ( qs: List[Qualifier] ): Option[List[Qualifier]]
-    = matchQ(qs,{ case Generator(_,e) if isTiled(e) => true; case _ => false },
-                { case (Generator(p1,e1))::r1
-                    => matchQ(r1,{ case Generator(_,e) if isTiled(e) => true; case _ => false },
-                                 { case (Generator(p2,e2))::r2
-                                     => Some(List(Generator(p1,e1),Generator(p2,e2)))
-                                  case _ => None })
-                  case _ => None })
-
-  def filter_tile_predicates ( qs: List[Qualifier], indices: List[String] ): List[Qualifier]
-    = qs.filter{ case Predicate(MethodCall(Var(i),"==",List(Var(j))))
-                   => indices.contains(i) && indices.contains(j)
-                 case Predicate(e) => false
-                 case _ => true }
-
   var QLcache: Option[Expr] = None
-
-  def div ( e: Expr, N: Expr ): Expr
-    = e match {
-        case Tuple(es)
-          => Tuple(es.map(e => MethodCall(e,"/",List(N))))
-        case _ => MethodCall(e,"/",List(N))
-      }
-
-  def mod ( e: Expr, N: Expr ): Expr
-    = e match {
-        case Tuple(es)
-          => Tuple(es.map(e => MethodCall(e,"%",List(N))))
-        case _ => MethodCall(e,"%",List(N))
-      }
 
   def translate_tiled ( block: String, hs: Expr, qs: List[Qualifier], vars: List[String],
                         tp: Type, dims: List[Expr] ): Expr
@@ -1585,6 +1580,15 @@ object ComprehensionTranslator {
            => r+(u -> newvar)
          case (r,_) => r
       }
+
+  def block_arrays_to_rdds ( qs: List[Qualifier] ): List[Qualifier]
+    = qs.flatMap {
+               case Generator(p,Lift(f@block_tensor_pat(_,_,dn,sn),x))
+                 => List(Generator(p,lift(f,x)))
+               case Generator(p,Lift(f@block_bool_tensor_pat(_,_,dn,sn),x))
+                 => List(Generator(p,lift(f,x)))
+               case q => List(q)
+             }
 
   /** Translate comprehensions to optimized algebra */
   def translate ( e: Expr, vars: List[String] ): Expr = {

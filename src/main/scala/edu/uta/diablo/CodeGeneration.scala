@@ -190,7 +190,7 @@ abstract class CodeGeneration {
       case Left(tp) => tp
       case Right(ex)
         => println(s"Typechecking error at line $line: ${ex.msg}")
-           println("Code: "+code)
+           println("Code: "+showCode(code))
            println("Bindings: "+env)
            val sw = new StringWriter
            ex.printStackTrace(new PrintWriter(sw))
