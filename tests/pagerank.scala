@@ -93,10 +93,9 @@ object PageRank {
 
 	def testPageRankDiablo2(): Double = {
           // count outgoing neighbors
-          val C = q("rdd[ (i,j.length) | (i,j) <- G, group by i ]")
+          //val C = q("rdd[ (i,j.length) | (i,j) <- G, group by i ]")
           // graph matrix: each vertex is (node,(count,array-of-neighbors))
-          val E = q("""tensor*(N)[ (j,(+/c,i))
-                                 | (i,j) <- G, (jj,c) <- C, jj == j, group by j ]""")
+          val E = q("""tensor*(N)[ (i,j) | (i,j) <- G, group by i ]""")
           E._3.cache
           val t = System.currentTimeMillis()
           val P = q("""
@@ -106,8 +105,8 @@ object PageRank {
 	      while (k < numIter) {
 	          k += 1;
 	          P = tensor*(N)[ ( j, b*(+/v) + (1-b)/N )
-                                | (i,(c,a)) <- E, j <- a,
-                                  (ii,p) <- P, ii == i, let v = p/c, group by j ];
+                                | (i,a) <- E, j <- a,
+                                  (ii,p) <- P, ii == i, let v = p/a.length, group by j ];
                   cache(P);
 	      };
               P;

@@ -259,7 +259,7 @@ abstract class CodeGeneration {
       case _
         => getOptionalType(ec,env) match {
               case Right(ex)
-                => throw ex
+                => throw new Error(ex.toString)
               case Left(tp)
                 => throw new Error(s"Expression $ec is not a collection (found type $tp)\nBindings: "+env)
            }
@@ -317,9 +317,43 @@ abstract class CodeGeneration {
         case _ => etp
       }
 
+  def codeLetBindings ( p: Pattern, u: Expr, env: Environment ): (c.Tree,Environment)
+    = p match {
+        case VarPat(v)
+          => val pc = TermName(v)
+             val uc = codeGen(u,env)
+             val tc = getType(uc,env)
+             (q"val $pc = $uc",add(p,tc,env))
+        case TuplePat(Nil)
+          => (q"",env)
+        case TuplePat(List(q))
+          => codeLetBindings(q,u,env)
+        case TuplePat(ps)
+          if u.isInstanceOf[Var]
+          => val nu = q""
+             ps.zipWithIndex.foldLeft[(c.Tree,Environment)] ((nu,env)) {
+                case ((s,r),(q,i))
+                  => val (ns,nr) = codeLetBindings(q,Nth(u,i+1),r)
+                     (q"..$s; ..$ns",nr)
+             }
+        case TuplePat(ps)
+          => val nv = newvar
+             val nvc = TermName(nv)
+             val uc = codeGen(u,env)
+             val tc = getType(uc,env)
+             val nenv = add(VarPat(nv),tc,env)
+             val nu = q"val $nvc = $uc"
+             ps.zipWithIndex.foldLeft[(c.Tree,Environment)] ((nu,nenv)) {
+                case ((s,r),(q,i))
+                  => val (ns,nr) = codeLetBindings(q,Nth(Var(nv),i+1),r)
+                     (q"..$s; ..$ns",nr)
+             }
+        case _ => (q"",env)
+      }
+
   /** Generate Scala code for e as a statement */
   def codeStmt ( e: Expr, env: Environment ): c.Tree
-    = e match {
+    = try { e match {
         case Seq(List(u))
           => codeStmt(u,env)
         case IfE(p,x,Seq(Nil))
@@ -355,11 +389,9 @@ abstract class CodeGeneration {
         case MethodCall(x@MethodCall(flatMap(Lambda(p,u),b),"toList",null),"toList",null)
           => codeStmt(x,env)
         case Let(p,u,b)
-          => val pc = code(p)
-             val uc = codeGen(u,env)
-             val tc = getType(uc,env)
-             val bc = codeStmt(b,add(p,tc,env))
-             q"{ val $pc: $tc = $uc; $bc }"
+          => val (bs,nenv) = codeLetBindings(p,u,env)
+             val bc = codeStmt(b,nenv)
+             q"{ ..$bs; $bc }"
         case Block(Nil)
           => q"()"
         case Block(es:+Seq(x::_))
@@ -392,7 +424,8 @@ abstract class CodeGeneration {
            q"{ ..$nes; $xc }"
         case u
           => codeGen(u,env)
-    }
+      }
+    } catch { case m: Error => throw new Error(m.getMessage+"\nFound in "+e) }
 
   def zero ( tp: DType ): c.Tree
     = tp match {
@@ -420,7 +453,7 @@ abstract class CodeGeneration {
       }
 
   /** Generate Scala code for expressions */
-  def codeGen ( e: Expr, env: Environment ): c.Tree = {
+  def codeGen ( e: Expr, env: Environment ): c.Tree = try {
     e match {
       case flatMap(Lambda(p,Seq(List(b))),x)
         if toExpr(p) == b
@@ -465,7 +498,7 @@ abstract class CodeGeneration {
              case tq"($kt,$et)"
                => val bc = codeGen(b,add(p,tq"($et,$et)",env))
                   q"$xc.reduceByKey(($nx:$et,$ny:$et) => ($nx,$ny) match { case $pc => $bc })"
-             case _ => throw new Exception("Wrong reduceByKey: "+e)
+             case _ => throw new Error("Wrong reduceByKey: "+e)
            }
       case MethodCall(x,"reduceByKey",List(Lambda(p,b),n))
         => val (tp,xc) = typedCode(x,env)
@@ -477,7 +510,7 @@ abstract class CodeGeneration {
              case tq"($kt,$et)"
                => val bc = codeGen(b,add(p,tq"($et,$et)",env))
                   q"$xc.reduceByKey(($nx:$et,$ny:$et) => ($nx,$ny) match { case $pc => $bc },$nc)"
-             case _ => throw new Exception("Wrong reduceByKey: "+e)
+             case _ => throw new Error("Wrong reduceByKey: "+e)
            }
       case Call("reducer",List(Lambda(p,b),zero))  // DataFrame custom aggregator
         => val zc = codeGen(zero,env)
@@ -497,7 +530,7 @@ abstract class CodeGeneration {
              case tq"($kt,$et)"
                => val bc = codeGen(b,add(p,tq"($et,$et)",env))
                   q"outerJoin($xc,$yc,($nx:$et,$ny:$et) => ($nx,$ny) match { case $pc => $bc })"
-             case _ => throw new Exception("Wrong outerJoin: "+e)
+             case _ => throw new Error("Wrong outerJoin: "+e)
            }
       case Call("merge_tensors",List(x,y,Lambda(TuplePat(List(px@VarPat(xv),py@VarPat(yv))),b),zero))
         => val zc = codeGen(zero,env)
@@ -594,6 +627,12 @@ abstract class CodeGeneration {
            }
       case Project(x,a)
         => codeGen(MethodCall(x,a,null),env)
+      case Assign(d,Seq(List(MethodCall(x,m,List(y)))))
+        if x == d && List("+","-","*","/").contains(m)
+        => val dc = codeGen(d,env)
+           val yc = codeGen(y,env)
+           val op = TermName(method_name(m)+"$eq")
+           q"$dc $op $yc"
       case Assign(d,Seq(u::_))
         => val uc = codeGen(u,env)
            val dc = codeGen(d,env)
@@ -689,11 +728,9 @@ abstract class CodeGeneration {
            val yc = codeGen(y,env)
            q"if ($pc) $xc else $yc"
      case Let(p,u,b)
-        => val pc = code(p)
-           val uc = codeGen(u,env)
-           val tc = getType(uc,env)
-           val bc = codeGen(b,add(p,tc,env))
-           q"{ val $pc: $tc = $uc; $bc }"
+       => val (bs,nenv) = codeLetBindings(p,u,env)
+          val bc = codeGen(b,nenv)
+          q"{ ..$bs; $bc }"
       case MatchE(x,List(Case(VarPat(v),BoolConst(true),b)))
         if occurrences(v,b) == 1
         => codeGen(subst(v,x,b),env)
@@ -844,9 +881,9 @@ abstract class CodeGeneration {
         => q"null"
       case Var(v)
         => Ident(TermName(v))
-      case _ => throw new Exception("Unrecognized AST: "+e)
+      case _ => throw new Error("Unrecognized AST: "+e)
     }
-  }
+  } catch { case m: Error => throw new Error(m.getMessage+"\nFound in "+e) }
 
   /** Generate Scala code for statements */
   def codeGen ( e: Stmt, env: Environment ): c.Tree =

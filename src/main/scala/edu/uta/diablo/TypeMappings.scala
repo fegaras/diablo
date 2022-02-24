@@ -88,21 +88,21 @@ object TypeMappings {
     val dims = "( d: ("+1.to(dn).map(i => "Int").mkString(",")+
                "), s: ("+1.to(sn).map(i => "Int").mkString(",")+") )"
     val ldims = "("+1.to(dn+sn).map(i => "Int").mkString(",")+")"
-    val dsize = if (dn==1) "d" else 1.to(dn).map(i => "d._"+i).mkString("*")
-    val ssize = if (sn==1) "s" else 1.to(sn).map(i => "s._"+i).mkString("*")
+    val dsize = if (dn==1) "d" else 1.to(dn).map(i => "d#"+i).mkString("*")
+    val ssize = if (sn==1) "s" else 1.to(sn).map(i => "s#"+i).mkString("*")
     val drange = if (dn==1) "i1 <- 0..(d-1)"
-                 else 1.to(dn).map(i => s"i$i <- 0..(d._$i-1)").mkString(", ")
+                 else 1.to(dn).map(i => s"i$i <- 0..(d#$i-1)").mkString(", ")
     val srange = if (sn==1) "i1 <- 0..(s-1)"
-                 else 1.to(sn).map(i => s"j$i <- 0..(s._$i-1)").mkString(", ")
+                 else 1.to(sn).map(i => s"j$i <- 0..(s#$i-1)").mkString(", ")
     val dvars = 1.to(dn).map("i"+_).mkString(",")
     val dvars2 = 1.to(dn).map("ii"+_).mkString(",")
     val svars = 1.to(sn).map("j"+_).mkString(",")
     val deq = 1.to(dn).map(i => s"ii$i == i$i").mkString(", ")
-    val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d._$i+i$i)" }
-    val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s._$i+j$i)" }
+    val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d#$i+i$i)" }
+    val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s#$i+j$i)" }
     val svarset = if (sn==1) "let j1 = sparse[col]%s"
                   else (1 to sn).map{ k => s"let j$k = "+("sparse[col]"::(sn.to(k+1,-1))
-                            .map(i => s"s._$i").toList).mkString("/")+s"%s._$k" }.mkString(", ")
+                            .map(i => s"s#$i").toList).mkString("/")+s"%s#$k" }.mkString(", ")
     if (sn == 0)   // a dense tensor
       s"""
        typemap tensor_${dn}_0[T] $dims: array$dn[T] {
@@ -192,13 +192,13 @@ object TypeMappings {
                "), s: ("+1.to(sn).map(i => "Int").mkString(",")+") )"
     val ldims = "("+1.to(dn+sn).map(i => "Int").mkString(",")+")"
     val drange = if (dn==1) "i1 <- 0..(d-1)"
-                 else 1.to(dn).map(i => s"i$i <- 0..(d._$i-1)").mkString(", ")
+                 else 1.to(dn).map(i => s"i$i <- 0..(d#$i-1)").mkString(", ")
     val srange = if (sn==1) "j1 <- 0..(s-1)"
-                 else 1.to(sn).map(i => s"j$i <- 0..(s._$i-1)").mkString(", ")
+                 else 1.to(sn).map(i => s"j$i <- 0..(s#$i-1)").mkString(", ")
     val dvars = 1.to(dn).map("i"+_).mkString(",")
     val svars = 1.to(sn).map("j"+_).mkString(",")
-    val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d._$i+i$i)" }
-    val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s._$i+j$i)" }
+    val dkey = (2 to dn).foldLeft("i1") { case (r,i) => s"($r*d#$i+i$i)" }
+    val skey = (2 to sn).foldLeft("j1") { case (r,i) => s"($r*s#$i+j$i)" }
     if (dn == 0 && boolean_values) // a boolean sparse tensor
       s"""
        typemap full_bool_tensor_0_$sn $dims: array$sn[Boolean] {
@@ -249,18 +249,18 @@ object TypeMappings {
     val ldims = rep(i => "Int")
     // the last tile size is dim % block_dim_size
     val ddims = if (dn==1) s"if ((ii1+1)*$N > d) (d % $N) else $N"
-                else 1.to(dn).map(k => s"if ((ii$k+1)*$N > d._$k) (d._$k % $N) else $N").mkString(",")
+                else 1.to(dn).map(k => s"if ((ii$k+1)*$N > d#$k) (d#$k % $N) else $N").mkString(",")
     val sdims = if (sn==1) s"if ((ii${dn+1}+1)*$N > s) (s % $N) else $N"
-                else 1.to(sn).map(k => s"if ((ii${k+dn}+1)*$N > s._$k) (s._$k % $N) else $N").mkString(",")
+                else 1.to(sn).map(k => s"if ((ii${k+dn}+1)*$N > s#$k) (s#$k % $N) else $N").mkString(",")
     val vars = rep("i"+_)
     val vars2 = rep("ii"+_)
     val div_vars = rep(k => s"let ii$k = i$k / $N")
     val mod_vars = rep(k => s"i$k % $N")
     val idx = rep(k => s"ii$k * $N + i$k")
     val ranges = ((if (dn==1) List(s"ii1 * $N + i1 < d")
-                   else 1.to(dn).map(k => s"ii$k * $N + i$k < d._$k"))
+                   else 1.to(dn).map(k => s"ii$k * $N + i$k < d#$k"))
                   ++(if (sn==1) List(s"ii${dn+1} * $N + i${dn+1} < s")
-                     else 1.to(sn).map(k => s"ii${k+dn} * $N + i${k+dn} < s._$k"))).mkString(", ")
+                     else 1.to(sn).map(k => s"ii${k+dn} * $N + i${k+dn} < s#$k"))).mkString(", ")
     if (boolean_values) {
       s"""
        typemap ${full}${cm}_block_bool_tensor_${dn}_$sn $dims: array${dn+sn}[Boolean] {

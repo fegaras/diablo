@@ -5,26 +5,26 @@
 #SBATCH --partition=compute
 #SBATCH --nodes=5
 #SBATCH --ntasks-per-node=128
-#SBATCH --mem=240G
+#SBATCH --mem=248G
 #SBATCH --export=ALL
-#SBATCH --time=30    # time limit in minutes
+#SBATCH --time=60    # time limit in minutes
 
 nodes=$SLURM_NNODES
 echo "Number of nodes = " $nodes
 
-### Make some local directories
-srun -n 5 --nodes=5 --ntasks-per-node=1 mkdir /scratch/$USER/job_$SLURM_JOBID/local
-srun -n 5 --nodes=5 --ntasks-per-node=1 mkdir /scratch/$USER/job_$SLURM_JOBID/locals
-srun -n 5 --nodes=5 --ntasks-per-node=1 mkdir /scratch/$USER/job_$SLURM_JOBID/tmp
+### Make some local directories -- don't run sbatch jobs within an sbatch job (these 5 nodes are not the same)
+#srun -n 5 --nodes=5 --ntasks-per-node=1 mkdir /scratch/$USER/job_$SLURM_JOBID/local
+#srun -n 5 --nodes=5 --ntasks-per-node=1 mkdir /scratch/$USER/job_$SLURM_JOBID/locals
+#srun -n 5 --nodes=5 --ntasks-per-node=1 mkdir /scratch/$USER/job_$SLURM_JOBID/tmp
 
 # Expanse node: 128 cores (126 available), 256 GB RAM
 #   executor-cores = 12   (10 executors/node)
-#   executor-memory = 20GB
+#   executor-memory = 24GB
 #   num-executors = nodes*10-1
 executors=$((nodes*10-1))
 echo "Number of executors = " $executors
 
-SPARK_OPTIONS="--driver-memory 24G --driver-cores 16 --num-executors $executors --executor-cores 12 --executor-memory 20G --conf spark.executor.extraJavaOptions=-Xss512m --driver-java-options '-Xss512m' --supervise"
+SPARK_OPTIONS="--driver-memory 24G --driver-cores 16 --num-executors $executors --executor-cores 12 --executor-memory 24G --conf spark.executor.extraJavaOptions=-Xss512m --driver-java-options '-Xss512m' --supervise"
 
 export HADOOP_CONF_DIR=$HOME/expansecluster
 export SPARK_CONF_DIR=$HADOOP_CONF_DIR/spark

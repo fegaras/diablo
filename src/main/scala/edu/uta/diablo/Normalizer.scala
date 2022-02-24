@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package edu.uta.diablo
+import scala.annotation.tailrec
 
 object Normalizer {
   import AST._
@@ -47,7 +48,7 @@ object Normalizer {
       case Tuple(cs)
         => cs.isEmpty || cs.forall(isSimple)
       case Record(cs)
-        => cs.isEmpty || cs.map(_._2).forall(isSimple)
+        => cs.isEmpty || cs.values.forall(isSimple)
       case Seq(cs)
         => cs.isEmpty || cs.forall(isSimple)
       case Merge(x,y)
@@ -55,6 +56,18 @@ object Normalizer {
       case MethodCall(x,op,xs)  // arithmetic operations are simple
         if List("+","*","/","%").contains(op)
         => isSimple(x) && xs.forall(isSimple)
+      case _ => false
+    }
+
+  def isConstant ( e: Expr ): Boolean =
+    e match {
+      case Var(_) => true
+      case StringConst(_) => true
+      case CharConst(_) => true
+      case IntConst(_) => true
+      case LongConst(_) => true
+      case DoubleConst(_) => true
+      case BoolConst(_) => true
       case _ => false
     }
 
@@ -96,6 +109,7 @@ object Normalizer {
   def notGrouped ( qs: List[Qualifier] ): Boolean
     = qs.forall{ case GroupByQual(_,_) => false; case _ => true }
 
+  @tailrec
   def notGrouped ( p: Pattern, head: Expr, qs: List[Qualifier] ): Boolean
     = qs match {
         case GroupByQual(gp,ge)::r
@@ -120,27 +134,62 @@ object Normalizer {
                = p match { case VarPat(v) => Map(v->newvar)
                            case TuplePat(ps) => ps.map(fresh).reduce(_++_)
                            case _ => Map() }
-             def substE ( e: Expr, env: Map[String,String] ): Expr
-               = env.foldLeft[Expr](e) { case (r,(v,u)) => subst(v,Var(u),r) }
+             def substS ( e: Expr, env: Map[String,String] ): Expr
+               = substE(e,env.mapValues(Var))
              val (env,nqs)
                = qs.foldLeft[(Map[String,String],List[Qualifier])] ((Map(),Nil)) {
                     case ((r,s),Generator(p,u))
                       => val nr = fresh(p)++r
-                         (nr,s:+Generator(substP(p,nr),substE(u,r)))
+                         (nr,s:+Generator(substP(p,nr),substS(u,r)))
                     case ((r,s),LetBinding(p,u))
                       => val nr = fresh(p)++r
-                         (nr,s:+LetBinding(substP(p,nr),substE(u,r)))
+                         (nr,s:+LetBinding(substP(p,nr),substS(u,r)))
                     case ((r,s),GroupByQual(p,k))
                       => val nr = fresh(p)++r
-                         (nr,s:+GroupByQual(substP(p,nr),substE(k,r)))
+                         (nr,s:+GroupByQual(substP(p,nr),substS(k,r)))
                     case ((r,s),Predicate(u))
-                      => (r,s:+Predicate(substE(u,r)))
+                      => (r,s:+Predicate(substS(u,r)))
                     case ((r,s),VarDef(v,t,u))
-                      => (r,s:+VarDef(if (r.contains(v)) r(v) else v,t,substE(u,r)))
+                      => (r,s:+VarDef(if (r.contains(v)) r(v) else v,t,substS(u,r)))
                     case ((r,s),AssignQual(d,v))
-                      => (r,s:+AssignQual(substE(d,r),substE(v,r)))
+                      => (r,s:+AssignQual(substS(d,r),substS(v,r)))
                  }
-             Comprehension(substE(h,env),nqs)
+             Comprehension(substS(h,env),nqs)
+      }
+
+  val inverses = Map( "+"->"-", "*"->"/", "-"->"+", "/"->"*" )
+
+  /* for dst=e(src), find g such that src=g(dst) */
+  @tailrec
+  def inverse ( e: Expr, src: String, dst: Expr ): Option[Expr]
+    = e match {
+        case Var(v)
+          if v==src
+          => Some(dst)
+        case MethodCall(x,op,List(y))
+          if inverses.contains(op) && freevars(x).contains(src) && !freevars(y).contains(src)
+          => inverse(x,src,MethodCall(dst,inverses(op),List(y)))
+        case MethodCall(y,op,List(x))
+          if inverses.contains(op) && freevars(x).contains(src) && !freevars(y).contains(src)
+          => if (List("-","/").contains(op))
+               inverse(x,src,MethodCall(y,op,List(dst)))
+             else inverse(x,src,MethodCall(dst,inverses(op),List(y)))
+/*
+        case MethodCall(u,op,List(c))
+          if (inverses.contains(op) && isConstant(c))
+          => inverse(u,src,MethodCall(dst,inverses(op),List(c)))
+        case MethodCall(c,op,List(u))
+          if (inverses.contains(op) && isConstant(c))
+          => inverse(u,src,MethodCall(dst,inverses(op),List(c)))
+        case MethodCall(x,op,List(y))
+          if (inverses.contains(op) && freevars(x).contains(src)
+              && !freevars(y).contains(src))
+          => inverse(x,src,MethodCall(dst,inverses(op),List(y)))
+        case MethodCall(y,"+",List(x))   // needs more cases
+          if (freevars(x).contains(src) && !freevars(y).contains(src))
+          => inverse(x,src,MethodCall(dst,"-",List(y)))
+*/
+        case _ => None
       }
 
   /** Normalize a comprehension */
@@ -168,13 +217,12 @@ object Normalizer {
       case LetBinding(TuplePat(ps),Tuple(es))::r
         => normalize(head,(ps zip es).map{ case (p,e) => LetBinding(p,e) }++r,env,opts)
       case LetBinding(p@VarPat(v),u)::r
-        => if (notGrouped(p,head,r) && (isSimple(u) || occurrences(v,Comprehension(head,r)) <= 1))
+        => if (notGrouped(p,head,r) && ((isSimple(u) || occurrences(v,Comprehension(head,r)) <= 1)
+                                        && !isRepeated(v,head)))
              normalize(head,r,bindEnv(p,normalize(substE(u,env)))++freeEnv(p,env),opts)
            else LetBinding(p,normalize(substE(u,env)))::normalize(head,r,env,opts)
       case LetBinding(p,u)::r
-        => if (false && notGrouped(p,head,r))
-             normalize(head,r,bindEnv(p,normalize(substE(u,env)))++freeEnv(p,env),opts)
-           else LetBinding(p,normalize(substE(u,env)))::normalize(head,r,env,opts)
+        => LetBinding(p,normalize(substE(u,env)))::normalize(head,r,env,opts)
       case Predicate(BoolConst(false))::r
         => Nil
       case Predicate(BoolConst(true))::r
@@ -199,23 +247,23 @@ object Normalizer {
           => isRepeated(v,u)
         case flatMap(Lambda(p,b),u)
           => occurrences(v,b) >= 1 || isRepeated(v,b) || isRepeated(v,u)
+        case Comprehension(_,_)
+          => occurrences(v,e) >= 1
         case _ => accumulate[Boolean](e,isRepeated(v,_),_||_,false)
       }
 
   /** normalize an expression */
   def normalize ( e: Expr ): Expr =
     e match {
-      case Apply(Lambda(p@VarPat(v),b),u)
-        => val nu = normalize(u)
-           val nb = normalize(b)
-           normalize(if (isSimple(nu) || occurrences(v,nb) <= 1)
-                        subst(Var(v),nu,nb)
-                     else Let(p,nu,nb))
       case Apply(Lambda(p,b),u)
-        => Let(p,u,b)
+        => normalize(Let(p,u,b))
       case Let(VarPat(v),u,b)   // if v appears in a flatMap body, don't subst
         if isSimple(u) || (occurrences(v,b) <= 1 && !isRepeated(v,b))
         => normalize(subst(Var(v),u,b))
+      case Let(VarPat(v),u,b)
+        if freevars(u).contains(v) // dependency
+        => val nv = newvar
+           Let(VarPat(nv),u,subst(v,Var(nv),b))
       case Let(TuplePat(ps),Tuple(us),b)
         => normalize((ps zip us).foldLeft(b){ case (r,(p,u)) => Let(p,u,r) })
       case Comprehension(h,List())
@@ -234,6 +282,18 @@ object Normalizer {
                   else normalize(nc)
              case _ => Seq(Nil)
            }
+      case flatMap(Lambda(p@VarPat(i),IfE(MethodCall(ie,"==",List(v)),b,nb)),
+                   Range(n1,n2,n3))
+        // eliminate a flatMap over a range that is bound to a value
+        if inverse(ie,i,v).isDefined
+        => val Some(nv) = inverse(ie,i,v)
+           Let(p,nv,IfE(Call("inRange",List(Var(i),n1,n2,n3)),b,nb))
+      case flatMap(Lambda(p@VarPat(i),IfE(MethodCall(v,"==",List(ie)),b,nb)),
+                   Range(n1,n2,n3))
+        // eliminate a flatMap over a range that is bound to a value
+        if inverse(ie,i,v).isDefined
+        => val Some(nv) = inverse(ie,i,v)
+           Let(p,nv,IfE(Call("inRange",List(Var(i),n1,n2,n3)),b,nb))
       case flatMap(Lambda(VarPat(v),Seq(List(Var(w)))),x)
         if v == w
         => normalize(x)

@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 package edu.uta.diablo
-
+import scala.annotation.tailrec
 
 object Optimizer {
   import AST._
-  import Normalizer.{normalizeAll,comprVars}
+  import Normalizer.{normalizeAll,comprVars,inverse}
   import ComprehensionTranslator.{isBlockTensor,isTensor,qual_vars}
 
   /* general span for comprehensions; if a qualifier matches, split there and continue with cont */
+  @tailrec
   def matchQ ( qs: List[Qualifier], filter: Qualifier => Boolean,
                cont: List[Qualifier] => Option[List[Qualifier]] ): Option[List[Qualifier]]
     = qs match {
@@ -56,30 +57,6 @@ object Optimizer {
         case Lift(name,_) if isBlockTensor(name) => true
         case Lift(name,_) if isTensor(name) => true
         case _ => false
-      }
-
-  val inverses = Map( "+"->"-", "*"->"/", "-"->"+", "/"->"*" )
-
-  /* for dst=e(src), find g such that src=g(dst) */
-  def inverse ( e: Expr, src: String, dst: Expr ): Option[Expr]
-    = e match {
-        case Var(v)
-          if v==src
-          => Some(dst)
-        case MethodCall(u,op,List(c))
-          if (inverses.contains(op) && constantKey(c))
-          => inverse(u,src,MethodCall(dst,inverses(op),List(c)))
-        case MethodCall(c,op,List(u))
-          if (inverses.contains(op) && constantKey(c))
-          => inverse(u,src,MethodCall(dst,inverses(op),List(c)))
-        case MethodCall(x,op,List(y))
-          if (inverses.contains(op) && freevars(x).contains(src)
-              && !freevars(y).contains(src))
-          => inverse(x,src,MethodCall(dst,inverses(op),List(y)))
-        case MethodCall(y,"+",List(x))   // needs more cases
-          if (freevars(x).contains(src) && !freevars(y).contains(src))
-          => inverse(x,src,MethodCall(dst,"-",List(y)))
-        case _ => None
       }
 
   /* matches ...,i<-range(...),...,p<-e,...,v==i,... where p contains v */
@@ -179,11 +156,9 @@ object Optimizer {
     = matchQ(qs,{ case Generator(VarPat(_),Range(_,_,_)) => true; case _ => false },
                 { case (g1@Generator(VarPat(v),Range(_,_,_)))::s
                     => matchQ(s,{ case p@Predicate(MethodCall(Var(v1),"==",List(e)))
-                                    => v != e && v == v1 &&
-                                         !freevars(Comprehension(e,s.dropWhile(_ != p))).contains(v1)
+                                    => v == v1 && !freevars(Comprehension(e,s.dropWhile(_ != p))).contains(v1)
                                   case p@Predicate(MethodCall(e,"==",List(Var(v1))))
-                                    => v != e && v == v1 &&
-                                         !freevars(Comprehension(e,s.dropWhile(_ != p))).contains(v1)
+                                    => v == v1 && !freevars(Comprehension(e,s.dropWhile(_ != p))).contains(v1)
                                   case _ => false },
                                 { case Predicate(MethodCall(e,"==",List(Var(v1))))::_
                                     => Some(List(g1,Predicate(MethodCall(Var(v1),"==",List(e)))))
@@ -193,7 +168,7 @@ object Optimizer {
                   case _ => None })
 
   def findLetBound ( qs: List[Qualifier] ): Option[List[Qualifier]]
-    = matchQ(qs,{ case Predicate(MethodCall(Var(v),"==",List(e))) => v!=e; case _ => false },
+    = matchQ(qs,{ case Predicate(MethodCall(Var(v),"==",List(e))) => true; case _ => false },
                 { case (c@Predicate(MethodCall(_,_,List(e))))::s
                     => matchQ(s,{ case LetBinding(p,u) => u == e; case _ => false },
                                 { case lb::_ => Some(List(c,lb))
