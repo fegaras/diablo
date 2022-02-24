@@ -5,7 +5,7 @@
 #SBATCH --partition=compute
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=128
-#SBATCH --mem=248G
+#SBATCH --mem=249325M
 #SBATCH --export=ALL
 #SBATCH --time=60    # time limit in minutes
 

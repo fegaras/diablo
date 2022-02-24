@@ -27,6 +27,7 @@ object Multiply {
     // each matrix has n*m elements
     val n = args(1).toInt
     val m = if (args.length > 2) args(2).toInt else n
+    val sparsity = if (args.length > 3) args(3).toDouble else 0.01
     parami(block_dim_size,1000)  // size of each dimension in a block
     val N = 1000
     val validate_output = false
@@ -99,9 +100,9 @@ object Multiply {
     def random () = rand.nextDouble()*10
 
     // sparse block tensors with 99% zeros
-    val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
+    val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > (1.0-sparsity)*10 ]")
     Az._3.cache
-    val Bz = q("tensor*(m)(n)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > 9.9 ]")
+    val Bz = q("tensor*(m)(n)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > (1.0-sparsity)*10 ]")
     Bz._3.cache
 
     def validate ( M: tiled_matrix ) = {
@@ -488,7 +489,7 @@ object Multiply {
     val tile_size = sizeof(((1,1),randomTile(N,N))).toDouble
     println("@@@ number of tiles: "+(n/N)+"*"+(m/N)+" = "+((n/N)*(m/N)))
     println("@@@@ dense matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
-    val sparse_tile = q("tensor(N)(N)[ ((i,j),random()) | i <- 0..(N-1), j <- 0..(N-1), random() > 9.9 ]")
+    val sparse_tile = q("tensor(N)(N)[ ((i,j),random()) | i <- 0..(N-1), j <- 0..(N-1), random() >  (1.0-sparsity)*10 ]")
     val sparse_tile_size = sizeof(sparse_tile).toDouble
     println("@@@@ sparse matrix size: %.2f MB".format(sparse_tile_size*(n/N)*(m/N)/(1024.0*1024.0)))
 
