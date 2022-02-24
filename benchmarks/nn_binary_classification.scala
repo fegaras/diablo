@@ -18,11 +18,11 @@ import scala.util.Random
 import Math._
 
 object NeuralNetwork extends Serializable {
-  /* The size of an object */
-  def sizeof ( x: AnyRef ): Long = {
-    import org.apache.spark.util.SizeEstimator.estimate
-    estimate(x)
-  }
+	/* The size of an object */
+	def sizeof ( x: AnyRef ): Long = {
+		import org.apache.spark.util.SizeEstimator.estimate
+		estimate(x)
+	}
 
 	def main ( args: Array[String] ) {
 		val conf = new SparkConf().setAppName("tiles")
@@ -37,11 +37,11 @@ object NeuralNetwork extends Serializable {
 		val N = 1000
 		
 		val learning_rate = 2.0
-		val total_size = 1000
+		val total_size = args(1).toInt
 		val n = (0.8*total_size).toInt
 		val test_size = total_size - n
 		val m = 2
-		val epochs = args(1).toInt
+		val epochs = 10
 
 		val input1 = sc.textFile(args(2))
 		          .map( line => { val a = line.split(",").toList
@@ -108,9 +108,7 @@ object NeuralNetwork extends Serializable {
 		def ln(x: Double): Double = math.log10(x)/math.log10(math.exp(1.0))
 		val rand = new Random()
 		def random(): Double = (rand.nextDouble()-0.5)*0.2
-		
-		var sweights: Array[Array[Double]] = Array()
-		var sbiases: Array[Array[Double]] = Array()
+
 		var weights: Array[Array[Double]] = Array()
 		var biases: Array[Array[Double]] = Array()
 		
@@ -120,152 +118,8 @@ object NeuralNetwork extends Serializable {
 			
 			val W = Array.tabulate(layer_output_size * layer_input_size){i => random()}
 			weights = weights ++ Array(W)
-			sweights = sweights ++ Array(W.clone)
 			val B = Array.tabulate(layer_output_size * 1){i => random()}
 			biases = biases ++ Array(B)
-			sbiases = sbiases ++ Array(B.clone)
-		}
-
-		def testHandWrittenNN(): Double = {
-			val t = System.currentTimeMillis()
-			val number_of_layers = nn_architecture.length
-			var cost_history = Array.tabulate(epochs){i => 0.0}
-			var acc_history = Array.tabulate(epochs){i => 0.0}
-			
-			for (itr <- 0 until epochs) {
-				var A_history: Array[Array[Double]] = Array()
-				var Z_history: Array[Array[Double]] = Array()
-				var A_curr = mat_transpose(X, n, m)
-				
-				for (idx <- 0 until number_of_layers) {
-					var A_prev = A_curr
-					var W_curr = weights(idx)
-					var b_curr = biases(idx)
-					var a_m = nn_architecture(idx)._2
-					var b_m = nn_architecture(idx)._1
-					var Z_curr = mat_add(mat_multiply(W_curr, A_prev, a_m, b_m, n), b_curr, a_m, n)
-					if(idx == number_of_layers - 1) {
-						// sigmoid
-						var res = Array.tabulate(a_m*n){j => 0.0}
-						for(j <- 0 until a_m*n)
-							res(j) = 1/(1+math.exp(-Z_curr(j)))
-						A_curr = res
-					}
-					else {
-						// relu
-						var res = Array.tabulate(a_m*n){j => 0.0}
-						for(j <- 0 until a_m*n)
-							res(j) = math.max(0.0,Z_curr(j))
-						A_curr = res
-					}
-					
-					A_history = A_history++Array(A_prev)
-					Z_history = Z_history++Array(Z_curr)
-				}
-				val Y_hat = A_curr
-				
-				var dA_prev = Array.tabulate(n) {j => 0.0}
-				var count = 0.0
-				for(j <- 0 until n) {
-					dA_prev(j) = (-Y(j)/Y_hat(j) + (1-Y(j))/(1-Y_hat(j)))
-					cost_history(itr) += (Y(j)*ln(Y_hat(j)) + (1-Y(j))*ln(1-Y_hat(j)))
-					var pr_to_cl = 0
-					if(Y_hat(j) > 0.5)
-						pr_to_cl = 1
-					if(pr_to_cl == Y(j))
-						count += 1.0
-				}
-				cost_history(itr) *= (-1.0/n)
-				acc_history(itr) = count/n
-				
-				var weight_grads: Array[Array[Double]] = Array()
-				var bias_grads: Array[Array[Double]] = Array()
-				for (idx <- number_of_layers-1 to 0 by -1) {
-					var dA_curr = dA_prev
-					var A_prev = A_history(idx)
-					var Z_curr = Z_history(idx)
-					var W_curr = weights(idx)
-					var b_curr = biases(idx)
-					
-					var a_m = nn_architecture(idx)._2
-					var b_m = nn_architecture(idx)._1
-					var dZ_curr = Array.tabulate(a_m*n) {j => 0.0}
-					if(idx == number_of_layers-1) {
-						// sigmoid
-						for(j <- 0 until a_m*n) {
-							var sig = 1/(1+math.exp(-Z_curr(j)))
-							dZ_curr(j) = dA_curr(j) * sig * (1-sig)
-						}
-					}
-					else {
-						// relu
-						for(j <- 0 until a_m*n) {
-							if(Z_curr(j) <= 0.0)
-								dZ_curr(j) = 0.0
-							else
-								dZ_curr(j) = dA_curr(j)
-						}
-					}
-					var dW_curr = mat_multiply(dZ_curr, mat_transpose(A_prev, b_m, n), a_m, n, b_m)
-					for(j <- 0 until a_m*b_m)
-						dW_curr(j) = dW_curr(j) / n
-
-					var db_curr = Array.tabulate(a_m) {j => 0.0}
-					for(j <- 0 until a_m) {
-						for(k <- 0 until n)
-							db_curr(j) += dZ_curr(j*n+k)
-						db_curr(j) = db_curr(j) / n
-					}
-					dA_prev = mat_multiply(mat_transpose(W_curr, a_m, b_m), dZ_curr, b_m, a_m, n)
-
-					weight_grads = weight_grads++Array(dW_curr)
-					bias_grads = bias_grads++Array(db_curr)
-				}
-				for (idx <- 0 until number_of_layers) {
-					for(j <- 0 until weights(idx).length) {
-						weights(idx)(j) -= learning_rate * weight_grads(number_of_layers-1-idx)(j)
-					}
-					for(j <- 0 until biases(idx).length) {
-						biases(idx)(j) -= learning_rate * bias_grads(number_of_layers-1-idx)(j)
-					}
-				}
-			}
-			var A_curr = mat_transpose(X_test, test_size, m)
-			for (idx <- 0 until number_of_layers) {
-				var A_prev = A_curr
-				var W_curr = weights(idx)
-				var b_curr = biases(idx)
-				var a_m = nn_architecture(idx)._2
-				var b_m = nn_architecture(idx)._1
-				var Z_curr = mat_add(mat_multiply(W_curr, A_prev, a_m, b_m, test_size), b_curr, a_m, test_size)
-				if(idx == number_of_layers - 1) {
-					// sigmoid
-					var res = Array.tabulate(a_m*test_size){j => 0.0}
-					for(j <- 0 until a_m*test_size)
-						res(j) = 1/(1+math.exp(-Z_curr(j)))
-					A_curr = res
-				}
-				else {
-					// relu
-					var res = Array.tabulate(a_m*test_size){j => 0.0}
-					for(j <- 0 until a_m*test_size)
-						res(j) = math.max(0.0,Z_curr(j))
-					A_curr = res
-				}
-			}
-			var Y_hat = A_curr
-			println("Y_hat")
-			Y_hat.map(println)
-			var count = 0.0
-			for(j <- 0 until test_size) {
-				var pr_to_cl = 0
-				if(Y_hat(j) > 0.5)
-					pr_to_cl = 1
-				if(pr_to_cl == Y_test(j))
-					count += 1.0
-			}
-			println("Test Accuracy: "+count/test_size)
-			(System.currentTimeMillis()-t)/1000.0
 		}
 		
 		def getMax(z: Double) = math.max(0.0,z)
@@ -283,10 +137,10 @@ object NeuralNetwork extends Serializable {
 			val layer1 = nn_architecture(0)._2
 			val layer2 = nn_architecture(1)._2
 			
-			val weights1 = sc.parallelize(for(i <- 0 to layer1-1; j <- 0 to m-1) yield ((i,j),sweights(0)(i*m+j))).cache()
-			val weights2 = sc.parallelize(for(i <- 0 to layer2-1; j <- 0 to layer1-1) yield ((i,j),sweights(1)(i*layer1+j))).cache()
-			val bias1 = sc.parallelize(for(i <- 0 to layer1-1) yield (i,sbiases(0)(i))).cache()
-			val bias2 = sc.parallelize(for(i <- 0 to layer2-1) yield (i,sbiases(1)(i))).cache()
+			val weights1 = sc.parallelize(for(i <- 0 to layer1-1; j <- 0 to m-1) yield ((i,j),weights(0)(i*m+j))).cache()
+			val weights2 = sc.parallelize(for(i <- 0 to layer2-1; j <- 0 to layer1-1) yield ((i,j),weights(1)(i*layer1+j))).cache()
+			val bias1 = sc.parallelize(for(i <- 0 to layer1-1) yield (i,biases(0)(i))).cache()
+			val bias2 = sc.parallelize(for(i <- 0 to layer2-1) yield (i,biases(1)(i))).cache()
 			val Y_hat = q("""
 				var X_d = tensor*(m,n)[ ((i,j),v) | ((j,i),v) <- X_1 ];
 				var Y_d = tensor*(n)[ (i,v) | (i,v) <- y_1 ];
@@ -341,7 +195,7 @@ object NeuralNetwork extends Serializable {
                     							
 					itr += 1;
 				}
-				var X_test_d = tensor*(m,test_size)[ ((i,j),v) | ((j,i),v) <- X_2 ];
+				var X_test_d = tensor*(m)(test_size)[ ((i,j),v) | ((j,i),v) <- X_2 ];
 				var Y_test_d = tensor*(test_size)[ (i,v) | (i,v) <- y_2 ];
 				var tmp_Z1 = tensor*(layer1,test_size)[ ((i,j),+/v) | ((i,k),w) <- w1, ((kk,j),a) <- X_test_d,
                                            kk == k, let v = w*a, group by (i,j) ];
@@ -360,138 +214,6 @@ object NeuralNetwork extends Serializable {
 			val count = Y_pred.join(input4).map{ case (i, (y1, y2)) => if(y1==y2) 1.0 else 0.0}.reduce(_+_)
 			println("Test Accuracy: "+count/test_size)
 		  	(System.currentTimeMillis()-t)/1000.0
-		}
-		
-		def rddToBlockMatrix(arr: RDD[((Long,Long), Double)]): BlockMatrix = {
-			new CoordinateMatrix(arr.map{ case ((i,j),v) => MatrixEntry(i,j,v)}).toBlockMatrix().cache()
-		}
-		
-		def blockMatrixTordd(mat: BlockMatrix): RDD[((Long,Long), Double)] = {
-			mat.toCoordinateMatrix().entries.map(e => ((e.i,e.j),e.value))
-		}
-		
-		def rddToBlockMatrix1(arr: RDD[(Long, Double)]): BlockMatrix = {
-			new CoordinateMatrix(arr.map{ case (i,v) => MatrixEntry(i,0,v)}).toBlockMatrix().cache()
-		}
-		
-		def blockMatrixTordd1(mat: BlockMatrix): RDD[(Long, Double)] = {
-			mat.toCoordinateMatrix().entries.map(e => (e.i,e.value))
-		}
-		
-		def testMLlibHandWrittenNN(): Double = {
-			val t = System.currentTimeMillis()
-			val number_of_layers = nn_architecture.length
-			var weights: Array[RDD[((Long,Long), Double)]] = Array()
-			var biases: Array[RDD[(Long, Double)]] = Array()
-			var cost_history = Array.tabulate(epochs){i => 0.0}
-			var acc_history = Array.tabulate(epochs){i => 0.0}
-			
-			for (idx <- 0 until number_of_layers) {
-				val layer_input_size = nn_architecture(idx)._1
-				val layer_output_size = nn_architecture(idx)._2
-				val W = sc.parallelize(for(i <- 0 to layer_output_size-1; j <- 0 to layer_input_size-1) 
-					yield ((i.toLong,j.toLong), sweights(idx)(i*m+j)))
-				weights = weights ++ Array(W)
-				val B = sc.parallelize(for(i <- 0 to layer_output_size-1)
-					yield (i.toLong, sbiases(idx)(i)))
-				biases = biases ++ Array(B)
-			}
-			
-			for (itr <- 0 until epochs) {
-				var A_history: Array[RDD[((Long,Long), Double)]] = Array()
-				var Z_history: Array[RDD[((Long,Long), Double)]] = Array()
-				var A_curr = input1.map{ case ((i,j),v) => ((j.toLong,i.toLong),v)}
-				
-				for (idx <- 0 until number_of_layers) {
-					var A_prev = A_curr
-					var W_curr = weights(idx)
-					var b_curr = biases(idx)
-					var a_m = nn_architecture(idx)._2
-					var b_m = nn_architecture(idx)._1
-					var Z_curr = blockMatrixTordd(rddToBlockMatrix(W_curr).multiply(rddToBlockMatrix(A_prev)))
-									.map{ case ((i,j),v) => (i,(j,v))}.join(b_curr).map{case (i, ((j,v),b)) => ((i,j),v+b)}
-					if(idx == number_of_layers - 1) {
-						// sigmoid
-						A_curr = Z_curr.map{ case ((i,j),v) => ((i,j),1/(1+math.exp(-v)))}
-					}
-					else {
-						// relu
-						A_curr = Z_curr.map{ case ((i,j),v) => ((i,j), math.max(0.0,v))}
-					}
-					
-					A_history = A_history++Array(A_prev)
-					Z_history = Z_history++Array(Z_curr)
-				}
-				var Y_hat = A_curr.map{ case ((i,j),a) => (j,a)}
-				
-				var dA_prev = input2.map{case (i,y) => (i.toLong, y)}.join(Y_hat)
-								.map{ case (i,(y,y_hat)) => ((0L,i),-y/y_hat+(1-y)/(1-y_hat))}
-				
-				var weight_grads: Array[RDD[((Long,Long), Double)]] = Array()
-				var bias_grads: Array[RDD[(Long, Double)]] = Array()
-				for (idx <- number_of_layers-1 to 0 by -1) {
-					var dA_curr = dA_prev
-					
-					var A_prev = A_history(idx)
-					var Z_curr = Z_history(idx)
-					var W_curr = weights(idx)
-					var b_curr = biases(idx)
-					
-					var a_m = nn_architecture(idx)._2
-					var b_m = nn_architecture(idx)._1
-					var dZ_curr = Z_curr
-					if(idx == number_of_layers-1) {
-						// sigmoid
-						dZ_curr = Z_curr.join(dA_curr).map{ case (i,(z,da)) => {
-										val sig = 1/(1+math.exp(-z))
-										(i,da*sig*(1-sig))
-									}}
-					}
-					else {
-						// relu
-						dZ_curr = Z_curr.join(dA_curr).map{ case (i,(z,da)) => {
-										var dz = da
-										if(z <= 0.0)
-											dz = 0.0
-										(i,dz)
-									}}
-					}
-					val dZ_curr_block = rddToBlockMatrix(dZ_curr)
-					var dW_curr = blockMatrixTordd(dZ_curr_block.multiply(rddToBlockMatrix(A_prev.map{case ((i,j),v) => ((j,i),v)})))
-					var db_curr = dZ_curr.map{ case ((i,j),dz) => (i,dz)}.reduceByKey(_+_)
-					dA_prev = blockMatrixTordd(rddToBlockMatrix(W_curr.map{case ((i,j),v) => ((j,i),v)}).multiply(dZ_curr_block))
-					
-					weight_grads = weight_grads++Array(dW_curr)
-					bias_grads = bias_grads++Array(db_curr)
-				}
-				for (idx <- 0 until number_of_layers) {
-					weights(idx) = weights(idx).join(weight_grads(number_of_layers-1-idx)).map{ case (i,(w,dw)) => (i, w-learning_rate*dw/n)}
-					biases(idx) = biases(idx).join(bias_grads(number_of_layers-1-idx)).map{ case (i,(b,db)) => (i, b-learning_rate*db/n)}
-				}
-			}
-			var A_curr = input3.map{ case ((i,j),v) => ((j.toLong,i.toLong),v)}
-			for (idx <- 0 until number_of_layers) {
-				var A_prev = A_curr
-				var W_curr = weights(idx)
-				var b_curr = biases(idx)
-				var a_m = nn_architecture(idx)._2
-				var b_m = nn_architecture(idx)._1
-				var Z_curr = blockMatrixTordd(rddToBlockMatrix(W_curr).multiply(rddToBlockMatrix(A_prev)))
-									.map{ case ((i,j),v) => (i,(j,v))}.join(b_curr).map{case (i, ((j,v),b)) => ((i,j),v+b)}
-				if(idx == number_of_layers - 1) {
-					// sigmoid
-					A_curr = Z_curr.map{ case ((i,j),a) => ((i,j),1/(1+math.exp(-a)))}
-				}
-				else {
-					// relu
-					A_curr = Z_curr.map{ case ((i,j),a) => ((i,j),math.max(0.0,a))}
-				}
-			}
-			var Y_hat = A_curr.map{ case ((i,j),a) => (j,a)}
-			var count = Y_hat.map{ case (i,y) => (i, if(y > 0.5) 1 else 0)}.join(input4.map{case (i,y) => (i.toLong, y)})
-				.map{ case (i,(y,y_t)) => if(y==y_t) 1.0 else 0.0}.reduce(_+_)
-			println("Test Accuracy: "+count/test_size)
-			(System.currentTimeMillis()-t)/1000.0
 		}
 		
 		val spark = SparkSession.builder().config(conf).getOrCreate()
@@ -561,9 +283,7 @@ object NeuralNetwork extends Serializable {
 			println("tries=%d %.3f secs".format(i,s))
 		}
 
-		test("Handwritten Neural Network",testHandWrittenNN)
 		test("Diablo Comprehension Neural Network",testDiabloNN)
-		test("MLlib Handwritten Neural Network",testMLlibHandWrittenNN)
 		test("MLlib Logistic Regression Neural Network",testMLlibNN)
 		
 		sc.stop()
