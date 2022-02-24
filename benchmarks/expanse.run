@@ -5,17 +5,12 @@
 #SBATCH --partition=compute
 #SBATCH --nodes=5
 #SBATCH --ntasks-per-node=128
-#SBATCH --mem=248G
+#SBATCH --mem=249325M
 #SBATCH --export=ALL
 #SBATCH --time=60    # time limit in minutes
 
 nodes=$SLURM_NNODES
 echo "Number of nodes = " $nodes
-
-### Make some local directories -- don't run sbatch jobs within an sbatch job (these 5 nodes are not the same)
-#srun -n 5 --nodes=5 --ntasks-per-node=1 mkdir /scratch/$USER/job_$SLURM_JOBID/local
-#srun -n 5 --nodes=5 --ntasks-per-node=1 mkdir /scratch/$USER/job_$SLURM_JOBID/locals
-#srun -n 5 --nodes=5 --ntasks-per-node=1 mkdir /scratch/$USER/job_$SLURM_JOBID/tmp
 
 # Expanse node: 128 cores (126 available), 256 GB RAM
 #   executor-cores = 12   (10 executors/node)
@@ -24,41 +19,34 @@ echo "Number of nodes = " $nodes
 executors=$((nodes*10-1))
 echo "Number of executors = " $executors
 
-SPARK_OPTIONS="--driver-memory 24G --driver-cores 16 --num-executors $executors --executor-cores 12 --executor-memory 24G --conf spark.executor.extraJavaOptions=-Xss512m --driver-java-options '-Xss512m' --supervise"
+SPARK_OPTIONS="--driver-memory 24G --driver-cores 16 --num-executors $executors --executor-cores 12 --executor-memory 24G --driver-java-options '-Xss512m' --supervise"
 
 export HADOOP_CONF_DIR=$HOME/expansecluster
-export SPARK_CONF_DIR=$HADOOP_CONF_DIR/spark
 module load openjdk
+module load hadoop
 
 SW=/expanse/lustre/projects/uot166/fegaras
 
 export DIABLO_HOME=$SW/diablo
 export SCALA_HOME=$SW/scala-2.12.3
 export HADOOP_HOME=$SW/hadoop-3.2.2
-export MYHADOOP_HOME=$SW/myhadoop
 export SPARK_HOME=$SW/spark-3.1.2-bin-hadoop3.2
 
-PATH="$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$SPARK_HOME/bin:$MYHADOOP_HOME/bin:$SCALA_HOME/bin:$PATH"
+PATH="$HADOOP_HOME/bin:$HADOOP_HOME/sbin:$SPARK_HOME/bin:$SCALA_HOME/bin:$PATH"
 
 # location of scratch space
 scratch=/scratch/$USER/job_$SLURM_JOB_ID
-export SPARK_JAVA_OPTS="-Djava.io.tmpdir=$scratch -Dspark.local.dir=$scratch"
-export MH_SCRATCH_DIR=$scratch
 
 myhadoop-configure.sh -s $scratch
-cp $HADOOP_CONF_DIR/slaves $HADOOP_CONF_DIR/spark/workers
-echo "export TMP=$scratch" >> $HADOOP_CONF_DIR/spark/spark-env.sh
-echo "export TMPDIR=$scratch" >> $HADOOP_CONF_DIR/spark/spark-env.sh
-echo "export SPARK_JAVA_OPTS='-Djava.io.tmpdir=$scratch -Dspark.local.dir=$scratch'" >> $HADOOP_CONF_DIR/spark/spark-env.sh
-#echo "export SPARK_MASTER_HOST=$SPARK_MASTER_IP" >> $HADOOP_CONF_DIR/spark/spark-env.sh
-#export SPARK_MASTER_HOST=$SPARK_MASTER_IP
+echo "export TMP=$scratch/tmp" >> $HADOOP_CONF_DIR/spark/spark-env.sh
+echo "export TMPDIR=$scratch/tmp" >> $HADOOP_CONF_DIR/spark/spark-env.sh
+echo "export SPARK_LOCAL_DIRS=$scratch" >> $HADOOP_CONF_DIR/spark/spark-env.sh
+
 source $HADOOP_CONF_DIR/spark/spark-env.sh
-export SPARK_LOCAL_DIRS=$scratch
-export TMPDIR=$scratch/tmp
-export _JAVA_OPTIONS=-Djava.io.tmpdir=$TMPDIR
+export SPARK_MASTER_HOST=$SPARK_MASTER_IP
 
 # start HDFS
-$HADOOP_HOME/sbin/start-dfs.sh
+start-dfs.sh
 # start Spark
 myspark start
 
@@ -67,28 +55,47 @@ for I in `ls $SPARK_HOME/jars/*.jar -I *unsafe*`; do
     JARS=$JARS:$I
 done
 
-#spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Add --master $MASTER $SPARK_OPTIONS test.jar 2 12000
+repeat=4
 
-spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply $SPARK_OPTIONS test.jar 2 30000 30000
+for ((i=1; i<=5; i++)); do
+    n = $(i*10000)
+    sp = 0.01
+    spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Add --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $sp
+done
 
-#hdfs dfs -mkdir -p /user/$USER
-#hdfs dfs -put page-rank2.txt /user/$USER/page-rank.txt
-#spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class PageRank --master $MASTER $SPARK_OPTIONS test.jar 2 20000 page-rank2.txt
+for ((i=2; i<=7; i++)); do
+    n = $(i*5000)
+    sp = 0.01
+    spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $sp
+done
 
-#spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Factorization --master $MASTER $SPARK_OPTIONS test.jar 2 20000 20000 10
+for ((i=1; i<=5; i++)); do
+    n = $(i*10000)
+    m = $n
+    d = 10
+    sp = 0.01
+    spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Factorization --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $m $d $sp
+done
 
-#hdfs dfs -put data_10000/lr_input1.txt /user/$USER/lr_input1.txt
-#hdfs dfs -put data_10000/lr_output1.txt /user/$USER/lr_output1.txt
-#hdfs dfs -put data_10000/lr_input2.txt /user/$USER/lr_input2.txt
-#hdfs dfs -put data_10000/lr_output2.txt /user/$USER/lr_output2.txt
-#spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class LinearRegression --master $MASTER $SPARK_OPTIONS test.jar 1000 10 /user/$USER/lr_input1.txt /user/$USER/lr_output1.txt /user/$USER/lr_input2.txt /user/$USER/lr_output2.txt
+hdfs dfs -mkdir -p /user/$USER
+for ((i=1; i<=5; i++)); do
+    n = $(i*10000)
+    hdfs dfs -put data_$n/lr_input1.txt /user/$USER/lr_input1.txt
+    hdfs dfs -put data_$n/lr_output1.txt /user/$USER/lr_output1.txt
+    hdfs dfs -put data_$n/lr_input2.txt /user/$USER/lr_input2.txt
+    hdfs dfs -put data_$n/lr_output2.txt /user/$USER/lr_output2.txt
+    spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class LinearRegression --master $MASTER $SPARK_OPTIONS test.jar $repeat $n /user/$USER/lr_input1.txt /user/$USER/lr_output1.txt /user/$USER/lr_input2.txt /user/$USER/lr_output2.txt
+done
 
-#hdfs dfs -put X_train.txt /user/$USER/X_train.txt
-#hdfs dfs -put y_train.txt /user/$USER/y_train.txt
-#hdfs dfs -put X_test.txt /user/$USER/X_test.txt
-#hdfs dfs -put y_test.txt /user/$USER/y_test.txt
-#spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class NeuralNetwork --master $MASTER $SPARK_OPTIONS test.jar 10000 10 /user/$USER/X_train.txt /user/$USER/y_train.txt /user/$USER/X_test.txt /user/$USER/y_test.txt
+for ((i=1; i<=5; i++)); do
+    n = $(i*50000)
+    hdfs dfs -put X_train.txt /user/$USER/X_train.txt
+    hdfs dfs -put y_train.txt /user/$USER/y_train.txt
+    hdfs dfs -put X_test.txt /user/$USER/X_test.txt
+    hdfs dfs -put y_test.txt /user/$USER/y_test.txt
+    spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class NeuralNetwork --master $MASTER $SPARK_OPTIONS test.jar $repeat $n /user/$USER/X_train.txt /user/$USER/y_train.txt /user/$USER/X_test.txt /user/$USER/y_test.txt
+done
 
 myspark stop
-$HADOOP_HOME/sbin/stop-dfs.sh
-$MYHADOOP_HOME/bin/myhadoop-cleanup.sh
+stop-dfs.sh
+myhadoop-cleanup.sh
