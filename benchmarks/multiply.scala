@@ -31,9 +31,9 @@ object Multiply {
     parami(block_dim_size,1000)  // size of each dimension in a block
     val N = 1000
     val validate_output = false
-    parami(number_of_partitions,10)
+    parami(number_of_partitions,100)
 
-    val conf = new SparkConf().setAppName("tiles")
+    val conf = new SparkConf().setAppName("multiply")
     spark_context = new SparkContext(conf)
     val spark = SparkSession.builder().config(conf).getOrCreate()
     import spark.implicits._
@@ -86,19 +86,21 @@ object Multiply {
     val ASparse = new BlockMatrix(AS,N,N).cache
     val BSparse = new BlockMatrix(BS,N,N).cache
 
-    type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
-
+    type tiled_matrix = ((Int,Int),EmptyTuple,RDD[((Int,Int),((Int,Int),EmptyTuple,Array[Double]))])
+    val et = EmptyTuple()
     // dense block tensors
-    val AA = (n,m,Am.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
-    val BB = (m,n,Bm.map{ case ((i,j),a) => ((i,j),(a.numRows,a.numCols,a.transpose.toArray)) })
+    val AA = ((n,m),et,Am.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
+    val BB = ((m,n),et,Bm.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
+    AA._3.cache
+    BB._3.cache
 
     val rand = new Random()
     def random () = rand.nextDouble()*10
 
     // sparse block tensors with 99% zeros
-    val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > (1-sparsity)*10 ]")
+    val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > (1.0-sparsity)*10 ]")
     Az._3.cache
-    val Bz = q("tensor*(m)(n)[ ((i,j),random()) | i <- 0..(m-1), j <- 0..(n-1), random() > (1-sparsity)*10 ]")
+    val Bz = q("tensor*(m)(n)[ ((i,j),random()) | i <- 0..(m-1), j <- 0..(n-1), random() > (1.0-sparsity)*10 ]")
     Bz._3.cache
 
     def validate ( M: tiled_matrix ) = {
@@ -108,7 +110,7 @@ object Multiply {
         val C = A.multiply(B).toLocalMatrix()
         val CC = M._3.collect
         println("Validating ...")
-        for { ((ii,jj),(nd,md,a)) <- CC
+        for { ((ii,jj),((nd,md),_,a)) <- CC
             i <- 0 until nd
             j <- 0 until md } {
           val ci = ii*N+nd

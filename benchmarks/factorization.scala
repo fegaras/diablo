@@ -26,11 +26,11 @@ object Factorization extends Serializable {
     val d = args(3).toInt  // number of attributes
     val sparsity = if (args.length > 4) args(4).toDouble else 0.01
     parami(block_dim_size,1000)  // size of each dimension in a block
-    parami(number_of_partitions, 10)
+    parami(number_of_partitions, 100)
     val validate_output = false
     val N = 1000
 
-    val conf = new SparkConf().setAppName("tiles")
+    val conf = new SparkConf().setAppName("factorization")
     spark_context = new SparkContext(conf)
     conf.set("spark.logConf","false")
     conf.set("spark.eventLog.enabled","false")
@@ -82,12 +82,17 @@ object Factorization extends Serializable {
     val rand = new Random()
     def random () = rand.nextDouble()*10
 
-    val RR = q("tensor*(n,m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1) ]")
+    type tiled_matrix = ((Int,Int),EmptyTuple,RDD[((Int,Int),((Int,Int),EmptyTuple,Array[Double]))])
+
+    val et = EmptyTuple()
+
+    val RR = ((n,m),et,Rm.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
     RR._3.cache
-    val PPinit = q("tensor*(n,d)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(d-1) ]")
+    val PPinit = ((n,d),et,Pm.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
     PPinit._3.cache
-    val QQinit = q("tensor*(d,m)[ ((i,j),random()) | i <- 0..(d-1), j <- 0..(m-1) ]")
+    val QQinit = ((d,m),et,Qm.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
     QQinit._3.cache
+
     val RSparse = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > (1-sparsity)*10 ]")
     RSparse._3.cache
 
@@ -97,42 +102,42 @@ object Factorization extends Serializable {
 
     // MLlib Factorization Dense to Dense-Dense
     def testFactorizationMLlibDense (): Double = {
-      val t = System.currentTimeMillis()
       var E = R
       var P = Pinit
       var Q = Qinit
+      val t = System.currentTimeMillis()
       try {
         E = R.subtract(P.multiply(Q))
         P = P.add(map(map(E.multiply(Q.transpose),2*_).subtract(map(P,b*_)),a*_))
         Q = Q.add(map(map(E.transpose.multiply(P),2*_).transpose.subtract(map(Q,b*_)),a*_))
-      val x = E.blocks.count+P.blocks.count+Q.blocks.count
+        val x = E.blocks.count+P.blocks.count+Q.blocks.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
 
     // MLlib Factorization Sparse to Dense-Dense
     def testFactorizationMLlibSparse (): Double = {
-      val t = System.currentTimeMillis()
       var E = RS
       var P = Pinit
       var Q = Qinit
+      val t = System.currentTimeMillis()
       try {
         E = RS.subtract(P.multiply(Q))
         P = P.add(map(map(E.multiply(Q.transpose),2*_).subtract(map(P,b*_)),a*_))
         Q = Q.add(map(map(E.transpose.multiply(P),2*_).transpose.subtract(map(Q,b*_)),a*_))
-      val x = E.blocks.count+P.blocks.count+Q.blocks.count
+        val x = E.blocks.count+P.blocks.count+Q.blocks.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
 
     // Diablo Factorization Dense to Dense-Dense
     def testFactorizationDiablo (): Double = {
-      val t = System.currentTimeMillis()
       var E = RR
       var P = PPinit
       var Q = QQinit
+      val t = System.currentTimeMillis()
       try {
-        q("""
+        val (p2,q2) = q("""
           var E1 = tensor*(n,m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
                                                kk == k, let v = p*q, group by (i,j) ];
           var E2 = tensor*(n,m)[ ((i,j),r-v) | ((i,j),r) <- E, ((ii,jj),v) <- E1,
@@ -142,27 +147,26 @@ object Factorization extends Serializable {
                             let v = 2*a*e*q, group by (i,k) ];
           var P2 = tensor*(n,d)[ ((i,k),p1+p-a*b*p)
                           | ((i,k),p1) <- P1, ((ii,kk),p) <-P, ii==i,kk==k ];
-          P = P2;
           var Q1 = tensor*(d,m)[ ((k,j),+/v)
                           | ((i,j),e) <- E2, ((ii,k),p) <- P, ii == i,
                             let v = 2*a*e*p, group by (k,j) ];
           var Q2 = tensor*(d,m)[ ((k,j),q1+q-a*b*q)
                           | ((k,j),q1) <- Q1, ((kk,jj),q) <-Q, jj==j,kk==k ];
-          Q = Q2;
+          (P2,Q2);
           """)
-        validate(P,Q)
+        val x = p2._3.count+q2._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
 
     // Diablo Factorization Sparse to Dense-Dense
     def testFactorizationDiabloSparseToDense(): Double = {
-      val t = System.currentTimeMillis()
       var E = RSparse
       var P = PPinit
       var Q = QQinit
+      val t = System.currentTimeMillis()
       try {
-        q("""
+        val (p2,q2) = q("""
           var E1 = tensor*(n)(m)[ ((i,j),+/v) | ((i,k),p) <- P, ((kk,j),q) <- Q,
                                    kk == k, let v = p*q, group by (i,j) ];
           var E2 = tensor*(n)(m)[ ((i,j),r-v) | ((i,j),r) <= E, ((ii,jj),v) <- E1,
@@ -172,20 +176,17 @@ object Factorization extends Serializable {
                             let v = 2*a*e*q, group by (i,k) ];
           var P2 = tensor*(n,d)[ ((i,k),p1+p-a*b*p)
                           | ((i,k),p1) <- P1, ((ii,kk),p) <-P, ii==i,kk==k ];
-          P = P2;
           var Q1 = tensor*(d,m)[ ((k,j),+/v)
                           | ((i,j),e) <- E2, ((ii,k),p) <- P, ii == i,
                             let v = 2*a*e*p, group by (k,j) ];
           var Q2 = tensor*(d,m)[ ((k,j),q1+q-a*b*q)
                           | ((k,j),q1) <- Q1, ((kk,jj),q) <-Q, jj==j,kk==k ];
-          Q = Q2;
+          (P2,Q2);
           """)
-        val x = E._3.count+P._3.count+Q._3.count
+        val x = p2._3.count+q2._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
-
-    type tiled_matrix = (Int,Int,RDD[((Int,Int),(Int,Int,Array[Double]))])
 
     def validate ( M1: tiled_matrix, M2: tiled_matrix ) = {
       if (!validate_output)
@@ -202,7 +203,7 @@ object Factorization extends Serializable {
         compareMatrix(M2, Q.toLocalMatrix())
         def compareMatrix(A: tiled_matrix, B: Matrix) {
           var C = A._3.collect
-          for { ((ii,jj),(nd,md,a)) <- C
+          for { ((ii,jj),((nd,md),_,a)) <- C
             i <- 0 until nd
             j <- 0 until md } {
             val ci = ii*N+nd

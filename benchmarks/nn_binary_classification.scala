@@ -25,13 +25,13 @@ object NeuralNetwork extends Serializable {
 	}
 
 	def main ( args: Array[String] ) {
-		val conf = new SparkConf().setAppName("tiles")
-		val sc = new SparkContext(conf)
+		val conf = new SparkConf().setAppName("neural_network")
+		spark_context = new SparkContext(conf)
 		conf.set("spark.logConf","false")
 		conf.set("spark.eventLog.enabled","false")
 		LogManager.getRootLogger().setLevel(Level.WARN)
 		
-		parami(number_of_partitions,10)
+		parami(number_of_partitions,100)
 		parami(block_dim_size,1000)
 		val repeats = args(0).toInt
 		val N = 1000
@@ -43,16 +43,16 @@ object NeuralNetwork extends Serializable {
 		val m = 2
 		val epochs = 10
 
-		val input1 = sc.textFile(args(2))
+		val input1 = spark_context.textFile(args(2))
 		          .map( line => { val a = line.split(",").toList
 		          				((a(0).toInt,a(1).toInt),a(2).toDouble)} ).cache
-		val input2 = sc.textFile(args(3))
+		val input2 = spark_context.textFile(args(3))
 		          .map( line => { val a = line.split(",").toList
 		                         (a(0).toInt,a(1).toDouble) } ).cache
-		val input3 = sc.textFile(args(4))
+		val input3 = spark_context.textFile(args(4))
 		          .map( line => { val a = line.split(",").toList
 		          				((a(0).toInt,a(1).toInt),a(2).toDouble) } ).cache
-		val input4 = sc.textFile(args(5))
+		val input4 = spark_context.textFile(args(5))
 		          .map( line => { val a = line.split(",").toList
 		                         (a(0).toInt,a(1).toDouble) } ).cache
 		
@@ -127,7 +127,6 @@ object NeuralNetwork extends Serializable {
 		def getVal(z: Double, a: Double) = if(z <= 0.0) 0.0 else a
 
 		def testDiabloNN(): Double = {
-			val t = System.currentTimeMillis()
 			var cost_history = Array.tabulate(epochs){i => 0.0}
 			var acc_history = Array.tabulate(epochs){i => 0.0}
 			val X_1 = input1
@@ -137,13 +136,20 @@ object NeuralNetwork extends Serializable {
 			val layer1 = nn_architecture(0)._2
 			val layer2 = nn_architecture(1)._2
 			
-			val weights1 = sc.parallelize(for(i <- 0 to layer1-1; j <- 0 to m-1) yield ((i,j),weights(0)(i*m+j))).cache()
-			val weights2 = sc.parallelize(for(i <- 0 to layer2-1; j <- 0 to layer1-1) yield ((i,j),weights(1)(i*layer1+j))).cache()
-			val bias1 = sc.parallelize(for(i <- 0 to layer1-1) yield (i,biases(0)(i))).cache()
-			val bias2 = sc.parallelize(for(i <- 0 to layer2-1) yield (i,biases(1)(i))).cache()
+			val weights1 = spark_context.parallelize(for(i <- 0 to layer1-1; j <- 0 to m-1) yield ((i,j),weights(0)(i*m+j))).cache()
+			val weights2 = spark_context.parallelize(for(i <- 0 to layer2-1; j <- 0 to layer1-1) yield ((i,j),weights(1)(i*layer1+j))).cache()
+			val bias1 = spark_context.parallelize(for(i <- 0 to layer1-1) yield (i,biases(0)(i))).cache()
+			val bias2 = spark_context.parallelize(for(i <- 0 to layer2-1) yield (i,biases(1)(i))).cache()
+			val X_d = q("tensor*(m,n)[ ((i,j),v) | ((j,i),v) <- X_1 ]")
+			X_d._3.cache
+			val Y_d = q("tensor*(n)[ (i,v) | (i,v) <- y_1 ]")
+			Y_d._3.cache
+			val X_test_d = q("tensor*(m)(test_size)[ ((i,j),v) | ((j,i),v) <- X_2 ]")
+			X_test_d._3.cache
+			val Y_test_d = q("tensor*(test_size)[ (i,v) | (i,v) <- y_2 ]")
+			Y_test_d._3.cache
+			val t = System.currentTimeMillis()
 			val Y_hat = q("""
-				var X_d = tensor*(m,n)[ ((i,j),v) | ((j,i),v) <- X_1 ];
-				var Y_d = tensor*(n)[ (i,v) | (i,v) <- y_1 ];
 				var w1 = tensor*(layer1,m)[ ((i,j),v) | ((i,j),v) <- weights1 ];
 				var b1 = tensor*(layer1)[(i,v) | (i,v) <- bias1 ];
 				var w2 = tensor*(layer2,layer1)[((i,j),v) | ((i,j),v) <- weights2 ];
@@ -195,8 +201,6 @@ object NeuralNetwork extends Serializable {
                     							
 					itr += 1;
 				}
-				var X_test_d = tensor*(m)(test_size)[ ((i,j),v) | ((j,i),v) <- X_2 ];
-				var Y_test_d = tensor*(test_size)[ (i,v) | (i,v) <- y_2 ];
 				var tmp_Z1 = tensor*(layer1,test_size)[ ((i,j),+/v) | ((i,k),w) <- w1, ((kk,j),a) <- X_test_d,
                                            kk == k, let v = w*a, group by (i,j) ];
                 var Z_curr1 = tensor*(layer1,test_size)[ ((i,j),z+b) | ((i,j),z) <- tmp_Z1, (ii,b) <- b1,
@@ -220,7 +224,6 @@ object NeuralNetwork extends Serializable {
 		import spark.implicits._
 		
 		def testMLlibNN(): Double = {
-			val t = System.currentTimeMillis()
 			def vect ( a: Iterable[Double] ): org.apache.spark.ml.linalg.Vector = {
 			  val s = Array.ofDim[Double](n*m)
 			  var count = 0
@@ -244,6 +247,7 @@ object NeuralNetwork extends Serializable {
 			  	row.getAs[org.apache.spark.ml.linalg.Vector]("features")
 			)}.toDF.cache()
 
+			val t = System.currentTimeMillis()
 			val lr = new LogisticRegression()
 			  .setMaxIter(epochs)
 			  .setRegParam(0.3)
@@ -286,6 +290,6 @@ object NeuralNetwork extends Serializable {
 		test("Diablo Comprehension Neural Network",testDiabloNN)
 		test("MLlib Logistic Regression Neural Network",testMLlibNN)
 		
-		sc.stop()
+		spark_context.stop()
 	}
 }

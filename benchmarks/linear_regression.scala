@@ -25,8 +25,10 @@ object LinearRegression extends Serializable {
    }
 
   def main ( args: Array[String] ) {
-    val conf = new SparkConf().setAppName("tiles")
-    val sc = new SparkContext(conf)
+    val conf = new SparkConf().setAppName("linear_regression")
+    spark_context = new SparkContext(conf)
+	val spark = SparkSession.builder().config(conf).getOrCreate()
+    import spark.implicits._
     conf.set("spark.logConf","false")
     conf.set("spark.eventLog.enabled","false")
     LogManager.getRootLogger().setLevel(Level.WARN)
@@ -40,32 +42,31 @@ object LinearRegression extends Serializable {
     val total_size = args(1).toInt
     val n = (0.8*total_size).toInt
     val test_size = total_size-n
-    val m = 100
+    val m = 10
     val numIter = 10
     val rand = new Random()
-    val X_train = sc.textFile(args(2))
+    val X_train = spark_context.textFile(args(2))
               .map( line => { val a = line.split(",").toList
               				((a(0).toInt,a(1).toInt),a(2).toDouble)} ).cache
-    val y_train = sc.textFile(args(3))
+    val y_train = spark_context.textFile(args(3))
               .map( line => { val a = line.split(",").toList
                              (a(0).toInt,a(1).toDouble)} ).cache
-	
-	val X_test = sc.textFile(args(4))
+	val X_test = spark_context.textFile(args(4))
               .map( line => { val a = line.split(",").toList
               				((a(0).toInt,a(1).toInt),a(2).toDouble)} ).cache
-    val y_test = sc.textFile(args(5))
+    val y_test = spark_context.textFile(args(5))
               .map( line => { val a = line.split(",").toList
                              (a(0).toInt,a(1).toDouble)} ).cache
     
     def testDiabloLR(): Double = {
-    	val t = System.currentTimeMillis()
-    	var theta = sc.parallelize(0 to m-1).map(i => (i,1.0)).cache
+		var theta = spark_context.parallelize(0 to m-1).map(i => (i,1.0)).cache
     	val input1 = X_train
     	val output1 = y_train
     	val input2 = X_test
     	val output2 = y_test
 		val A = q("tensor*(n,m)[((i,j),v) | ((i,j),v) <- input1 ]")
 		A._3.cache
+		val t = System.currentTimeMillis()
     	val cost = q("""
 			var B = tensor*(n)[(i,v) | (i,v) <- output1];
 			var W = tensor*(m)[(i,v) | (i,v) <- theta];
@@ -88,12 +89,7 @@ object LinearRegression extends Serializable {
 	  	(System.currentTimeMillis()-t)/1000.0
     }
 
-    val spark = SparkSession.builder().config(conf).getOrCreate()
-    import spark.implicits._
-
     def testMLlibLR(): Double = {
-    	val t = System.currentTimeMillis()
-    	
     	def vect ( a: Iterable[Double] ): org.apache.spark.ml.linalg.Vector = {
 		  val s = Array.ofDim[Double](n*m)
 		  var count = 0
@@ -118,6 +114,7 @@ object LinearRegression extends Serializable {
 		  	row.getAs[org.apache.spark.ml.linalg.Vector]("features")
 		)}.toDF.cache()
 
+		val t = System.currentTimeMillis()
 		val lr = new LinearRegression()
           .setMaxIter(numIter)
           .setFitIntercept(false)
@@ -155,7 +152,7 @@ object LinearRegression extends Serializable {
 
     test("Diablo Linear Regression",testDiabloLR)
     test("MLlib Linear Regression",testMLlibLR)
-    
-    sc.stop()
+
+    spark_context.stop()
   }
 }
