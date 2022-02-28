@@ -146,7 +146,7 @@ object LinearRegression extends Serializable {
 			}
 		}
 		if (i > 0) s = s/(i-1)
-		print("*** %s cores=%d N=%d ".format(name,cores,N))
+		print("*** %s cores=%d n=%d m=%d N=%d ".format(name,cores,total_size,m,N))
 		println("tries=%d %.3f secs".format(i,s))
     }
 

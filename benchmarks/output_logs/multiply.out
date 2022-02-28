@@ -1,0 +1,522 @@
+Number of nodes =  5
+Number of executors =  49
+myHadoop: Setting MH_IPOIB_TRANSFORM='s/\([^.]*\).*$/\1.ib.cluster/' from myhadoop.conf
+myHadoop: Setting MH_SCRATCH_DIR=/scratch/$USER/job_$SLURM_JOBID from myhadoop.conf
+myHadoop: Using HADOOP_HOME=/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2
+myHadoop: Using MH_SCRATCH_DIR=/scratch/txk6771/job_10048396
+myHadoop: Using JAVA_HOME=/cm/shared/apps/spack/cpu/opt/spack/linux-centos8-zen/gcc-8.3.1/openjdk-11.0.2-k5ezeyjgjeqmehyvrmmpymaguuf2qzsk
+myHadoop: Generating Hadoop configuration in directory in /home/txk6771/expansecluster...
+myHadoop: Backing up old config dir to /home/txk6771/expansecluster.40...
+renamed '/home/txk6771/expansecluster' -> '/home/txk6771/expansecluster.40'
+cp: -r not specified; omitting directory '/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/etc/hadoop/shellprofile.d'
+myHadoop: Designating exp-2-28.ib.cluster as master node (namenode, secondary namenode, and jobtracker)
+myHadoop: The following nodes will be slaves (datanode, tasktracer):
+exp-2-28.ib.cluster
+exp-2-29.ib.cluster
+exp-2-30.ib.cluster
+exp-2-31.ib.cluster
+exp-2-32.ib.cluster
+WARNING: /scratch/txk6771/job_10048396/pids does not exist. Creating.
+WARNING: /scratch/txk6771/job_10048396/logs does not exist. Creating.
+2022-02-27 17:39:35,865 INFO namenode.NameNode: STARTUP_MSG: 
+/************************************************************
+STARTUP_MSG: Starting NameNode
+STARTUP_MSG:   host = exp-2-28/198.202.103.167
+STARTUP_MSG:   args = [-format]
+STARTUP_MSG:   version = 3.2.2
+STARTUP_MSG:   classpath = /home/txk6771/expansecluster:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-annotations-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/hadoop-auth-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-xml-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-collections-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/audience-annotations-0.5.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/javax.activation-api-1.2.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/checker-qual-2.5.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/curator-framework-2.13.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/gson-2.2.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerby-config-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-simplekdc-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-core-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-webapp-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-codec-1.11.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-io-2.5.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerby-util-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/httpcore-4.4.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-server-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/netty-3.10.6.Final.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-math3-3.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-cli-1.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-util-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerby-xdr-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-lang3-3.7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/log4j-1.2.17.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-http-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-xc-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-jaxrs-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerby-asn1-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/guava-27.0-jre.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerby-pkix-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-common-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jersey-core-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/paranamer-2.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-servlet-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-text-1.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jsp-api-2.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/animal-sniffer-annotations-1.17.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-server-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-crypto-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/javax.servlet-api-3.1.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/stax2-api-3.1.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/asm-5.0.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/token-provider-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-util-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/snappy-java-1.0.5.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-mapper-asl-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/failureaccess-1.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jaxb-api-2.2.11.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/avro-1.7.7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/error_prone_annotations-2.2.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-client-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/curator-client-2.13.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-security-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jsch-0.1.55.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/zookeeper-3.4.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/accessors-smart-1.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jersey-servlet-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/woodstox-core-5.0.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/slf4j-log4j12-1.7.25.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jersey-server-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-databind-2.9.10.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-io-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jul-to-slf4j-1.7.25.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/protobuf-java-2.5.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-compress-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/json-smart-2.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jcip-annotations-1.0-1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-configuration2-2.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-admin-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/httpclient-4.5.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-identity-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/j2objc-annotations-1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jaxb-impl-2.2.3-1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jsr311-api-1.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/slf4j-api-1.7.25.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jersey-json-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/dnsjava-2.1.7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-beanutils-1.9.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/hadoop-annotations-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-logging-1.1.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/metrics-core-3.2.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jettison-1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/nimbus-jose-jwt-7.9.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/curator-recipes-2.13.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jsr305-3.0.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-core-asl-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-core-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/re2j-1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/htrace-core4-4.1.0-incubating.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-net-3.6.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/hadoop-common-3.2.2-tests.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/hadoop-nfs-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/hadoop-common-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/hadoop-kms-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jersey-server-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/stax2-api-3.1.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/guava-27.0-jre.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jersey-core-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-collections-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/curator-client-2.13.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerby-pkix-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerby-asn1-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/error_prone_annotations-2.2.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-text-1.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-util-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jsch-0.1.55.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/dnsjava-2.1.7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/httpclient-4.5.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jaxb-api-2.2.11.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-webapp-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-configuration2-2.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/animal-sniffer-annotations-1.17.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-io-2.5.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-server-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jaxb-impl-2.2.3-1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-mapper-asl-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-core-asl-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/httpcore-4.4.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-core-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/audience-annotations-0.5.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-beanutils-1.9.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-annotations-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-cli-1.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-xml-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/json-simple-1.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jsr305-3.0.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-math3-3.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/javax.activation-api-1.2.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-http-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/hadoop-annotations-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerby-util-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jettison-1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerby-xdr-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-util-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-codec-1.11.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/curator-recipes-2.13.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-io-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerby-config-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/hadoop-auth-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-security-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/re2j-1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/checker-qual-2.5.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/leveldbjni-all-1.8.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/nimbus-jose-jwt-7.9.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/paranamer-2.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/j2objc-annotations-1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-util-ajax-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/htrace-core4-4.1.0-incubating.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/log4j-1.2.17.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jersey-json-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/netty-all-4.1.48.Final.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/okio-1.6.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-net-3.6.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/curator-framework-2.13.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/gson-2.2.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jsr311-api-1.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-xc-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/netty-3.10.6.Final.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-core-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-logging-1.1.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-lang3-3.7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-databind-2.9.10.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/token-provider-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jersey-servlet-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/accessors-smart-1.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-common-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-simplekdc-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/okhttp-2.7.5.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-admin-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-server-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jcip-annotations-1.0-1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/woodstox-core-5.0.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-crypto-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/asm-5.0.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/avro-1.7.7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/failureaccess-1.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-jaxrs-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/protobuf-java-2.5.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/snappy-java-1.0.5.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/javax.servlet-api-3.1.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/zookeeper-3.4.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-daemon-1.0.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-client-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-compress-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-servlet-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/json-smart-2.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-identity-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-client-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-client-3.2.2-tests.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-rbf-3.2.2-tests.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-native-client-3.2.2-tests.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-nfs-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-rbf-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-httpfs-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-3.2.2-tests.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-native-client-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/lib/junit-4.11.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/lib/hamcrest-core-1.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-common-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-uploader-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-hs-plugins-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-nativetask-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-shuffle-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-app-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-3.2.2-tests.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-hs-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-core-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/snakeyaml-1.16.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/ehcache-3.3.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/guice-4.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/json-io-2.5.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/jersey-guice-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/metrics-core-3.2.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/objenesis-1.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/guice-servlet-4.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/aopalliance-1.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/jackson-jaxrs-base-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/geronimo-jcache_1.0_spec-1.0-alpha-1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/jersey-client-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/mssql-jdbc-6.2.1.jre7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/fst-2.50.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/jackson-jaxrs-json-provider-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/javax.inject-1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/bcpkix-jdk15on-1.60.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/swagger-annotations-1.5.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/jackson-module-jaxb-annotations-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/bcprov-jdk15on-1.60.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/java-util-1.9.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/HikariCP-java7-2.4.12.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-services-core-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-web-proxy-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-sharedcachemanager-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-nodemanager-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-resourcemanager-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-common-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-applications-distributedshell-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-applications-unmanaged-am-launcher-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-registry-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-router-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-submarine-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-applicationhistoryservice-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-api-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-client-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-timeline-pluginstorage-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-services-api-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-tests-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-common-3.2.2.jar
+STARTUP_MSG:   build = Unknown -r 7a3bc90b05f257c8ace2f76d74264906f0f7a932; compiled by 'hexiaoqiao' on 2021-01-03T09:26Z
+STARTUP_MSG:   java = 11.0.2
+************************************************************/
+2022-02-27 17:39:35,871 INFO namenode.NameNode: registered UNIX signal handlers for [TERM, HUP, INT]
+2022-02-27 17:39:35,926 INFO namenode.NameNode: createNameNode [-format]
+2022-02-27 17:39:36,219 INFO common.Util: Assuming 'file' scheme for path /scratch/txk6771/job_10048396/namenode_data in configuration.
+2022-02-27 17:39:36,220 INFO common.Util: Assuming 'file' scheme for path /scratch/txk6771/job_10048396/namenode_data in configuration.
+Formatting using clusterid: CID-c96f3d8a-c9c0-4e79-b481-0894f5081dfa
+2022-02-27 17:39:36,240 INFO namenode.FSEditLog: Edit logging is async:true
+2022-02-27 17:39:36,259 INFO namenode.FSNamesystem: KeyProvider: null
+2022-02-27 17:39:36,260 INFO namenode.FSNamesystem: fsLock is fair: true
+2022-02-27 17:39:36,260 INFO namenode.FSNamesystem: Detailed lock hold time metrics enabled: false
+2022-02-27 17:39:36,287 INFO namenode.FSNamesystem: fsOwner             = txk6771 (auth:SIMPLE)
+2022-02-27 17:39:36,287 INFO namenode.FSNamesystem: supergroup          = supergroup
+2022-02-27 17:39:36,287 INFO namenode.FSNamesystem: isPermissionEnabled = true
+2022-02-27 17:39:36,287 INFO namenode.FSNamesystem: HA Enabled: false
+2022-02-27 17:39:36,387 INFO common.Util: dfs.datanode.fileio.profiling.sampling.percentage set to 0. Disabling file IO profiling
+2022-02-27 17:39:36,393 INFO blockmanagement.DatanodeManager: dfs.block.invalidate.limit: configured=1000, counted=60, effected=1000
+2022-02-27 17:39:36,393 INFO blockmanagement.DatanodeManager: dfs.namenode.datanode.registration.ip-hostname-check=true
+2022-02-27 17:39:36,396 INFO blockmanagement.BlockManager: dfs.namenode.startup.delay.block.deletion.sec is set to 000:00:00:00.000
+2022-02-27 17:39:36,396 INFO blockmanagement.BlockManager: The block deletion will start around 2022 Feb 27 17:39:36
+2022-02-27 17:39:36,397 INFO util.GSet: Computing capacity for map BlocksMap
+2022-02-27 17:39:36,397 INFO util.GSet: VM type       = 64-bit
+2022-02-27 17:39:36,398 INFO util.GSet: 2.0% max memory 30.0 GB = 613.8 MB
+2022-02-27 17:39:36,398 INFO util.GSet: capacity      = 2^26 = 67108864 entries
+2022-02-27 17:39:36,430 INFO blockmanagement.BlockManager: Storage policy satisfier is disabled
+2022-02-27 17:39:36,430 INFO blockmanagement.BlockManager: dfs.block.access.token.enable = false
+2022-02-27 17:39:36,434 INFO Configuration.deprecation: No unit for dfs.namenode.safemode.extension(30000) assuming MILLISECONDS
+2022-02-27 17:39:36,434 INFO blockmanagement.BlockManagerSafeMode: dfs.namenode.safemode.threshold-pct = 0.9990000128746033
+2022-02-27 17:39:36,434 INFO blockmanagement.BlockManagerSafeMode: dfs.namenode.safemode.min.datanodes = 0
+2022-02-27 17:39:36,434 INFO blockmanagement.BlockManagerSafeMode: dfs.namenode.safemode.extension = 30000
+2022-02-27 17:39:36,435 INFO blockmanagement.BlockManager: defaultReplication         = 3
+2022-02-27 17:39:36,435 INFO blockmanagement.BlockManager: maxReplication             = 512
+2022-02-27 17:39:36,435 INFO blockmanagement.BlockManager: minReplication             = 1
+2022-02-27 17:39:36,435 INFO blockmanagement.BlockManager: maxReplicationStreams      = 2
+2022-02-27 17:39:36,435 INFO blockmanagement.BlockManager: redundancyRecheckInterval  = 3000ms
+2022-02-27 17:39:36,435 INFO blockmanagement.BlockManager: encryptDataTransfer        = false
+2022-02-27 17:39:36,435 INFO blockmanagement.BlockManager: maxNumBlocksToLog          = 1000
+2022-02-27 17:39:36,449 INFO namenode.FSDirectory: GLOBAL serial map: bits=29 maxEntries=536870911
+2022-02-27 17:39:36,449 INFO namenode.FSDirectory: USER serial map: bits=24 maxEntries=16777215
+2022-02-27 17:39:36,449 INFO namenode.FSDirectory: GROUP serial map: bits=24 maxEntries=16777215
+2022-02-27 17:39:36,449 INFO namenode.FSDirectory: XATTR serial map: bits=24 maxEntries=16777215
+2022-02-27 17:39:36,455 INFO util.GSet: Computing capacity for map INodeMap
+2022-02-27 17:39:36,455 INFO util.GSet: VM type       = 64-bit
+2022-02-27 17:39:36,455 INFO util.GSet: 1.0% max memory 30.0 GB = 306.9 MB
+2022-02-27 17:39:36,456 INFO util.GSet: capacity      = 2^25 = 33554432 entries
+2022-02-27 17:39:36,469 INFO namenode.FSDirectory: ACLs enabled? false
+2022-02-27 17:39:36,469 INFO namenode.FSDirectory: POSIX ACL inheritance enabled? true
+2022-02-27 17:39:36,469 INFO namenode.FSDirectory: XAttrs enabled? true
+2022-02-27 17:39:36,469 INFO namenode.NameNode: Caching file names occurring more than 10 times
+2022-02-27 17:39:36,474 INFO snapshot.SnapshotManager: Loaded config captureOpenFiles: false, skipCaptureAccessTimeOnlyChange: false, snapshotDiffAllowSnapRootDescendant: true, maxSnapshotLimit: 65536
+2022-02-27 17:39:36,475 INFO snapshot.SnapshotManager: SkipList is disabled
+2022-02-27 17:39:36,478 INFO util.GSet: Computing capacity for map cachedBlocks
+2022-02-27 17:39:36,478 INFO util.GSet: VM type       = 64-bit
+2022-02-27 17:39:36,478 INFO util.GSet: 0.25% max memory 30.0 GB = 76.7 MB
+2022-02-27 17:39:36,478 INFO util.GSet: capacity      = 2^23 = 8388608 entries
+2022-02-27 17:39:36,487 INFO metrics.TopMetrics: NNTop conf: dfs.namenode.top.window.num.buckets = 10
+2022-02-27 17:39:36,488 INFO metrics.TopMetrics: NNTop conf: dfs.namenode.top.num.users = 10
+2022-02-27 17:39:36,488 INFO metrics.TopMetrics: NNTop conf: dfs.namenode.top.windows.minutes = 1,5,25
+2022-02-27 17:39:36,490 INFO namenode.FSNamesystem: Retry cache on namenode is enabled
+2022-02-27 17:39:36,490 INFO namenode.FSNamesystem: Retry cache will use 0.03 of total heap and retry cache entry expiry time is 600000 millis
+2022-02-27 17:39:36,491 INFO util.GSet: Computing capacity for map NameNodeRetryCache
+2022-02-27 17:39:36,491 INFO util.GSet: VM type       = 64-bit
+2022-02-27 17:39:36,491 INFO util.GSet: 0.029999999329447746% max memory 30.0 GB = 9.2 MB
+2022-02-27 17:39:36,491 INFO util.GSet: capacity      = 2^20 = 1048576 entries
+2022-02-27 17:39:36,508 INFO namenode.FSImage: Allocated new BlockPoolId: BP-49341628-198.202.103.167-1646012376503
+2022-02-27 17:39:36,519 INFO common.Storage: Storage directory /scratch/txk6771/job_10048396/namenode_data has been successfully formatted.
+2022-02-27 17:39:36,544 INFO namenode.FSImageFormatProtobuf: Saving image file /scratch/txk6771/job_10048396/namenode_data/current/fsimage.ckpt_0000000000000000000 using no compression
+2022-02-27 17:39:36,624 INFO namenode.FSImageFormatProtobuf: Image file /scratch/txk6771/job_10048396/namenode_data/current/fsimage.ckpt_0000000000000000000 of size 402 bytes saved in 0 seconds .
+2022-02-27 17:39:36,636 INFO namenode.NNStorageRetentionManager: Going to retain 1 images with txid >= 0
+2022-02-27 17:39:36,640 INFO namenode.FSImage: FSImageSaver clean checkpoint: txid=0 when meet shutdown.
+2022-02-27 17:39:36,641 INFO namenode.NameNode: SHUTDOWN_MSG: 
+/************************************************************
+SHUTDOWN_MSG: Shutting down NameNode at exp-2-28/198.202.103.167
+************************************************************/
+myHadoop:  
+myHadoop: Enabling experimental Spark support
+myHadoop: Using SPARK_CONF_DIR=/home/txk6771/expansecluster/spark
+myHadoop:  
+To use Spark, you will want to type the following commands:"
+  source /home/txk6771/expansecluster/spark/spark-env.sh
+  myspark start
+Starting namenodes on [exp-2-28.ib.cluster]
+exp-2-28: could not open any host key
+exp-2-28: ssh_keysign: no reply
+exp-2-28: sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+Starting datanodes
+WARNING: HADOOP_SECURE_DN_PID_DIR has been replaced by HADOOP_SECURE_PID_DIR. Using value of HADOOP_SECURE_DN_PID_DIR.
+localhost: could not open any host key
+localhost: ssh_keysign: no reply
+localhost: sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+localhost: WARNING: HADOOP_SECURE_DN_PID_DIR has been replaced by HADOOP_SECURE_PID_DIR. Using value of HADOOP_SECURE_DN_PID_DIR.
+Starting secondary namenodes [exp-2-28.ib.cluster]
+exp-2-28: could not open any host key
+exp-2-28: ssh_keysign: no reply
+exp-2-28: sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+mySpark: Using /home/txk6771/expansecluster/spark/slaves as our slaves file
+mySpark: Reading in /home/txk6771/expansecluster/spark/spark-env.sh as our slaves file
+starting org.apache.spark.deploy.master.Master, logging to /scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.master.Master-1-exp-2-28.out
+mySpark: Starting worker on exp-2-28.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark start org.apache.spark.deploy.worker.Worker 1 spark://exp-2-28.ib.cluster:7077
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+starting org.apache.spark.deploy.worker.Worker, logging to /scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-2-28.out
+mySpark: Starting worker on exp-2-29.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark start org.apache.spark.deploy.worker.Worker 1 spark://exp-2-28.ib.cluster:7077
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+starting org.apache.spark.deploy.worker.Worker, logging to /scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-2-29.out
+mySpark: Starting worker on exp-2-30.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark start org.apache.spark.deploy.worker.Worker 1 spark://exp-2-28.ib.cluster:7077
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+starting org.apache.spark.deploy.worker.Worker, logging to /scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-2-30.out
+mySpark: Starting worker on exp-2-31.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark start org.apache.spark.deploy.worker.Worker 1 spark://exp-2-28.ib.cluster:7077
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+starting org.apache.spark.deploy.worker.Worker, logging to /scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-2-31.out
+mySpark: Starting worker on exp-2-32.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark start org.apache.spark.deploy.worker.Worker 1 spark://exp-2-28.ib.cluster:7077
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+starting org.apache.spark.deploy.worker.Worker, logging to /scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-2-32.out
+WARNING: An illegal reflective access operation has occurred
+WARNING: Illegal reflective access by org.apache.spark.unsafe.Platform (file:/expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/jars/spark-unsafe_2.12-3.1.2.jar) to constructor java.nio.DirectByteBuffer(long,int)
+WARNING: Please consider reporting this to the maintainers of org.apache.spark.unsafe.Platform
+WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
+WARNING: All illegal access operations will be denied in a future release
+2022-02-27 17:40:18,261 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2022-02-27 17:40:18,504 INFO spark.SparkContext: Running Spark version 3.1.2
+2022-02-27 17:40:18,532 INFO resource.ResourceUtils: ==============================================================
+2022-02-27 17:40:18,532 INFO resource.ResourceUtils: No custom resources configured for spark.driver.
+2022-02-27 17:40:18,532 INFO resource.ResourceUtils: ==============================================================
+2022-02-27 17:40:18,533 INFO spark.SparkContext: Submitted application: multiply
+2022-02-27 17:40:18,547 INFO resource.ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 12, script: , vendor: , memory -> name: memory, amount: 24576, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
+2022-02-27 17:40:18,567 INFO resource.ResourceProfile: Limiting resource is cpus at 12 tasks per executor
+2022-02-27 17:40:18,568 INFO resource.ResourceProfileManager: Added ResourceProfile id: 0
+2022-02-27 17:40:18,601 INFO spark.SecurityManager: Changing view acls to: txk6771
+2022-02-27 17:40:18,601 INFO spark.SecurityManager: Changing modify acls to: txk6771
+2022-02-27 17:40:18,601 INFO spark.SecurityManager: Changing view acls groups to: 
+2022-02-27 17:40:18,601 INFO spark.SecurityManager: Changing modify acls groups to: 
+2022-02-27 17:40:18,601 INFO spark.SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users  with view permissions: Set(txk6771); groups with view permissions: Set(); users  with modify permissions: Set(txk6771); groups with modify permissions: Set()
+2022-02-27 17:40:18,838 INFO util.Utils: Successfully started service 'sparkDriver' on port 36285.
+2022-02-27 17:40:18,863 INFO spark.SparkEnv: Registering MapOutputTracker
+2022-02-27 17:40:18,889 INFO spark.SparkEnv: Registering BlockManagerMaster
+2022-02-27 17:40:18,901 INFO storage.BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+2022-02-27 17:40:18,901 INFO storage.BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+2022-02-27 17:40:18,905 INFO spark.SparkEnv: Registering BlockManagerMasterHeartbeat
+2022-02-27 17:40:18,915 INFO storage.DiskBlockManager: Created local directory at /scratch/txk6771/job_10048396/blockmgr-46571067-4f9f-4ad1-8051-06a65b027fe3
+2022-02-27 17:40:18,940 INFO memory.MemoryStore: MemoryStore started with capacity 14.2 GiB
+2022-02-27 17:40:18,953 INFO spark.SparkEnv: Registering OutputCommitCoordinator
+2022-02-27 17:40:19,024 INFO util.log: Logging initialized @1901ms to org.sparkproject.jetty.util.log.Slf4jLog
+2022-02-27 17:40:19,075 INFO server.Server: jetty-9.4.40.v20210413; built: 2021-04-13T20:42:42.668Z; git: b881a572662e1943a14ae12e7e1207989f218b74; jvm 11.0.2+9
+2022-02-27 17:40:19,090 INFO server.Server: Started @1968ms
+2022-02-27 17:40:19,128 INFO server.AbstractConnector: Started ServerConnector@32568a3f{HTTP/1.1, (http/1.1)}{exp-2-28.ib.cluster:4040}
+2022-02-27 17:40:19,128 INFO util.Utils: Successfully started service 'SparkUI' on port 4040.
+2022-02-27 17:40:19,149 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@78d6447a{/jobs,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,150 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@e5cbff2{/jobs/json,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,151 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@4fc3c165{/jobs/job,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,153 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@2643d762{/jobs/job/json,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,154 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@2f236de0{/stages,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,155 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@767a014e{/stages/json,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,155 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@3968bc60{/stages/stage,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,157 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@63c12e52{/stages/stage/json,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,157 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@26c47874{/stages/pool,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,158 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@2849434b{/stages/pool/json,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,158 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@65b97f47{/storage,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,159 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@476fe690{/storage/json,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,160 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@54e3658c{/storage/rdd,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,160 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@3c5dbdf8{/storage/rdd/json,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,161 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@7aac8884{/environment,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,161 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@5b852b49{/environment/json,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,162 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@122d6c22{/executors,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,163 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@5df778c3{/executors/json,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,163 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@71a06021{/executors/threadDump,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,166 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@6edcad64{/executors/threadDump/json,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,173 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@3e33d73e{/static,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,174 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@4d41ba0f{/,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,174 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@77bbadc{/api,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,175 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@49faf066{/jobs/job/kill,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,176 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@455c1d8c{/stages/stage/kill,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,177 INFO ui.SparkUI: Bound SparkUI to exp-2-28.ib.cluster, and started at http://exp-2-28.ib.cluster:4040
+2022-02-27 17:40:19,195 INFO spark.SparkContext: Added JAR file:///home/txk6771/Diablo/diablo/lib/diablo.jar at spark://exp-2-28.ib.cluster:36285/jars/diablo.jar with timestamp 1646012418499
+2022-02-27 17:40:19,195 INFO spark.SparkContext: Added JAR file:/home/txk6771/Diablo/diablo/benchmarks/test.jar at spark://exp-2-28.ib.cluster:36285/jars/test.jar with timestamp 1646012418499
+2022-02-27 17:40:19,362 INFO client.StandaloneAppClient$ClientEndpoint: Connecting to master spark://exp-2-28.ib.cluster:7077...
+2022-02-27 17:40:19,410 INFO client.TransportClientFactory: Successfully created connection to exp-2-28.ib.cluster/10.22.2.28:7077 after 30 ms (0 ms spent in bootstraps)
+2022-02-27 17:40:19,535 INFO cluster.StandaloneSchedulerBackend: Connected to Spark cluster with app ID app-20220227174019-0000
+2022-02-27 17:40:19,542 INFO util.Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 35301.
+2022-02-27 17:40:19,542 INFO netty.NettyBlockTransferService: Server created on exp-2-28.ib.cluster:35301
+2022-02-27 17:40:19,543 INFO storage.BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+2022-02-27 17:40:19,548 INFO storage.BlockManagerMaster: Registering BlockManager BlockManagerId(driver, exp-2-28.ib.cluster, 35301, None)
+2022-02-27 17:40:19,551 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/0 on worker-20220227174004-10.22.2.29-46421 (10.22.2.29:46421) with 12 core(s)
+2022-02-27 17:40:19,552 INFO storage.BlockManagerMasterEndpoint: Registering block manager exp-2-28.ib.cluster:35301 with 14.2 GiB RAM, BlockManagerId(driver, exp-2-28.ib.cluster, 35301, None)
+2022-02-27 17:40:19,554 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/0 on hostPort 10.22.2.29:46421 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,555 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/1 on worker-20220227174004-10.22.2.29-46421 (10.22.2.29:46421) with 12 core(s)
+2022-02-27 17:40:19,555 INFO storage.BlockManagerMaster: Registered BlockManager BlockManagerId(driver, exp-2-28.ib.cluster, 35301, None)
+2022-02-27 17:40:19,555 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/1 on hostPort 10.22.2.29:46421 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,556 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/2 on worker-20220227174004-10.22.2.29-46421 (10.22.2.29:46421) with 12 core(s)
+2022-02-27 17:40:19,556 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/2 on hostPort 10.22.2.29:46421 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,556 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/3 on worker-20220227174004-10.22.2.29-46421 (10.22.2.29:46421) with 12 core(s)
+2022-02-27 17:40:19,556 INFO storage.BlockManager: Initialized BlockManager: BlockManagerId(driver, exp-2-28.ib.cluster, 35301, None)
+2022-02-27 17:40:19,556 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/3 on hostPort 10.22.2.29:46421 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,557 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/4 on worker-20220227174004-10.22.2.29-46421 (10.22.2.29:46421) with 12 core(s)
+2022-02-27 17:40:19,557 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/4 on hostPort 10.22.2.29:46421 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,557 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/5 on worker-20220227174004-10.22.2.29-46421 (10.22.2.29:46421) with 12 core(s)
+2022-02-27 17:40:19,557 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/5 on hostPort 10.22.2.29:46421 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,557 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/6 on worker-20220227174004-10.22.2.29-46421 (10.22.2.29:46421) with 12 core(s)
+2022-02-27 17:40:19,558 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/6 on hostPort 10.22.2.29:46421 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,558 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/7 on worker-20220227174004-10.22.2.29-46421 (10.22.2.29:46421) with 12 core(s)
+2022-02-27 17:40:19,558 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/7 on hostPort 10.22.2.29:46421 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,558 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/8 on worker-20220227174004-10.22.2.29-46421 (10.22.2.29:46421) with 12 core(s)
+2022-02-27 17:40:19,558 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/8 on hostPort 10.22.2.29:46421 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,559 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/9 on worker-20220227174004-10.22.2.29-46421 (10.22.2.29:46421) with 12 core(s)
+2022-02-27 17:40:19,559 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/9 on hostPort 10.22.2.29:46421 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,559 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/10 on worker-20220227173958-10.22.2.28-39865 (10.22.2.28:39865) with 12 core(s)
+2022-02-27 17:40:19,559 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/10 on hostPort 10.22.2.28:39865 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,559 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/11 on worker-20220227173958-10.22.2.28-39865 (10.22.2.28:39865) with 12 core(s)
+2022-02-27 17:40:19,560 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/11 on hostPort 10.22.2.28:39865 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,560 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/12 on worker-20220227173958-10.22.2.28-39865 (10.22.2.28:39865) with 12 core(s)
+2022-02-27 17:40:19,560 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/12 on hostPort 10.22.2.28:39865 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,560 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/13 on worker-20220227173958-10.22.2.28-39865 (10.22.2.28:39865) with 12 core(s)
+2022-02-27 17:40:19,560 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/13 on hostPort 10.22.2.28:39865 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,561 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/14 on worker-20220227173958-10.22.2.28-39865 (10.22.2.28:39865) with 12 core(s)
+2022-02-27 17:40:19,561 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/14 on hostPort 10.22.2.28:39865 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,561 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/15 on worker-20220227173958-10.22.2.28-39865 (10.22.2.28:39865) with 12 core(s)
+2022-02-27 17:40:19,561 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/15 on hostPort 10.22.2.28:39865 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,561 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/16 on worker-20220227173958-10.22.2.28-39865 (10.22.2.28:39865) with 12 core(s)
+2022-02-27 17:40:19,562 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/16 on hostPort 10.22.2.28:39865 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,562 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/17 on worker-20220227173958-10.22.2.28-39865 (10.22.2.28:39865) with 12 core(s)
+2022-02-27 17:40:19,562 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/17 on hostPort 10.22.2.28:39865 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,562 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/18 on worker-20220227173958-10.22.2.28-39865 (10.22.2.28:39865) with 12 core(s)
+2022-02-27 17:40:19,562 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/18 on hostPort 10.22.2.28:39865 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,562 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/19 on worker-20220227173958-10.22.2.28-39865 (10.22.2.28:39865) with 12 core(s)
+2022-02-27 17:40:19,563 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/19 on hostPort 10.22.2.28:39865 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,563 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/20 on worker-20220227174008-10.22.2.30-38815 (10.22.2.30:38815) with 12 core(s)
+2022-02-27 17:40:19,563 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/20 on hostPort 10.22.2.30:38815 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,563 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/21 on worker-20220227174008-10.22.2.30-38815 (10.22.2.30:38815) with 12 core(s)
+2022-02-27 17:40:19,563 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/21 on hostPort 10.22.2.30:38815 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,563 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/22 on worker-20220227174008-10.22.2.30-38815 (10.22.2.30:38815) with 12 core(s)
+2022-02-27 17:40:19,563 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/22 on hostPort 10.22.2.30:38815 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,564 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/23 on worker-20220227174008-10.22.2.30-38815 (10.22.2.30:38815) with 12 core(s)
+2022-02-27 17:40:19,564 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/23 on hostPort 10.22.2.30:38815 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,564 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/24 on worker-20220227174008-10.22.2.30-38815 (10.22.2.30:38815) with 12 core(s)
+2022-02-27 17:40:19,564 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/24 on hostPort 10.22.2.30:38815 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,564 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/25 on worker-20220227174008-10.22.2.30-38815 (10.22.2.30:38815) with 12 core(s)
+2022-02-27 17:40:19,564 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/25 on hostPort 10.22.2.30:38815 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,565 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/26 on worker-20220227174008-10.22.2.30-38815 (10.22.2.30:38815) with 12 core(s)
+2022-02-27 17:40:19,565 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/26 on hostPort 10.22.2.30:38815 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,565 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/27 on worker-20220227174008-10.22.2.30-38815 (10.22.2.30:38815) with 12 core(s)
+2022-02-27 17:40:19,565 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/27 on hostPort 10.22.2.30:38815 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,565 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/28 on worker-20220227174008-10.22.2.30-38815 (10.22.2.30:38815) with 12 core(s)
+2022-02-27 17:40:19,565 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/28 on hostPort 10.22.2.30:38815 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,566 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/29 on worker-20220227174008-10.22.2.30-38815 (10.22.2.30:38815) with 12 core(s)
+2022-02-27 17:40:19,566 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/29 on hostPort 10.22.2.30:38815 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,566 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/30 on worker-20220227174016-10.22.2.32-42171 (10.22.2.32:42171) with 12 core(s)
+2022-02-27 17:40:19,566 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/30 on hostPort 10.22.2.32:42171 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,566 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/31 on worker-20220227174016-10.22.2.32-42171 (10.22.2.32:42171) with 12 core(s)
+2022-02-27 17:40:19,566 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/31 on hostPort 10.22.2.32:42171 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,566 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/32 on worker-20220227174016-10.22.2.32-42171 (10.22.2.32:42171) with 12 core(s)
+2022-02-27 17:40:19,567 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/32 on hostPort 10.22.2.32:42171 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,567 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/33 on worker-20220227174016-10.22.2.32-42171 (10.22.2.32:42171) with 12 core(s)
+2022-02-27 17:40:19,567 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/33 on hostPort 10.22.2.32:42171 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,567 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/34 on worker-20220227174016-10.22.2.32-42171 (10.22.2.32:42171) with 12 core(s)
+2022-02-27 17:40:19,567 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/34 on hostPort 10.22.2.32:42171 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,567 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/35 on worker-20220227174016-10.22.2.32-42171 (10.22.2.32:42171) with 12 core(s)
+2022-02-27 17:40:19,567 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/35 on hostPort 10.22.2.32:42171 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,568 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/36 on worker-20220227174016-10.22.2.32-42171 (10.22.2.32:42171) with 12 core(s)
+2022-02-27 17:40:19,568 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/36 on hostPort 10.22.2.32:42171 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,568 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/37 on worker-20220227174016-10.22.2.32-42171 (10.22.2.32:42171) with 12 core(s)
+2022-02-27 17:40:19,568 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/37 on hostPort 10.22.2.32:42171 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,568 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/38 on worker-20220227174016-10.22.2.32-42171 (10.22.2.32:42171) with 12 core(s)
+2022-02-27 17:40:19,568 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/38 on hostPort 10.22.2.32:42171 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,568 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/39 on worker-20220227174016-10.22.2.32-42171 (10.22.2.32:42171) with 12 core(s)
+2022-02-27 17:40:19,569 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/39 on hostPort 10.22.2.32:42171 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,569 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/40 on worker-20220227174012-10.22.2.31-34601 (10.22.2.31:34601) with 12 core(s)
+2022-02-27 17:40:19,569 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/40 on hostPort 10.22.2.31:34601 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,569 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/41 on worker-20220227174012-10.22.2.31-34601 (10.22.2.31:34601) with 12 core(s)
+2022-02-27 17:40:19,569 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/41 on hostPort 10.22.2.31:34601 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,569 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/42 on worker-20220227174012-10.22.2.31-34601 (10.22.2.31:34601) with 12 core(s)
+2022-02-27 17:40:19,570 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/42 on hostPort 10.22.2.31:34601 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,570 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/43 on worker-20220227174012-10.22.2.31-34601 (10.22.2.31:34601) with 12 core(s)
+2022-02-27 17:40:19,570 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/43 on hostPort 10.22.2.31:34601 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,570 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/44 on worker-20220227174012-10.22.2.31-34601 (10.22.2.31:34601) with 12 core(s)
+2022-02-27 17:40:19,570 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/44 on hostPort 10.22.2.31:34601 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,570 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/45 on worker-20220227174012-10.22.2.31-34601 (10.22.2.31:34601) with 12 core(s)
+2022-02-27 17:40:19,570 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/45 on hostPort 10.22.2.31:34601 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,570 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/46 on worker-20220227174012-10.22.2.31-34601 (10.22.2.31:34601) with 12 core(s)
+2022-02-27 17:40:19,570 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/46 on hostPort 10.22.2.31:34601 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,571 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/47 on worker-20220227174012-10.22.2.31-34601 (10.22.2.31:34601) with 12 core(s)
+2022-02-27 17:40:19,571 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/47 on hostPort 10.22.2.31:34601 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,571 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/48 on worker-20220227174012-10.22.2.31-34601 (10.22.2.31:34601) with 12 core(s)
+2022-02-27 17:40:19,571 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/48 on hostPort 10.22.2.31:34601 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,571 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227174019-0000/49 on worker-20220227174012-10.22.2.31-34601 (10.22.2.31:34601) with 12 core(s)
+2022-02-27 17:40:19,571 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227174019-0000/49 on hostPort 10.22.2.31:34601 with 12 core(s), 24.0 GiB RAM
+2022-02-27 17:40:19,671 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/1 is now RUNNING
+2022-02-27 17:40:19,671 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/5 is now RUNNING
+2022-02-27 17:40:19,673 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/9 is now RUNNING
+2022-02-27 17:40:19,674 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/6 is now RUNNING
+2022-02-27 17:40:19,675 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/4 is now RUNNING
+2022-02-27 17:40:19,676 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/0 is now RUNNING
+2022-02-27 17:40:19,677 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/7 is now RUNNING
+2022-02-27 17:40:19,678 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/8 is now RUNNING
+2022-02-27 17:40:19,678 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/2 is now RUNNING
+2022-02-27 17:40:19,679 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/3 is now RUNNING
+2022-02-27 17:40:19,680 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/48 is now RUNNING
+2022-02-27 17:40:19,681 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/41 is now RUNNING
+2022-02-27 17:40:19,682 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/49 is now RUNNING
+2022-02-27 17:40:19,682 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/44 is now RUNNING
+2022-02-27 17:40:19,683 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/46 is now RUNNING
+2022-02-27 17:40:19,684 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/11 is now RUNNING
+2022-02-27 17:40:19,685 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/42 is now RUNNING
+2022-02-27 17:40:19,686 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/15 is now RUNNING
+2022-02-27 17:40:19,686 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/14 is now RUNNING
+2022-02-27 17:40:19,687 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/43 is now RUNNING
+2022-02-27 17:40:19,688 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/45 is now RUNNING
+2022-02-27 17:40:19,688 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/17 is now RUNNING
+2022-02-27 17:40:19,689 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/16 is now RUNNING
+2022-02-27 17:40:19,689 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/47 is now RUNNING
+2022-02-27 17:40:19,690 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/40 is now RUNNING
+2022-02-27 17:40:19,691 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/10 is now RUNNING
+2022-02-27 17:40:19,691 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/12 is now RUNNING
+2022-02-27 17:40:19,692 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/18 is now RUNNING
+2022-02-27 17:40:19,692 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/19 is now RUNNING
+2022-02-27 17:40:19,692 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/13 is now RUNNING
+2022-02-27 17:40:19,693 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/32 is now RUNNING
+2022-02-27 17:40:19,694 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/31 is now RUNNING
+2022-02-27 17:40:19,694 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/39 is now RUNNING
+2022-02-27 17:40:19,695 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/30 is now RUNNING
+2022-02-27 17:40:19,695 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/35 is now RUNNING
+2022-02-27 17:40:19,695 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@682af059{/metrics/json,null,AVAILABLE,@Spark}
+2022-02-27 17:40:19,695 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/33 is now RUNNING
+2022-02-27 17:40:19,696 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/38 is now RUNNING
+2022-02-27 17:40:19,696 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/37 is now RUNNING
+2022-02-27 17:40:19,697 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/28 is now RUNNING
+2022-02-27 17:40:19,697 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/36 is now RUNNING
+2022-02-27 17:40:19,698 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/24 is now RUNNING
+2022-02-27 17:40:19,698 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/34 is now RUNNING
+2022-02-27 17:40:19,699 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/22 is now RUNNING
+2022-02-27 17:40:19,699 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/21 is now RUNNING
+2022-02-27 17:40:19,699 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/25 is now RUNNING
+2022-02-27 17:40:19,700 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/20 is now RUNNING
+2022-02-27 17:40:19,700 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/27 is now RUNNING
+2022-02-27 17:40:19,701 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/26 is now RUNNING
+2022-02-27 17:40:19,701 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/29 is now RUNNING
+2022-02-27 17:40:19,701 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227174019-0000/23 is now RUNNING
+2022-02-27 17:40:19,734 INFO cluster.StandaloneSchedulerBackend: SchedulerBackend is ready for scheduling beginning after reached minRegisteredResourcesRatio: 0.0
+2022-02-27 17:40:19,745 WARN spark.SparkContext: Using an existing SparkContext; some configuration may not take effect.
+@@@ number of tiles: 15*15 = 225
+@@@@ dense matrix size: 1.68 GB
+@@@@ sparse matrix size: 26.55 MB
+Try: 1/1 time: 1741.45
+*** MLlib Multiply dense-dense n=15000 m=15000 N=1000 tries=1 NaN secs
+Try: 1/1 time: 31.527
+*** MLlib Multiply sparse-dense n=15000 m=15000 N=1000 tries=1 NaN secs
+Try: 1/1 time: 1.277
+*** MLlib Multiply sparse-sparse n=15000 m=15000 N=1000 tries=1 NaN secs
+Try: 1/1 time: 25.807
+*** DIABLO Multiply dense-dense giving dense n=15000 m=15000 N=1000 tries=1 NaN secs
+Try: 1/1 time: 15.315
+*** DIABLO Multiply sparse-dense giving dense n=15000 m=15000 N=1000 tries=1 NaN secs
+Try: 1/1 time: 10.87
+*** DIABLO Multiply sparse-sparse giving dense n=15000 m=15000 N=1000 tries=1 NaN secs
+Try: 1/1 time: 36.462
+*** DIABLO Multiply dense-dense giving sparse n=15000 m=15000 N=1000 tries=1 NaN secs
+Try: 1/1 time: 26.384
+*** DIABLO Multiply sparse-dense giving sparse n=15000 m=15000 N=1000 tries=1 NaN secs
+Try: 1/1 time: 10.532
+*** DIABLO Multiply sparse-sparse giving sparse n=15000 m=15000 N=1000 tries=1 NaN secs
+mySpark: Using /home/txk6771/expansecluster/spark/slaves as our slaves file
+mySpark: Reading in /home/txk6771/expansecluster/spark/spark-env.sh as our slaves file
+stopping org.apache.spark.deploy.master.Master
+mySpark: Stopping worker on exp-2-28.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark stop org.apache.spark.deploy.worker.Worker 1
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+stopping org.apache.spark.deploy.worker.Worker
+mySpark: Stopping worker on exp-2-29.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark stop org.apache.spark.deploy.worker.Worker 1
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+stopping org.apache.spark.deploy.worker.Worker
+mySpark: Stopping worker on exp-2-30.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark stop org.apache.spark.deploy.worker.Worker 1
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+stopping org.apache.spark.deploy.worker.Worker
+mySpark: Stopping worker on exp-2-31.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark stop org.apache.spark.deploy.worker.Worker 1
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+stopping org.apache.spark.deploy.worker.Worker
+mySpark: Stopping worker on exp-2-32.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark stop org.apache.spark.deploy.worker.Worker 1
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+stopping org.apache.spark.deploy.worker.Worker
+Stopping namenodes on [exp-2-28.ib.cluster]
+exp-2-28: could not open any host key
+exp-2-28: ssh_keysign: no reply
+exp-2-28: sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+Stopping datanodes
+WARNING: HADOOP_SECURE_DN_PID_DIR has been replaced by HADOOP_SECURE_PID_DIR. Using value of HADOOP_SECURE_DN_PID_DIR.
+localhost: could not open any host key
+localhost: ssh_keysign: no reply
+localhost: sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+localhost: WARNING: HADOOP_SECURE_DN_PID_DIR has been replaced by HADOOP_SECURE_PID_DIR. Using value of HADOOP_SECURE_DN_PID_DIR.
+Stopping secondary namenodes [exp-2-28.ib.cluster]
+exp-2-28: could not open any host key
+exp-2-28: ssh_keysign: no reply
+exp-2-28: sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+Copying Hadoop logs back to /home/txk6771/expansecluster/logs...
+'/scratch/txk6771/job_10048396/logs' -> '/home/txk6771/expansecluster/logs'
+'/scratch/txk6771/job_10048396/logs/hadoop-txk6771-namenode-exp-2-28.out' -> '/home/txk6771/expansecluster/logs/hadoop-txk6771-namenode-exp-2-28.out'
+'/scratch/txk6771/job_10048396/logs/SecurityAuth-txk6771.audit' -> '/home/txk6771/expansecluster/logs/SecurityAuth-txk6771.audit'
+'/scratch/txk6771/job_10048396/logs/hadoop-txk6771-datanode-exp-2-28.out' -> '/home/txk6771/expansecluster/logs/hadoop-txk6771-datanode-exp-2-28.out'
+'/scratch/txk6771/job_10048396/logs/hadoop-txk6771-namenode-exp-2-28.log' -> '/home/txk6771/expansecluster/logs/hadoop-txk6771-namenode-exp-2-28.log'
+'/scratch/txk6771/job_10048396/logs/hadoop-txk6771-datanode-exp-2-28.log' -> '/home/txk6771/expansecluster/logs/hadoop-txk6771-datanode-exp-2-28.log'
+'/scratch/txk6771/job_10048396/logs/hadoop-txk6771-secondarynamenode-exp-2-28.out' -> '/home/txk6771/expansecluster/logs/hadoop-txk6771-secondarynamenode-exp-2-28.out'
+'/scratch/txk6771/job_10048396/logs/hadoop-txk6771-secondarynamenode-exp-2-28.log' -> '/home/txk6771/expansecluster/logs/hadoop-txk6771-secondarynamenode-exp-2-28.log'
+'/scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.master.Master-1-exp-2-28.out' -> '/home/txk6771/expansecluster/logs/spark-txk6771-org.apache.spark.deploy.master.Master-1-exp-2-28.out'
+'/scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-2-28.out' -> '/home/txk6771/expansecluster/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-2-28.out'
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+removed '/scratch/txk6771/job_10048396/tmp/dfs/namesecondary/current/fsimage_0000000000000000000.md5'
+removed '/scratch/txk6771/job_10048396/tmp/dfs/namesecondary/current/fsimage_0000000000000000000'
+removed '/scratch/txk6771/job_10048396/tmp/dfs/namesecondary/current/fsimage_0000000000000000002'
+removed '/scratch/txk6771/job_10048396/tmp/dfs/namesecondary/current/VERSION'
+removed '/scratch/txk6771/job_10048396/tmp/dfs/namesecondary/current/fsimage_0000000000000000002.md5'
+removed '/scratch/txk6771/job_10048396/tmp/dfs/namesecondary/current/edits_0000000000000000001-0000000000000000002'
+removed directory '/scratch/txk6771/job_10048396/tmp/dfs/namesecondary/current'
+removed directory '/scratch/txk6771/job_10048396/tmp/dfs/namesecondary'
+removed directory '/scratch/txk6771/job_10048396/tmp/dfs'
+removed directory '/scratch/txk6771/job_10048396/tmp'
+removed '/scratch/txk6771/job_10048396/hdfs_data/current/VERSION'
+removed directory '/scratch/txk6771/job_10048396/hdfs_data/current/BP-49341628-198.202.103.167-1646012376503/tmp'
+removed '/scratch/txk6771/job_10048396/hdfs_data/current/BP-49341628-198.202.103.167-1646012376503/scanner.cursor'
+removed directory '/scratch/txk6771/job_10048396/hdfs_data/current/BP-49341628-198.202.103.167-1646012376503/current/rbw'
+removed '/scratch/txk6771/job_10048396/hdfs_data/current/BP-49341628-198.202.103.167-1646012376503/current/dfsUsed'
+removed '/scratch/txk6771/job_10048396/hdfs_data/current/BP-49341628-198.202.103.167-1646012376503/current/VERSION'
+removed directory '/scratch/txk6771/job_10048396/hdfs_data/current/BP-49341628-198.202.103.167-1646012376503/current/finalized'
+removed directory '/scratch/txk6771/job_10048396/hdfs_data/current/BP-49341628-198.202.103.167-1646012376503/current'
+removed directory '/scratch/txk6771/job_10048396/hdfs_data/current/BP-49341628-198.202.103.167-1646012376503'
+removed directory '/scratch/txk6771/job_10048396/hdfs_data/current'
+removed directory '/scratch/txk6771/job_10048396/hdfs_data'
+removed '/scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-2-28.out'
+removed '/scratch/txk6771/job_10048396/logs/hadoop-txk6771-datanode-exp-2-28.log'
+removed '/scratch/txk6771/job_10048396/logs/hadoop-txk6771-namenode-exp-2-28.log'
+removed '/scratch/txk6771/job_10048396/logs/hadoop-txk6771-secondarynamenode-exp-2-28.out'
+removed '/scratch/txk6771/job_10048396/logs/hadoop-txk6771-datanode-exp-2-28.out'
+removed '/scratch/txk6771/job_10048396/logs/SecurityAuth-txk6771.audit'
+removed '/scratch/txk6771/job_10048396/logs/hadoop-txk6771-secondarynamenode-exp-2-28.log'
+removed '/scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.master.Master-1-exp-2-28.out'
+removed '/scratch/txk6771/job_10048396/logs/hadoop-txk6771-namenode-exp-2-28.out'
+removed directory '/scratch/txk6771/job_10048396/logs'
+removed '/scratch/txk6771/job_10048396/namenode_data/current/edits_inprogress_0000000000000000003'
+removed '/scratch/txk6771/job_10048396/namenode_data/current/fsimage_0000000000000000000.md5'
+removed '/scratch/txk6771/job_10048396/namenode_data/current/fsimage_0000000000000000000'
+removed '/scratch/txk6771/job_10048396/namenode_data/current/VERSION'
+removed '/scratch/txk6771/job_10048396/namenode_data/current/seen_txid'
+removed '/scratch/txk6771/job_10048396/namenode_data/current/edits_0000000000000000001-0000000000000000002'
+removed directory '/scratch/txk6771/job_10048396/namenode_data/current'
+removed directory '/scratch/txk6771/job_10048396/namenode_data'
+removed directory '/scratch/txk6771/job_10048396/pids'
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+removed '/scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-2-29.out'
+removed directory '/scratch/txk6771/job_10048396/logs'
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+removed '/scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-2-30.out'
+removed directory '/scratch/txk6771/job_10048396/logs'
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+removed '/scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-2-31.out'
+removed directory '/scratch/txk6771/job_10048396/logs'
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:/2SczMvdu+Jkx3380f9ie4H8oPoZ/yO2nPAy/mhvnoE failed
+removed '/scratch/txk6771/job_10048396/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-2-32.out'
+removed directory '/scratch/txk6771/job_10048396/logs'

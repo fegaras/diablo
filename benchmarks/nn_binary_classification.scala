@@ -283,7 +283,7 @@ object NeuralNetwork extends Serializable {
 				}
 			}
 			if (i > 0) s = s/i
-			print("*** %s cores=%d N=%d ".format(name,cores,N))
+			print("*** %s cores=%d n=%d m=%d N=%d ".format(name,cores,total_size,m,N))
 			println("tries=%d %.3f secs".format(i,s))
 		}
 

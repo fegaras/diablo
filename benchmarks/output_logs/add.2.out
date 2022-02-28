@@ -1,0 +1,975 @@
+Number of nodes =  5
+Number of executors =  49
+myHadoop: Setting MH_IPOIB_TRANSFORM='s/\([^.]*\).*$/\1.ib.cluster/' from myhadoop.conf
+myHadoop: Setting MH_SCRATCH_DIR=/scratch/$USER/job_$SLURM_JOBID from myhadoop.conf
+myHadoop: Using HADOOP_HOME=/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2
+myHadoop: Using MH_SCRATCH_DIR=/scratch/txk6771/job_10051849
+myHadoop: Using JAVA_HOME=/cm/shared/apps/spack/cpu/opt/spack/linux-centos8-zen/gcc-8.3.1/openjdk-11.0.2-k5ezeyjgjeqmehyvrmmpymaguuf2qzsk
+myHadoop: Generating Hadoop configuration in directory in /home/txk6771/expansecluster...
+myHadoop: Backing up old config dir to /home/txk6771/expansecluster.52...
+renamed '/home/txk6771/expansecluster' -> '/home/txk6771/expansecluster.52'
+cp: -r not specified; omitting directory '/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/etc/hadoop/shellprofile.d'
+myHadoop: Designating exp-5-29.ib.cluster as master node (namenode, secondary namenode, and jobtracker)
+myHadoop: The following nodes will be slaves (datanode, tasktracer):
+exp-5-29.ib.cluster
+exp-5-30.ib.cluster
+exp-5-31.ib.cluster
+exp-5-32.ib.cluster
+exp-5-33.ib.cluster
+WARNING: /scratch/txk6771/job_10051849/pids does not exist. Creating.
+WARNING: /scratch/txk6771/job_10051849/logs does not exist. Creating.
+2022-02-27 23:18:17,398 INFO namenode.NameNode: STARTUP_MSG: 
+/************************************************************
+STARTUP_MSG: Starting NameNode
+STARTUP_MSG:   host = exp-5-29/198.202.102.242
+STARTUP_MSG:   args = [-format]
+STARTUP_MSG:   version = 3.2.2
+STARTUP_MSG:   classpath = /home/txk6771/expansecluster:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-annotations-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/hadoop-auth-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-xml-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-collections-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/audience-annotations-0.5.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/javax.activation-api-1.2.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/checker-qual-2.5.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/curator-framework-2.13.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/gson-2.2.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerby-config-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-simplekdc-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-core-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-webapp-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-codec-1.11.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-io-2.5.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerby-util-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/httpcore-4.4.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-server-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/netty-3.10.6.Final.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-math3-3.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-cli-1.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-util-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerby-xdr-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-lang3-3.7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/log4j-1.2.17.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-http-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-xc-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-jaxrs-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerby-asn1-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/guava-27.0-jre.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerby-pkix-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-common-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jersey-core-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/paranamer-2.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-servlet-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-text-1.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jsp-api-2.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/animal-sniffer-annotations-1.17.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-server-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-crypto-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/javax.servlet-api-3.1.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/stax2-api-3.1.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/asm-5.0.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/token-provider-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-util-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/snappy-java-1.0.5.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-mapper-asl-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/failureaccess-1.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jaxb-api-2.2.11.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/avro-1.7.7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/error_prone_annotations-2.2.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-client-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/curator-client-2.13.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-security-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jsch-0.1.55.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/zookeeper-3.4.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/accessors-smart-1.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jersey-servlet-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/woodstox-core-5.0.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/slf4j-log4j12-1.7.25.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jersey-server-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-databind-2.9.10.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jetty-io-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jul-to-slf4j-1.7.25.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/protobuf-java-2.5.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-compress-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/json-smart-2.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jcip-annotations-1.0-1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-configuration2-2.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-admin-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/httpclient-4.5.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-identity-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/j2objc-annotations-1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jaxb-impl-2.2.3-1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jsr311-api-1.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/slf4j-api-1.7.25.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jersey-json-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/dnsjava-2.1.7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-beanutils-1.9.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/hadoop-annotations-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-logging-1.1.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/metrics-core-3.2.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jettison-1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/nimbus-jose-jwt-7.9.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/curator-recipes-2.13.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jsr305-3.0.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/jackson-core-asl-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/kerb-core-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/re2j-1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/htrace-core4-4.1.0-incubating.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/lib/commons-net-3.6.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/hadoop-common-3.2.2-tests.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/hadoop-nfs-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/hadoop-common-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/common/hadoop-kms-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jersey-server-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/stax2-api-3.1.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/guava-27.0-jre.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jersey-core-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-collections-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/curator-client-2.13.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerby-pkix-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerby-asn1-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/error_prone_annotations-2.2.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-text-1.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-util-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jsch-0.1.55.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/dnsjava-2.1.7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/httpclient-4.5.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jaxb-api-2.2.11.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-webapp-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-configuration2-2.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/animal-sniffer-annotations-1.17.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-io-2.5.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-server-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jaxb-impl-2.2.3-1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-mapper-asl-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-core-asl-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/httpcore-4.4.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-core-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/audience-annotations-0.5.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-beanutils-1.9.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-annotations-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-cli-1.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-xml-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/json-simple-1.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jsr305-3.0.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-math3-3.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/javax.activation-api-1.2.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-http-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/hadoop-annotations-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerby-util-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jettison-1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerby-xdr-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-util-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-codec-1.11.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/curator-recipes-2.13.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-io-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerby-config-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/hadoop-auth-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-security-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/re2j-1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/checker-qual-2.5.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/leveldbjni-all-1.8.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/nimbus-jose-jwt-7.9.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/paranamer-2.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/j2objc-annotations-1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-util-ajax-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/htrace-core4-4.1.0-incubating.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/log4j-1.2.17.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jersey-json-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/netty-all-4.1.48.Final.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/okio-1.6.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-net-3.6.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/curator-framework-2.13.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/gson-2.2.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jsr311-api-1.1.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-xc-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/netty-3.10.6.Final.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-core-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-logging-1.1.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-lang3-3.7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-databind-2.9.10.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/token-provider-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jersey-servlet-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/accessors-smart-1.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-common-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-simplekdc-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/okhttp-2.7.5.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-admin-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-server-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jcip-annotations-1.0-1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/woodstox-core-5.0.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-crypto-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/asm-5.0.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/avro-1.7.7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/failureaccess-1.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jackson-jaxrs-1.9.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/protobuf-java-2.5.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/snappy-java-1.0.5.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/javax.servlet-api-3.1.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/zookeeper-3.4.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-daemon-1.0.13.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-client-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/commons-compress-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/jetty-servlet-9.4.20.v20190813.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/json-smart-2.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/lib/kerb-identity-1.0.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-client-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-client-3.2.2-tests.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-rbf-3.2.2-tests.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-native-client-3.2.2-tests.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-nfs-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-rbf-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-httpfs-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-3.2.2-tests.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/hdfs/hadoop-hdfs-native-client-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/lib/junit-4.11.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/lib/hamcrest-core-1.3.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-examples-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-common-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-uploader-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-hs-plugins-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-nativetask-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-shuffle-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-app-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-jobclient-3.2.2-tests.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-hs-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/mapreduce/hadoop-mapreduce-client-core-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/snakeyaml-1.16.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/ehcache-3.3.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/guice-4.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/json-io-2.5.1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/jersey-guice-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/metrics-core-3.2.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/objenesis-1.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/guice-servlet-4.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/aopalliance-1.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/jackson-jaxrs-base-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/geronimo-jcache_1.0_spec-1.0-alpha-1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/jersey-client-1.19.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/mssql-jdbc-6.2.1.jre7.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/fst-2.50.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/jackson-jaxrs-json-provider-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/javax.inject-1.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/bcpkix-jdk15on-1.60.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/swagger-annotations-1.5.4.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/jackson-module-jaxb-annotations-2.9.10.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/bcprov-jdk15on-1.60.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/java-util-1.9.0.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/lib/HikariCP-java7-2.4.12.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-services-core-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-web-proxy-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-sharedcachemanager-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-nodemanager-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-resourcemanager-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-common-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-applications-distributedshell-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-applications-unmanaged-am-launcher-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-registry-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-router-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-submarine-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-applicationhistoryservice-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-api-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-client-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-timeline-pluginstorage-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-services-api-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-server-tests-3.2.2.jar:/expanse/lustre/projects/uot166/fegaras/hadoop-3.2.2/share/hadoop/yarn/hadoop-yarn-common-3.2.2.jar
+STARTUP_MSG:   build = Unknown -r 7a3bc90b05f257c8ace2f76d74264906f0f7a932; compiled by 'hexiaoqiao' on 2021-01-03T09:26Z
+STARTUP_MSG:   java = 11.0.2
+************************************************************/
+2022-02-27 23:18:17,405 INFO namenode.NameNode: registered UNIX signal handlers for [TERM, HUP, INT]
+2022-02-27 23:18:17,460 INFO namenode.NameNode: createNameNode [-format]
+2022-02-27 23:18:17,768 INFO common.Util: Assuming 'file' scheme for path /scratch/txk6771/job_10051849/namenode_data in configuration.
+2022-02-27 23:18:17,768 INFO common.Util: Assuming 'file' scheme for path /scratch/txk6771/job_10051849/namenode_data in configuration.
+Formatting using clusterid: CID-133df5b5-6b60-485d-b95b-e13d85d42b76
+2022-02-27 23:18:17,791 INFO namenode.FSEditLog: Edit logging is async:true
+2022-02-27 23:18:17,812 INFO namenode.FSNamesystem: KeyProvider: null
+2022-02-27 23:18:17,813 INFO namenode.FSNamesystem: fsLock is fair: true
+2022-02-27 23:18:17,813 INFO namenode.FSNamesystem: Detailed lock hold time metrics enabled: false
+2022-02-27 23:18:17,843 INFO namenode.FSNamesystem: fsOwner             = txk6771 (auth:SIMPLE)
+2022-02-27 23:18:17,843 INFO namenode.FSNamesystem: supergroup          = supergroup
+2022-02-27 23:18:17,843 INFO namenode.FSNamesystem: isPermissionEnabled = true
+2022-02-27 23:18:17,843 INFO namenode.FSNamesystem: HA Enabled: false
+2022-02-27 23:18:17,946 INFO common.Util: dfs.datanode.fileio.profiling.sampling.percentage set to 0. Disabling file IO profiling
+2022-02-27 23:18:17,952 INFO blockmanagement.DatanodeManager: dfs.block.invalidate.limit: configured=1000, counted=60, effected=1000
+2022-02-27 23:18:17,952 INFO blockmanagement.DatanodeManager: dfs.namenode.datanode.registration.ip-hostname-check=true
+2022-02-27 23:18:17,955 INFO blockmanagement.BlockManager: dfs.namenode.startup.delay.block.deletion.sec is set to 000:00:00:00.000
+2022-02-27 23:18:17,955 INFO blockmanagement.BlockManager: The block deletion will start around 2022 Feb 27 23:18:17
+2022-02-27 23:18:17,956 INFO util.GSet: Computing capacity for map BlocksMap
+2022-02-27 23:18:17,956 INFO util.GSet: VM type       = 64-bit
+2022-02-27 23:18:17,957 INFO util.GSet: 2.0% max memory 30.0 GB = 613.8 MB
+2022-02-27 23:18:17,957 INFO util.GSet: capacity      = 2^26 = 67108864 entries
+2022-02-27 23:18:17,989 INFO blockmanagement.BlockManager: Storage policy satisfier is disabled
+2022-02-27 23:18:17,989 INFO blockmanagement.BlockManager: dfs.block.access.token.enable = false
+2022-02-27 23:18:17,993 INFO Configuration.deprecation: No unit for dfs.namenode.safemode.extension(30000) assuming MILLISECONDS
+2022-02-27 23:18:17,993 INFO blockmanagement.BlockManagerSafeMode: dfs.namenode.safemode.threshold-pct = 0.9990000128746033
+2022-02-27 23:18:17,993 INFO blockmanagement.BlockManagerSafeMode: dfs.namenode.safemode.min.datanodes = 0
+2022-02-27 23:18:17,993 INFO blockmanagement.BlockManagerSafeMode: dfs.namenode.safemode.extension = 30000
+2022-02-27 23:18:17,994 INFO blockmanagement.BlockManager: defaultReplication         = 3
+2022-02-27 23:18:17,994 INFO blockmanagement.BlockManager: maxReplication             = 512
+2022-02-27 23:18:17,994 INFO blockmanagement.BlockManager: minReplication             = 1
+2022-02-27 23:18:17,994 INFO blockmanagement.BlockManager: maxReplicationStreams      = 2
+2022-02-27 23:18:17,994 INFO blockmanagement.BlockManager: redundancyRecheckInterval  = 3000ms
+2022-02-27 23:18:17,994 INFO blockmanagement.BlockManager: encryptDataTransfer        = false
+2022-02-27 23:18:17,994 INFO blockmanagement.BlockManager: maxNumBlocksToLog          = 1000
+2022-02-27 23:18:18,008 INFO namenode.FSDirectory: GLOBAL serial map: bits=29 maxEntries=536870911
+2022-02-27 23:18:18,008 INFO namenode.FSDirectory: USER serial map: bits=24 maxEntries=16777215
+2022-02-27 23:18:18,008 INFO namenode.FSDirectory: GROUP serial map: bits=24 maxEntries=16777215
+2022-02-27 23:18:18,008 INFO namenode.FSDirectory: XATTR serial map: bits=24 maxEntries=16777215
+2022-02-27 23:18:18,014 INFO util.GSet: Computing capacity for map INodeMap
+2022-02-27 23:18:18,014 INFO util.GSet: VM type       = 64-bit
+2022-02-27 23:18:18,015 INFO util.GSet: 1.0% max memory 30.0 GB = 306.9 MB
+2022-02-27 23:18:18,015 INFO util.GSet: capacity      = 2^25 = 33554432 entries
+2022-02-27 23:18:18,028 INFO namenode.FSDirectory: ACLs enabled? false
+2022-02-27 23:18:18,028 INFO namenode.FSDirectory: POSIX ACL inheritance enabled? true
+2022-02-27 23:18:18,028 INFO namenode.FSDirectory: XAttrs enabled? true
+2022-02-27 23:18:18,028 INFO namenode.NameNode: Caching file names occurring more than 10 times
+2022-02-27 23:18:18,033 INFO snapshot.SnapshotManager: Loaded config captureOpenFiles: false, skipCaptureAccessTimeOnlyChange: false, snapshotDiffAllowSnapRootDescendant: true, maxSnapshotLimit: 65536
+2022-02-27 23:18:18,034 INFO snapshot.SnapshotManager: SkipList is disabled
+2022-02-27 23:18:18,037 INFO util.GSet: Computing capacity for map cachedBlocks
+2022-02-27 23:18:18,037 INFO util.GSet: VM type       = 64-bit
+2022-02-27 23:18:18,037 INFO util.GSet: 0.25% max memory 30.0 GB = 76.7 MB
+2022-02-27 23:18:18,037 INFO util.GSet: capacity      = 2^23 = 8388608 entries
+2022-02-27 23:18:18,047 INFO metrics.TopMetrics: NNTop conf: dfs.namenode.top.window.num.buckets = 10
+2022-02-27 23:18:18,047 INFO metrics.TopMetrics: NNTop conf: dfs.namenode.top.num.users = 10
+2022-02-27 23:18:18,047 INFO metrics.TopMetrics: NNTop conf: dfs.namenode.top.windows.minutes = 1,5,25
+2022-02-27 23:18:18,049 INFO namenode.FSNamesystem: Retry cache on namenode is enabled
+2022-02-27 23:18:18,049 INFO namenode.FSNamesystem: Retry cache will use 0.03 of total heap and retry cache entry expiry time is 600000 millis
+2022-02-27 23:18:18,050 INFO util.GSet: Computing capacity for map NameNodeRetryCache
+2022-02-27 23:18:18,050 INFO util.GSet: VM type       = 64-bit
+2022-02-27 23:18:18,051 INFO util.GSet: 0.029999999329447746% max memory 30.0 GB = 9.2 MB
+2022-02-27 23:18:18,051 INFO util.GSet: capacity      = 2^20 = 1048576 entries
+2022-02-27 23:18:18,067 INFO namenode.FSImage: Allocated new BlockPoolId: BP-98009843-198.202.102.242-1646032698062
+2022-02-27 23:18:18,078 INFO common.Storage: Storage directory /scratch/txk6771/job_10051849/namenode_data has been successfully formatted.
+2022-02-27 23:18:18,103 INFO namenode.FSImageFormatProtobuf: Saving image file /scratch/txk6771/job_10051849/namenode_data/current/fsimage.ckpt_0000000000000000000 using no compression
+2022-02-27 23:18:18,184 INFO namenode.FSImageFormatProtobuf: Image file /scratch/txk6771/job_10051849/namenode_data/current/fsimage.ckpt_0000000000000000000 of size 402 bytes saved in 0 seconds .
+2022-02-27 23:18:18,196 INFO namenode.NNStorageRetentionManager: Going to retain 1 images with txid >= 0
+2022-02-27 23:18:18,200 INFO namenode.FSImage: FSImageSaver clean checkpoint: txid=0 when meet shutdown.
+2022-02-27 23:18:18,201 INFO namenode.NameNode: SHUTDOWN_MSG: 
+/************************************************************
+SHUTDOWN_MSG: Shutting down NameNode at exp-5-29/198.202.102.242
+************************************************************/
+myHadoop:  
+myHadoop: Enabling experimental Spark support
+myHadoop: Using SPARK_CONF_DIR=/home/txk6771/expansecluster/spark
+myHadoop:  
+To use Spark, you will want to type the following commands:"
+  source /home/txk6771/expansecluster/spark/spark-env.sh
+  myspark start
+Starting namenodes on [exp-5-29.ib.cluster]
+exp-5-29: could not open any host key
+exp-5-29: ssh_keysign: no reply
+exp-5-29: sign using hostkey ssh-ed25519 SHA256:KEXTXmxlo3gIs/Vs+uYB7GlaTcWGIOSIPMxP5lRi3rI failed
+Starting datanodes
+WARNING: HADOOP_SECURE_DN_PID_DIR has been replaced by HADOOP_SECURE_PID_DIR. Using value of HADOOP_SECURE_DN_PID_DIR.
+localhost: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+localhost: @    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+localhost: @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+localhost: IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+localhost: Someone could be eavesdropping on you right now (man-in-the-middle attack)!
+localhost: It is also possible that a host key has just been changed.
+localhost: The fingerprint for the ED25519 key sent by the remote host is
+localhost: SHA256:KEXTXmxlo3gIs/Vs+uYB7GlaTcWGIOSIPMxP5lRi3rI.
+localhost: Please contact your system administrator.
+localhost: Add correct host key in /home/txk6771/.ssh/known_hosts to get rid of this message.
+localhost: Offending ED25519 key in /home/txk6771/.ssh/known_hosts:1
+localhost: Password authentication is disabled to avoid man-in-the-middle attacks.
+localhost: Keyboard-interactive authentication is disabled to avoid man-in-the-middle attacks.
+localhost: could not open any host key
+localhost: ssh_keysign: no reply
+localhost: sign using hostkey ssh-ed25519 SHA256:KEXTXmxlo3gIs/Vs+uYB7GlaTcWGIOSIPMxP5lRi3rI failed
+localhost: WARNING: HADOOP_SECURE_DN_PID_DIR has been replaced by HADOOP_SECURE_PID_DIR. Using value of HADOOP_SECURE_DN_PID_DIR.
+Starting secondary namenodes [exp-5-29.ib.cluster]
+exp-5-29: could not open any host key
+exp-5-29: ssh_keysign: no reply
+exp-5-29: sign using hostkey ssh-ed25519 SHA256:KEXTXmxlo3gIs/Vs+uYB7GlaTcWGIOSIPMxP5lRi3rI failed
+mySpark: Using /home/txk6771/expansecluster/spark/slaves as our slaves file
+mySpark: Reading in /home/txk6771/expansecluster/spark/spark-env.sh as our slaves file
+starting org.apache.spark.deploy.master.Master, logging to /scratch/txk6771/job_10051849/logs/spark-txk6771-org.apache.spark.deploy.master.Master-1-exp-5-29.out
+mySpark: Starting worker on exp-5-29.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark start org.apache.spark.deploy.worker.Worker 1 spark://exp-5-29.ib.cluster:7077
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:KEXTXmxlo3gIs/Vs+uYB7GlaTcWGIOSIPMxP5lRi3rI failed
+starting org.apache.spark.deploy.worker.Worker, logging to /scratch/txk6771/job_10051849/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-5-29.out
+mySpark: Starting worker on exp-5-30.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark start org.apache.spark.deploy.worker.Worker 1 spark://exp-5-29.ib.cluster:7077
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:KEXTXmxlo3gIs/Vs+uYB7GlaTcWGIOSIPMxP5lRi3rI failed
+starting org.apache.spark.deploy.worker.Worker, logging to /scratch/txk6771/job_10051849/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-5-30.out
+mySpark: Starting worker on exp-5-31.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark start org.apache.spark.deploy.worker.Worker 1 spark://exp-5-29.ib.cluster:7077
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:KEXTXmxlo3gIs/Vs+uYB7GlaTcWGIOSIPMxP5lRi3rI failed
+starting org.apache.spark.deploy.worker.Worker, logging to /scratch/txk6771/job_10051849/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-5-31.out
+mySpark: Starting worker on exp-5-32.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark start org.apache.spark.deploy.worker.Worker 1 spark://exp-5-29.ib.cluster:7077
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:KEXTXmxlo3gIs/Vs+uYB7GlaTcWGIOSIPMxP5lRi3rI failed
+starting org.apache.spark.deploy.worker.Worker, logging to /scratch/txk6771/job_10051849/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-5-32.out
+mySpark: Starting worker on exp-5-33.ib.cluster:
+  /expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/sbin/spark-daemon.sh --config /home/txk6771/expansecluster/spark start org.apache.spark.deploy.worker.Worker 1 spark://exp-5-29.ib.cluster:7077
+could not open any host key
+ssh_keysign: no reply
+sign using hostkey ssh-ed25519 SHA256:KEXTXmxlo3gIs/Vs+uYB7GlaTcWGIOSIPMxP5lRi3rI failed
+starting org.apache.spark.deploy.worker.Worker, logging to /scratch/txk6771/job_10051849/logs/spark-txk6771-org.apache.spark.deploy.worker.Worker-1-exp-5-33.out
+WARNING: An illegal reflective access operation has occurred
+WARNING: Illegal reflective access by org.apache.spark.unsafe.Platform (file:/expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/jars/spark-unsafe_2.12-3.1.2.jar) to constructor java.nio.DirectByteBuffer(long,int)
+WARNING: Please consider reporting this to the maintainers of org.apache.spark.unsafe.Platform
+WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
+WARNING: All illegal access operations will be denied in a future release
+2022-02-27 23:18:56,762 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2022-02-27 23:18:57,034 INFO spark.SparkContext: Running Spark version 3.1.2
+2022-02-27 23:18:57,065 INFO resource.ResourceUtils: ==============================================================
+2022-02-27 23:18:57,065 INFO resource.ResourceUtils: No custom resources configured for spark.driver.
+2022-02-27 23:18:57,065 INFO resource.ResourceUtils: ==============================================================
+2022-02-27 23:18:57,066 INFO spark.SparkContext: Submitted application: add
+2022-02-27 23:18:57,082 INFO resource.ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 12, script: , vendor: , memory -> name: memory, amount: 24576, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
+2022-02-27 23:18:57,108 INFO resource.ResourceProfile: Limiting resource is cpus at 12 tasks per executor
+2022-02-27 23:18:57,110 INFO resource.ResourceProfileManager: Added ResourceProfile id: 0
+2022-02-27 23:18:57,143 INFO spark.SecurityManager: Changing view acls to: txk6771
+2022-02-27 23:18:57,144 INFO spark.SecurityManager: Changing modify acls to: txk6771
+2022-02-27 23:18:57,144 INFO spark.SecurityManager: Changing view acls groups to: 
+2022-02-27 23:18:57,144 INFO spark.SecurityManager: Changing modify acls groups to: 
+2022-02-27 23:18:57,144 INFO spark.SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users  with view permissions: Set(txk6771); groups with view permissions: Set(); users  with modify permissions: Set(txk6771); groups with modify permissions: Set()
+2022-02-27 23:18:57,398 INFO util.Utils: Successfully started service 'sparkDriver' on port 46807.
+2022-02-27 23:18:57,421 INFO spark.SparkEnv: Registering MapOutputTracker
+2022-02-27 23:18:57,445 INFO spark.SparkEnv: Registering BlockManagerMaster
+2022-02-27 23:18:57,458 INFO storage.BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+2022-02-27 23:18:57,458 INFO storage.BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+2022-02-27 23:18:57,462 INFO spark.SparkEnv: Registering BlockManagerMasterHeartbeat
+2022-02-27 23:18:57,472 INFO storage.DiskBlockManager: Created local directory at /scratch/txk6771/job_10051849/blockmgr-54c9e9ab-6861-4075-a60b-7b8999a504f8
+2022-02-27 23:18:57,498 INFO memory.MemoryStore: MemoryStore started with capacity 14.2 GiB
+2022-02-27 23:18:57,512 INFO spark.SparkEnv: Registering OutputCommitCoordinator
+2022-02-27 23:18:57,583 INFO util.log: Logging initialized @2026ms to org.sparkproject.jetty.util.log.Slf4jLog
+2022-02-27 23:18:57,637 INFO server.Server: jetty-9.4.40.v20210413; built: 2021-04-13T20:42:42.668Z; git: b881a572662e1943a14ae12e7e1207989f218b74; jvm 11.0.2+9
+2022-02-27 23:18:57,656 INFO server.Server: Started @2100ms
+2022-02-27 23:18:57,692 INFO server.AbstractConnector: Started ServerConnector@7c12c9de{HTTP/1.1, (http/1.1)}{exp-5-29.ib.cluster:4040}
+2022-02-27 23:18:57,692 INFO util.Utils: Successfully started service 'SparkUI' on port 4040.
+2022-02-27 23:18:57,712 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@1e8ab90f{/jobs,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,714 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@1229a2b7{/jobs/json,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,714 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@51c959a4{/jobs/job,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,717 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@43045f9f{/jobs/job/json,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,718 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@6403e24c{/stages,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,718 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@4eba373c{/stages/json,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,719 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@d109c4f{/stages/stage,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,721 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@70228253{/stages/stage/json,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,721 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@21bd20ee{/stages/pool,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,722 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@421056e5{/stages/pool/json,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,723 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@60bbacfc{/storage,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,723 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@255eaa6b{/storage/json,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,724 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@7a0e7ecd{/storage/rdd,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,724 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@43e9089{/storage/rdd/json,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,725 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@352c44a8{/environment,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,726 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@a66e580{/environment/json,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,726 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@cdb2d95{/executors,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,727 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@2f5ac102{/executors/json,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,728 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@895416d{/executors/threadDump,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,730 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@80bfdc6{/executors/threadDump/json,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,737 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@4c6007fb{/static,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,738 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@79b84841{/,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,739 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@3c87e6b7{/api,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,739 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@25ad4f71{/jobs/job/kill,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,740 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@6f94a5a5{/stages/stage/kill,null,AVAILABLE,@Spark}
+2022-02-27 23:18:57,741 INFO ui.SparkUI: Bound SparkUI to exp-5-29.ib.cluster, and started at http://exp-5-29.ib.cluster:4040
+2022-02-27 23:18:57,760 INFO spark.SparkContext: Added JAR file:///home/txk6771/Diablo/diablo/lib/diablo.jar at spark://exp-5-29.ib.cluster:46807/jars/diablo.jar with timestamp 1646032737028
+2022-02-27 23:18:57,760 INFO spark.SparkContext: Added JAR file:/home/txk6771/Diablo/diablo/benchmarks/test.jar at spark://exp-5-29.ib.cluster:46807/jars/test.jar with timestamp 1646032737028
+2022-02-27 23:18:57,931 INFO client.StandaloneAppClient$ClientEndpoint: Connecting to master spark://exp-5-29.ib.cluster:7077...
+2022-02-27 23:18:57,979 INFO client.TransportClientFactory: Successfully created connection to exp-5-29.ib.cluster/10.22.5.29:7077 after 26 ms (0 ms spent in bootstraps)
+2022-02-27 23:18:58,104 INFO cluster.StandaloneSchedulerBackend: Connected to Spark cluster with app ID app-20220227231858-0000
+2022-02-27 23:18:58,112 INFO util.Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 35603.
+2022-02-27 23:18:58,112 INFO netty.NettyBlockTransferService: Server created on exp-5-29.ib.cluster:35603
+2022-02-27 23:18:58,114 INFO storage.BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+2022-02-27 23:18:58,119 INFO storage.BlockManagerMaster: Registering BlockManager BlockManagerId(driver, exp-5-29.ib.cluster, 35603, None)
+2022-02-27 23:18:58,122 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/0 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:18:58,123 INFO storage.BlockManagerMasterEndpoint: Registering block manager exp-5-29.ib.cluster:35603 with 14.2 GiB RAM, BlockManagerId(driver, exp-5-29.ib.cluster, 35603, None)
+2022-02-27 23:18:58,125 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/0 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,125 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/1 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:18:58,126 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/1 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,126 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/2 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:18:58,127 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/2 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,127 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/3 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:18:58,127 INFO storage.BlockManagerMaster: Registered BlockManager BlockManagerId(driver, exp-5-29.ib.cluster, 35603, None)
+2022-02-27 23:18:58,127 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/3 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,127 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/4 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:18:58,128 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/4 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,128 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/5 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:18:58,128 INFO storage.BlockManager: Initialized BlockManager: BlockManagerId(driver, exp-5-29.ib.cluster, 35603, None)
+2022-02-27 23:18:58,128 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/5 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,128 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/6 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:18:58,129 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/6 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,129 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/7 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:18:58,129 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/7 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,129 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/8 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:18:58,129 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/8 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,129 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/9 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:18:58,130 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/9 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,130 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/10 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:18:58,131 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/10 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,131 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/11 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:18:58,131 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/11 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,131 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/12 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:18:58,132 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/12 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,132 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/13 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:18:58,132 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/13 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,132 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/14 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:18:58,132 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/14 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,132 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/15 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:18:58,133 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/15 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,133 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/16 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:18:58,133 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/16 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,133 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/17 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:18:58,133 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/17 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,134 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/18 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:18:58,134 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/18 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,134 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/19 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:18:58,134 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/19 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,134 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/20 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:18:58,135 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/20 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,135 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/21 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:18:58,135 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/21 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,135 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/22 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:18:58,135 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/22 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,135 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/23 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:18:58,136 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/23 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,136 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/24 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:18:58,136 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/24 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,136 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/25 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:18:58,136 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/25 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,137 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/26 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:18:58,137 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/26 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,137 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/27 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:18:58,137 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/27 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,137 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/28 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:18:58,138 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/28 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,138 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/29 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:18:58,138 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/29 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,138 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/30 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:18:58,138 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/30 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,138 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/31 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:18:58,139 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/31 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,139 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/32 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:18:58,139 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/32 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,139 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/33 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:18:58,139 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/33 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,139 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/34 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:18:58,140 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/34 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,140 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/35 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:18:58,140 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/35 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,140 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/36 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:18:58,140 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/36 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,140 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/37 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:18:58,140 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/37 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,141 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/38 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:18:58,141 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/38 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,141 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/39 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:18:58,141 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/39 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,141 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/40 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:18:58,141 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/40 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,141 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/41 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:18:58,142 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/41 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,142 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/42 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:18:58,142 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/42 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,142 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/43 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:18:58,142 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/43 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,142 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/44 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:18:58,142 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/44 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,142 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/45 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:18:58,143 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/45 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,143 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/46 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:18:58,143 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/46 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,143 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/47 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:18:58,143 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/47 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,143 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/48 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:18:58,143 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/48 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,143 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227231858-0000/49 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:18:58,144 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227231858-0000/49 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:18:58,261 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@32a2a6be{/metrics/json,null,AVAILABLE,@Spark}
+2022-02-27 23:18:58,263 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/14 is now RUNNING
+2022-02-27 23:18:58,263 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/5 is now RUNNING
+2022-02-27 23:18:58,265 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/10 is now RUNNING
+2022-02-27 23:18:58,266 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/2 is now RUNNING
+2022-02-27 23:18:58,267 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/19 is now RUNNING
+2022-02-27 23:18:58,268 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/37 is now RUNNING
+2022-02-27 23:18:58,273 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/3 is now RUNNING
+2022-02-27 23:18:58,276 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/30 is now RUNNING
+2022-02-27 23:18:58,279 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/18 is now RUNNING
+2022-02-27 23:18:58,281 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/1 is now RUNNING
+2022-02-27 23:18:58,284 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/39 is now RUNNING
+2022-02-27 23:18:58,287 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/11 is now RUNNING
+2022-02-27 23:18:58,288 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/8 is now RUNNING
+2022-02-27 23:18:58,289 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/13 is now RUNNING
+2022-02-27 23:18:58,290 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/31 is now RUNNING
+2022-02-27 23:18:58,291 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/17 is now RUNNING
+2022-02-27 23:18:58,293 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/33 is now RUNNING
+2022-02-27 23:18:58,294 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/0 is now RUNNING
+2022-02-27 23:18:58,296 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/16 is now RUNNING
+2022-02-27 23:18:58,297 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/36 is now RUNNING
+2022-02-27 23:18:58,299 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/15 is now RUNNING
+2022-02-27 23:18:58,300 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/9 is now RUNNING
+2022-02-27 23:18:58,300 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/38 is now RUNNING
+2022-02-27 23:18:58,301 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/12 is now RUNNING
+2022-02-27 23:18:58,302 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/6 is now RUNNING
+2022-02-27 23:18:58,302 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/32 is now RUNNING
+2022-02-27 23:18:58,303 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/35 is now RUNNING
+2022-02-27 23:18:58,303 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/7 is now RUNNING
+2022-02-27 23:18:58,304 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/34 is now RUNNING
+2022-02-27 23:18:58,304 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/4 is now RUNNING
+2022-02-27 23:18:58,305 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/23 is now RUNNING
+2022-02-27 23:18:58,305 INFO cluster.StandaloneSchedulerBackend: SchedulerBackend is ready for scheduling beginning after reached minRegisteredResourcesRatio: 0.0
+2022-02-27 23:18:58,305 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/25 is now RUNNING
+2022-02-27 23:18:58,306 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/44 is now RUNNING
+2022-02-27 23:18:58,306 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/28 is now RUNNING
+2022-02-27 23:18:58,307 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/21 is now RUNNING
+2022-02-27 23:18:58,307 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/41 is now RUNNING
+2022-02-27 23:18:58,307 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/26 is now RUNNING
+2022-02-27 23:18:58,308 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/40 is now RUNNING
+2022-02-27 23:18:58,308 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/29 is now RUNNING
+2022-02-27 23:18:58,308 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/45 is now RUNNING
+2022-02-27 23:18:58,309 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/20 is now RUNNING
+2022-02-27 23:18:58,309 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/27 is now RUNNING
+2022-02-27 23:18:58,310 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/48 is now RUNNING
+2022-02-27 23:18:58,310 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/24 is now RUNNING
+2022-02-27 23:18:58,310 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/49 is now RUNNING
+2022-02-27 23:18:58,311 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/42 is now RUNNING
+2022-02-27 23:18:58,311 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/22 is now RUNNING
+2022-02-27 23:18:58,311 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/43 is now RUNNING
+2022-02-27 23:18:58,312 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/47 is now RUNNING
+2022-02-27 23:18:58,312 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227231858-0000/46 is now RUNNING
+2022-02-27 23:18:58,319 WARN spark.SparkContext: Using an existing SparkContext; some configuration may not take effect.
+@@@ number of tiles: 10*10 = 100
+@@@@ dense matrix size: 0.75 GB
+@@@@ sparse matrix size: 572.00 MB
+Try: 1/1 time: 3.033
+Try: 2/2 time: 2.73
+Try: 3/3 time: 2.519
+Try: 4/4 time: 2.913
+*** MLlib Add dense-dense cores=128 n=10000 m=10000 N=1000 tries=4 2.721 secs
+Try: 1/1 time: 33.02
+Try: 2/2 time: 32.519
+Try: 3/3 time: 32.597
+Try: 4/4 time: 32.428
+*** MLlib Add sparse-dense cores=128 n=10000 m=10000 N=1000 tries=4 32.515 secs
+Try: 1/1 time: 0.548
+Try: 2/2 time: 0.642
+Try: 3/3 time: 0.371
+Try: 4/4 time: 0.306
+*** MLlib Add sparse-sparse cores=128 n=10000 m=10000 N=1000 tries=4 0.440 secs
+Try: 1/1 time: 2.228
+Try: 2/2 time: 1.596
+Try: 3/3 time: 1.598
+Try: 4/4 time: 1.471
+*** DIABLO Add dense-dense giving dense cores=128 n=10000 m=10000 N=1000 tries=4 1.555 secs
+Try: 1/1 time: 2.187
+Try: 2/2 time: 1.251
+Try: 3/3 time: 1.298
+Try: 4/4 time: 1.069
+*** DIABLO Add sparse-dense giving dense cores=128 n=10000 m=10000 N=1000 tries=4 1.206 secs
+Try: 1/1 time: 1.886
+Try: 2/2 time: 0.533
+Try: 3/3 time: 0.266
+Try: 4/4 time: 0.284
+*** DIABLO Add sparse-sparse giving dense cores=128 n=10000 m=10000 N=1000 tries=4 0.361 secs
+Try: 1/1 time: 2.082
+Try: 2/2 time: 1.865
+Try: 3/3 time: 1.481
+Try: 4/4 time: 1.493
+*** DIABLO Add dense-dense giving sparse cores=128 n=10000 m=10000 N=1000 tries=4 1.613 secs
+Try: 1/1 time: 1.547
+Try: 2/2 time: 1.224
+Try: 3/3 time: 1.182
+Try: 4/4 time: 1.077
+*** DIABLO Add sparse-dense giving sparse cores=128 n=10000 m=10000 N=1000 tries=4 1.161 secs
+Try: 1/1 time: 1.078
+Try: 2/2 time: 0.497
+Try: 3/3 time: 0.458
+Try: 4/4 time: 0.331
+*** DIABLO Add sparse-sparse giving sparse cores=128 n=10000 m=10000 N=1000 tries=4 0.429 secs
+WARNING: An illegal reflective access operation has occurred
+WARNING: Illegal reflective access by org.apache.spark.unsafe.Platform (file:/expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/jars/spark-unsafe_2.12-3.1.2.jar) to constructor java.nio.DirectByteBuffer(long,int)
+WARNING: Please consider reporting this to the maintainers of org.apache.spark.unsafe.Platform
+WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
+WARNING: All illegal access operations will be denied in a future release
+2022-02-27 23:26:40,370 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2022-02-27 23:26:40,626 INFO spark.SparkContext: Running Spark version 3.1.2
+2022-02-27 23:26:40,657 INFO resource.ResourceUtils: ==============================================================
+2022-02-27 23:26:40,657 INFO resource.ResourceUtils: No custom resources configured for spark.driver.
+2022-02-27 23:26:40,657 INFO resource.ResourceUtils: ==============================================================
+2022-02-27 23:26:40,658 INFO spark.SparkContext: Submitted application: add
+2022-02-27 23:26:40,674 INFO resource.ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 12, script: , vendor: , memory -> name: memory, amount: 24576, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
+2022-02-27 23:26:40,699 INFO resource.ResourceProfile: Limiting resource is cpus at 12 tasks per executor
+2022-02-27 23:26:40,700 INFO resource.ResourceProfileManager: Added ResourceProfile id: 0
+2022-02-27 23:26:40,733 INFO spark.SecurityManager: Changing view acls to: txk6771
+2022-02-27 23:26:40,733 INFO spark.SecurityManager: Changing modify acls to: txk6771
+2022-02-27 23:26:40,733 INFO spark.SecurityManager: Changing view acls groups to: 
+2022-02-27 23:26:40,733 INFO spark.SecurityManager: Changing modify acls groups to: 
+2022-02-27 23:26:40,733 INFO spark.SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users  with view permissions: Set(txk6771); groups with view permissions: Set(); users  with modify permissions: Set(txk6771); groups with modify permissions: Set()
+2022-02-27 23:26:40,952 INFO util.Utils: Successfully started service 'sparkDriver' on port 40271.
+2022-02-27 23:26:40,974 INFO spark.SparkEnv: Registering MapOutputTracker
+2022-02-27 23:26:40,998 INFO spark.SparkEnv: Registering BlockManagerMaster
+2022-02-27 23:26:41,011 INFO storage.BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+2022-02-27 23:26:41,012 INFO storage.BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+2022-02-27 23:26:41,015 INFO spark.SparkEnv: Registering BlockManagerMasterHeartbeat
+2022-02-27 23:26:41,025 INFO storage.DiskBlockManager: Created local directory at /scratch/txk6771/job_10051849/blockmgr-807b4ea6-30a3-4916-a226-447e6ef70970
+2022-02-27 23:26:41,054 INFO memory.MemoryStore: MemoryStore started with capacity 14.2 GiB
+2022-02-27 23:26:41,079 INFO spark.SparkEnv: Registering OutputCommitCoordinator
+2022-02-27 23:26:41,159 INFO util.log: Logging initialized @1932ms to org.sparkproject.jetty.util.log.Slf4jLog
+2022-02-27 23:26:41,209 INFO server.Server: jetty-9.4.40.v20210413; built: 2021-04-13T20:42:42.668Z; git: b881a572662e1943a14ae12e7e1207989f218b74; jvm 11.0.2+9
+2022-02-27 23:26:41,225 INFO server.Server: Started @1998ms
+2022-02-27 23:26:41,261 INFO server.AbstractConnector: Started ServerConnector@6886862f{HTTP/1.1, (http/1.1)}{exp-5-29.ib.cluster:4040}
+2022-02-27 23:26:41,261 INFO util.Utils: Successfully started service 'SparkUI' on port 4040.
+2022-02-27 23:26:41,280 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@1e8ab90f{/jobs,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,282 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@1229a2b7{/jobs/json,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,282 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@51c959a4{/jobs/job,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,285 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@43045f9f{/jobs/job/json,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,285 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@6403e24c{/stages,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,286 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@4eba373c{/stages/json,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,287 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@d109c4f{/stages/stage,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,288 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@70228253{/stages/stage/json,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,289 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@21bd20ee{/stages/pool,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,290 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@421056e5{/stages/pool/json,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,290 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@60bbacfc{/storage,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,291 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@255eaa6b{/storage/json,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,292 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@7a0e7ecd{/storage/rdd,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,292 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@43e9089{/storage/rdd/json,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,293 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@352c44a8{/environment,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,293 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@a66e580{/environment/json,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,294 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@cdb2d95{/executors,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,295 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@2f5ac102{/executors/json,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,295 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@895416d{/executors/threadDump,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,297 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@80bfdc6{/executors/threadDump/json,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,304 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@4c6007fb{/static,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,305 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@79b84841{/,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,306 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@3c87e6b7{/api,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,306 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@25ad4f71{/jobs/job/kill,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,307 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@6f94a5a5{/stages/stage/kill,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,308 INFO ui.SparkUI: Bound SparkUI to exp-5-29.ib.cluster, and started at http://exp-5-29.ib.cluster:4040
+2022-02-27 23:26:41,325 INFO spark.SparkContext: Added JAR file:///home/txk6771/Diablo/diablo/lib/diablo.jar at spark://exp-5-29.ib.cluster:40271/jars/diablo.jar with timestamp 1646033200619
+2022-02-27 23:26:41,326 INFO spark.SparkContext: Added JAR file:/home/txk6771/Diablo/diablo/benchmarks/test.jar at spark://exp-5-29.ib.cluster:40271/jars/test.jar with timestamp 1646033200619
+2022-02-27 23:26:41,484 INFO client.StandaloneAppClient$ClientEndpoint: Connecting to master spark://exp-5-29.ib.cluster:7077...
+2022-02-27 23:26:41,527 INFO client.TransportClientFactory: Successfully created connection to exp-5-29.ib.cluster/10.22.5.29:7077 after 24 ms (0 ms spent in bootstraps)
+2022-02-27 23:26:41,611 INFO cluster.StandaloneSchedulerBackend: Connected to Spark cluster with app ID app-20220227232641-0001
+2022-02-27 23:26:41,613 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/0 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:26:41,615 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/0 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,615 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/1 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:26:41,616 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/1 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,616 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/2 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:26:41,616 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/2 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,616 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/3 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:26:41,617 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/3 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,617 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/4 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:26:41,617 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/4 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,617 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/5 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:26:41,618 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/5 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,618 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/6 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:26:41,618 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/6 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,619 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/7 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:26:41,620 INFO util.Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 37983.
+2022-02-27 23:26:41,620 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/7 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,620 INFO netty.NettyBlockTransferService: Server created on exp-5-29.ib.cluster:37983
+2022-02-27 23:26:41,621 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/8 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:26:41,621 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/8 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,621 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/9 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:26:41,621 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/9 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,621 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/10 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:26:41,622 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/10 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,622 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/11 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:26:41,622 INFO storage.BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+2022-02-27 23:26:41,622 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/11 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,622 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/12 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:26:41,622 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/12 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,622 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/13 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:26:41,623 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/13 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,623 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/14 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:26:41,623 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/14 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,623 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/15 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:26:41,623 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/15 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,623 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/16 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:26:41,624 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/16 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,624 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/17 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:26:41,624 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/17 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,624 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/18 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:26:41,624 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/18 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,625 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/19 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:26:41,625 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/19 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,625 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/20 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:26:41,625 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/20 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,625 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/21 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:26:41,625 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/21 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,626 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/22 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:26:41,626 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/22 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,626 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/23 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:26:41,626 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/23 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,626 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/24 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:26:41,627 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/24 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,627 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/25 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:26:41,627 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/25 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,627 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/26 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:26:41,627 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/26 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,627 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/27 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:26:41,627 INFO storage.BlockManagerMaster: Registering BlockManager BlockManagerId(driver, exp-5-29.ib.cluster, 37983, None)
+2022-02-27 23:26:41,627 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/27 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,628 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/28 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:26:41,628 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/28 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,628 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/29 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:26:41,628 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/29 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,628 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/30 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:26:41,628 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/30 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,629 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/31 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:26:41,629 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/31 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,629 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/32 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:26:41,630 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/32 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,630 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/33 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:26:41,630 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/33 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,630 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/34 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:26:41,630 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/34 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,630 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/35 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:26:41,630 INFO storage.BlockManagerMasterEndpoint: Registering block manager exp-5-29.ib.cluster:37983 with 14.2 GiB RAM, BlockManagerId(driver, exp-5-29.ib.cluster, 37983, None)
+2022-02-27 23:26:41,631 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/35 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,631 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/36 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:26:41,631 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/36 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,631 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/37 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:26:41,632 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/37 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,632 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/38 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:26:41,632 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/38 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,632 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/39 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:26:41,632 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/39 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,632 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/40 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:26:41,633 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/40 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,633 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/41 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:26:41,633 INFO storage.BlockManagerMaster: Registered BlockManager BlockManagerId(driver, exp-5-29.ib.cluster, 37983, None)
+2022-02-27 23:26:41,633 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/41 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,633 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/42 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:26:41,633 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/42 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,634 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/43 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:26:41,634 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/43 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,634 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/44 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:26:41,634 INFO storage.BlockManager: Initialized BlockManager: BlockManagerId(driver, exp-5-29.ib.cluster, 37983, None)
+2022-02-27 23:26:41,634 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/44 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,634 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/45 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:26:41,634 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/45 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,634 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/46 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:26:41,634 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/46 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,635 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/47 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:26:41,635 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/47 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,635 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/48 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:26:41,635 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/48 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,635 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227232641-0001/49 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:26:41,635 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227232641-0001/49 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:26:41,640 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/20 is now RUNNING
+2022-02-27 23:26:41,641 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/24 is now RUNNING
+2022-02-27 23:26:41,642 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/21 is now RUNNING
+2022-02-27 23:26:41,643 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/10 is now RUNNING
+2022-02-27 23:26:41,645 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/25 is now RUNNING
+2022-02-27 23:26:41,645 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/12 is now RUNNING
+2022-02-27 23:26:41,647 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/28 is now RUNNING
+2022-02-27 23:26:41,648 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/11 is now RUNNING
+2022-02-27 23:26:41,648 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/14 is now RUNNING
+2022-02-27 23:26:41,649 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/15 is now RUNNING
+2022-02-27 23:26:41,650 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/16 is now RUNNING
+2022-02-27 23:26:41,651 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/22 is now RUNNING
+2022-02-27 23:26:41,651 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/29 is now RUNNING
+2022-02-27 23:26:41,652 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/27 is now RUNNING
+2022-02-27 23:26:41,653 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/23 is now RUNNING
+2022-02-27 23:26:41,655 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/26 is now RUNNING
+2022-02-27 23:26:41,656 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/13 is now RUNNING
+2022-02-27 23:26:41,656 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/18 is now RUNNING
+2022-02-27 23:26:41,657 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/17 is now RUNNING
+2022-02-27 23:26:41,658 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/2 is now RUNNING
+2022-02-27 23:26:41,658 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/19 is now RUNNING
+2022-02-27 23:26:41,659 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/3 is now RUNNING
+2022-02-27 23:26:41,659 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/0 is now RUNNING
+2022-02-27 23:26:41,659 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/5 is now RUNNING
+2022-02-27 23:26:41,660 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/1 is now RUNNING
+2022-02-27 23:26:41,660 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/6 is now RUNNING
+2022-02-27 23:26:41,661 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/30 is now RUNNING
+2022-02-27 23:26:41,661 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/33 is now RUNNING
+2022-02-27 23:26:41,662 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/31 is now RUNNING
+2022-02-27 23:26:41,662 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/7 is now RUNNING
+2022-02-27 23:26:41,663 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/32 is now RUNNING
+2022-02-27 23:26:41,664 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/35 is now RUNNING
+2022-02-27 23:26:41,664 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/36 is now RUNNING
+2022-02-27 23:26:41,664 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/37 is now RUNNING
+2022-02-27 23:26:41,665 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/40 is now RUNNING
+2022-02-27 23:26:41,665 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/42 is now RUNNING
+2022-02-27 23:26:41,665 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/41 is now RUNNING
+2022-02-27 23:26:41,666 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/43 is now RUNNING
+2022-02-27 23:26:41,666 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/44 is now RUNNING
+2022-02-27 23:26:41,666 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/48 is now RUNNING
+2022-02-27 23:26:41,667 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/45 is now RUNNING
+2022-02-27 23:26:41,667 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/34 is now RUNNING
+2022-02-27 23:26:41,667 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/8 is now RUNNING
+2022-02-27 23:26:41,668 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/9 is now RUNNING
+2022-02-27 23:26:41,668 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/4 is now RUNNING
+2022-02-27 23:26:41,668 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/39 is now RUNNING
+2022-02-27 23:26:41,669 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/49 is now RUNNING
+2022-02-27 23:26:41,669 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/46 is now RUNNING
+2022-02-27 23:26:41,669 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/47 is now RUNNING
+2022-02-27 23:26:41,670 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227232641-0001/38 is now RUNNING
+2022-02-27 23:26:41,758 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@32a2a6be{/metrics/json,null,AVAILABLE,@Spark}
+2022-02-27 23:26:41,803 INFO cluster.StandaloneSchedulerBackend: SchedulerBackend is ready for scheduling beginning after reached minRegisteredResourcesRatio: 0.0
+2022-02-27 23:26:41,813 WARN spark.SparkContext: Using an existing SparkContext; some configuration may not take effect.
+@@@ number of tiles: 20*20 = 400
+@@@@ dense matrix size: 2.98 GB
+@@@@ sparse matrix size: 2285.54 MB
+Try: 1/1 time: 9.764
+Try: 2/2 time: 9.23
+Try: 3/3 time: 8.681
+Try: 4/4 time: 8.752
+*** MLlib Add dense-dense cores=128 n=20000 m=20000 N=1000 tries=4 8.888 secs
+Try: 1/1 time: 61.4
+Try: 2/2 time: 48.345
+Try: 3/3 time: 48.782
+Try: 4/4 time: 48.629
+*** MLlib Add sparse-dense cores=128 n=20000 m=20000 N=1000 tries=4 48.585 secs
+Try: 1/1 time: 0.817
+Try: 2/2 time: 0.496
+Try: 3/3 time: 0.456
+Try: 4/4 time: 0.52
+*** MLlib Add sparse-sparse cores=128 n=20000 m=20000 N=1000 tries=4 0.491 secs
+Try: 1/1 time: 6.474
+Try: 2/2 time: 5.195
+Try: 3/3 time: 4.97
+Try: 4/4 time: 5.611
+*** DIABLO Add dense-dense giving dense cores=128 n=20000 m=20000 N=1000 tries=4 5.259 secs
+Try: 1/1 time: 5.755
+Try: 2/2 time: 4.015
+Try: 3/3 time: 4.123
+Try: 4/4 time: 4.092
+*** DIABLO Add sparse-dense giving dense cores=128 n=20000 m=20000 N=1000 tries=4 4.077 secs
+Try: 1/1 time: 2.354
+Try: 2/2 time: 0.789
+Try: 3/3 time: 0.801
+Try: 4/4 time: 0.799
+*** DIABLO Add sparse-sparse giving dense cores=128 n=20000 m=20000 N=1000 tries=4 0.796 secs
+Try: 1/1 time: 5.568
+Try: 2/2 time: 5.189
+Try: 3/3 time: 5.59
+Try: 4/4 time: 5.707
+*** DIABLO Add dense-dense giving sparse cores=128 n=20000 m=20000 N=1000 tries=4 5.495 secs
+Try: 1/1 time: 4.633
+Try: 2/2 time: 4.304
+Try: 3/3 time: 4.526
+Try: 4/4 time: 4.42
+*** DIABLO Add sparse-dense giving sparse cores=128 n=20000 m=20000 N=1000 tries=4 4.417 secs
+Try: 1/1 time: 1.612
+Try: 2/2 time: 0.921
+Try: 3/3 time: 0.93
+Try: 4/4 time: 1.058
+*** DIABLO Add sparse-sparse giving sparse cores=128 n=20000 m=20000 N=1000 tries=4 0.970 secs
+WARNING: An illegal reflective access operation has occurred
+WARNING: Illegal reflective access by org.apache.spark.unsafe.Platform (file:/expanse/lustre/projects/uot166/fegaras/spark-3.1.2-bin-hadoop3.2/jars/spark-unsafe_2.12-3.1.2.jar) to constructor java.nio.DirectByteBuffer(long,int)
+WARNING: Please consider reporting this to the maintainers of org.apache.spark.unsafe.Platform
+WARNING: Use --illegal-access=warn to enable warnings of further illegal reflective access operations
+WARNING: All illegal access operations will be denied in a future release
+2022-02-27 23:45:17,049 WARN util.NativeCodeLoader: Unable to load native-hadoop library for your platform... using builtin-java classes where applicable
+2022-02-27 23:45:17,294 INFO spark.SparkContext: Running Spark version 3.1.2
+2022-02-27 23:45:17,320 INFO resource.ResourceUtils: ==============================================================
+2022-02-27 23:45:17,321 INFO resource.ResourceUtils: No custom resources configured for spark.driver.
+2022-02-27 23:45:17,321 INFO resource.ResourceUtils: ==============================================================
+2022-02-27 23:45:17,321 INFO spark.SparkContext: Submitted application: add
+2022-02-27 23:45:17,337 INFO resource.ResourceProfile: Default ResourceProfile created, executor resources: Map(cores -> name: cores, amount: 12, script: , vendor: , memory -> name: memory, amount: 24576, script: , vendor: , offHeap -> name: offHeap, amount: 0, script: , vendor: ), task resources: Map(cpus -> name: cpus, amount: 1.0)
+2022-02-27 23:45:17,352 INFO resource.ResourceProfile: Limiting resource is cpus at 12 tasks per executor
+2022-02-27 23:45:17,354 INFO resource.ResourceProfileManager: Added ResourceProfile id: 0
+2022-02-27 23:45:17,386 INFO spark.SecurityManager: Changing view acls to: txk6771
+2022-02-27 23:45:17,386 INFO spark.SecurityManager: Changing modify acls to: txk6771
+2022-02-27 23:45:17,386 INFO spark.SecurityManager: Changing view acls groups to: 
+2022-02-27 23:45:17,386 INFO spark.SecurityManager: Changing modify acls groups to: 
+2022-02-27 23:45:17,387 INFO spark.SecurityManager: SecurityManager: authentication disabled; ui acls disabled; users  with view permissions: Set(txk6771); groups with view permissions: Set(); users  with modify permissions: Set(txk6771); groups with modify permissions: Set()
+2022-02-27 23:45:17,620 INFO util.Utils: Successfully started service 'sparkDriver' on port 46513.
+2022-02-27 23:45:17,642 INFO spark.SparkEnv: Registering MapOutputTracker
+2022-02-27 23:45:17,667 INFO spark.SparkEnv: Registering BlockManagerMaster
+2022-02-27 23:45:17,680 INFO storage.BlockManagerMasterEndpoint: Using org.apache.spark.storage.DefaultTopologyMapper for getting topology information
+2022-02-27 23:45:17,681 INFO storage.BlockManagerMasterEndpoint: BlockManagerMasterEndpoint up
+2022-02-27 23:45:17,684 INFO spark.SparkEnv: Registering BlockManagerMasterHeartbeat
+2022-02-27 23:45:17,694 INFO storage.DiskBlockManager: Created local directory at /scratch/txk6771/job_10051849/blockmgr-62da3cd1-7ceb-4978-a9bf-a393e0690cf5
+2022-02-27 23:45:17,719 INFO memory.MemoryStore: MemoryStore started with capacity 14.2 GiB
+2022-02-27 23:45:17,732 INFO spark.SparkEnv: Registering OutputCommitCoordinator
+2022-02-27 23:45:17,798 INFO util.log: Logging initialized @2226ms to org.sparkproject.jetty.util.log.Slf4jLog
+2022-02-27 23:45:17,846 INFO server.Server: jetty-9.4.40.v20210413; built: 2021-04-13T20:42:42.668Z; git: b881a572662e1943a14ae12e7e1207989f218b74; jvm 11.0.2+9
+2022-02-27 23:45:17,861 INFO server.Server: Started @2289ms
+2022-02-27 23:45:17,896 INFO server.AbstractConnector: Started ServerConnector@557c5707{HTTP/1.1, (http/1.1)}{exp-5-29.ib.cluster:4040}
+2022-02-27 23:45:17,896 INFO util.Utils: Successfully started service 'SparkUI' on port 4040.
+2022-02-27 23:45:17,915 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@7a729f84{/jobs,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,917 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@51c959a4{/jobs/json,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,917 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@10a0fe30{/jobs/job,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,920 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@6403e24c{/jobs/job/json,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,920 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@4eba373c{/stages,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,921 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@d109c4f{/stages/json,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,922 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@26f46fa6{/stages/stage,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,923 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@21bd20ee{/stages/stage/json,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,924 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@421056e5{/stages/pool,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,924 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@60bbacfc{/stages/pool/json,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,925 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@255eaa6b{/storage,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,925 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@7a0e7ecd{/storage/json,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,926 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@43e9089{/storage/rdd,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,927 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@352c44a8{/storage/rdd/json,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,927 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@a66e580{/environment,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,928 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@cdb2d95{/environment/json,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,928 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@2f5ac102{/executors,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,929 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@895416d{/executors/json,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,929 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@80bfdc6{/executors/threadDump,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,931 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@4c6007fb{/executors/threadDump/json,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,938 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@6981f8f3{/static,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,938 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@3c87e6b7{/,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,939 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@3c3a0032{/api,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,940 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@6f94a5a5{/jobs/job/kill,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,941 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@a451491{/stages/stage/kill,null,AVAILABLE,@Spark}
+2022-02-27 23:45:17,942 INFO ui.SparkUI: Bound SparkUI to exp-5-29.ib.cluster, and started at http://exp-5-29.ib.cluster:4040
+2022-02-27 23:45:17,960 INFO spark.SparkContext: Added JAR file:///home/txk6771/Diablo/diablo/lib/diablo.jar at spark://exp-5-29.ib.cluster:46513/jars/diablo.jar with timestamp 1646034317288
+2022-02-27 23:45:17,960 INFO spark.SparkContext: Added JAR file:/home/txk6771/Diablo/diablo/benchmarks/test.jar at spark://exp-5-29.ib.cluster:46513/jars/test.jar with timestamp 1646034317288
+2022-02-27 23:45:18,105 INFO client.StandaloneAppClient$ClientEndpoint: Connecting to master spark://exp-5-29.ib.cluster:7077...
+2022-02-27 23:45:18,147 INFO client.TransportClientFactory: Successfully created connection to exp-5-29.ib.cluster/10.22.5.29:7077 after 24 ms (0 ms spent in bootstraps)
+2022-02-27 23:45:18,231 INFO cluster.StandaloneSchedulerBackend: Connected to Spark cluster with app ID app-20220227234518-0002
+2022-02-27 23:45:18,233 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/0 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:45:18,235 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/0 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,235 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/1 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:45:18,235 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/1 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,236 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/2 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:45:18,236 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/2 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,236 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/3 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:45:18,236 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/3 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,237 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/4 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:45:18,237 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/4 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,237 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/5 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:45:18,237 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/5 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,237 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/6 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:45:18,240 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/6 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,240 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/7 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:45:18,240 INFO util.Utils: Successfully started service 'org.apache.spark.network.netty.NettyBlockTransferService' on port 40475.
+2022-02-27 23:45:18,240 INFO netty.NettyBlockTransferService: Server created on exp-5-29.ib.cluster:40475
+2022-02-27 23:45:18,240 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/7 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,240 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/8 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:45:18,240 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/8 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,240 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/9 on worker-20220227231842-10.22.5.30-44083 (10.22.5.30:44083) with 12 core(s)
+2022-02-27 23:45:18,241 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/9 on hostPort 10.22.5.30:44083 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,241 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/10 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:45:18,241 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/10 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,241 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/11 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:45:18,241 INFO storage.BlockManager: Using org.apache.spark.storage.RandomBlockReplicationPolicy for block replication policy
+2022-02-27 23:45:18,241 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/11 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,242 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/12 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:45:18,242 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/12 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,242 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/13 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:45:18,242 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/13 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,242 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/14 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:45:18,242 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/14 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,243 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/15 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:45:18,243 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/15 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,243 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/16 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:45:18,243 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/16 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,243 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/17 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:45:18,243 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/17 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,244 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/18 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:45:18,244 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/18 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,244 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/19 on worker-20220227231850-10.22.5.32-38629 (10.22.5.32:38629) with 12 core(s)
+2022-02-27 23:45:18,244 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/19 on hostPort 10.22.5.32:38629 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,244 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/20 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:45:18,244 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/20 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,244 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/21 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:45:18,245 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/21 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,245 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/22 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:45:18,245 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/22 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,245 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/23 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:45:18,245 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/23 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,245 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/24 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:45:18,246 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/24 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,246 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/25 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:45:18,246 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/25 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,246 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/26 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:45:18,246 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/26 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,246 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/27 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:45:18,247 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/27 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,247 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/28 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:45:18,247 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/28 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,247 INFO storage.BlockManagerMaster: Registering BlockManager BlockManagerId(driver, exp-5-29.ib.cluster, 40475, None)
+2022-02-27 23:45:18,247 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/29 on worker-20220227231838-10.22.5.29-41089 (10.22.5.29:41089) with 12 core(s)
+2022-02-27 23:45:18,247 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/29 on hostPort 10.22.5.29:41089 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,247 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/30 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:45:18,248 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/30 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,248 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/31 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:45:18,248 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/31 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,248 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/32 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:45:18,248 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/32 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,248 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/33 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:45:18,249 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/33 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,249 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/34 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:45:18,249 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/34 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,249 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/35 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:45:18,250 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/35 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,250 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/36 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:45:18,250 INFO storage.BlockManagerMasterEndpoint: Registering block manager exp-5-29.ib.cluster:40475 with 14.2 GiB RAM, BlockManagerId(driver, exp-5-29.ib.cluster, 40475, None)
+2022-02-27 23:45:18,250 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/36 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,250 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/37 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:45:18,251 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/37 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,251 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/38 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:45:18,251 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/38 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,251 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/39 on worker-20220227231854-10.22.5.33-43877 (10.22.5.33:43877) with 12 core(s)
+2022-02-27 23:45:18,251 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/39 on hostPort 10.22.5.33:43877 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,251 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/40 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:45:18,251 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/40 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,252 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/41 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:45:18,252 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/41 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,252 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/42 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:45:18,253 INFO storage.BlockManagerMaster: Registered BlockManager BlockManagerId(driver, exp-5-29.ib.cluster, 40475, None)
+2022-02-27 23:45:18,253 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/42 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,253 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/43 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:45:18,253 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/43 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,254 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/44 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:45:18,254 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/44 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,254 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/45 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:45:18,254 INFO storage.BlockManager: Initialized BlockManager: BlockManagerId(driver, exp-5-29.ib.cluster, 40475, None)
+2022-02-27 23:45:18,254 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/45 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,254 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/46 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:45:18,254 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/46 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,254 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/47 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:45:18,254 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/47 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,255 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/48 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:45:18,255 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/48 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,255 INFO client.StandaloneAppClient$ClientEndpoint: Executor added: app-20220227234518-0002/49 on worker-20220227231846-10.22.5.31-39043 (10.22.5.31:39043) with 12 core(s)
+2022-02-27 23:45:18,255 INFO cluster.StandaloneSchedulerBackend: Granted executor ID app-20220227234518-0002/49 on hostPort 10.22.5.31:39043 with 12 core(s), 24.0 GiB RAM
+2022-02-27 23:45:18,259 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/20 is now RUNNING
+2022-02-27 23:45:18,260 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/25 is now RUNNING
+2022-02-27 23:45:18,263 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/22 is now RUNNING
+2022-02-27 23:45:18,263 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/27 is now RUNNING
+2022-02-27 23:45:18,264 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/23 is now RUNNING
+2022-02-27 23:45:18,265 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/24 is now RUNNING
+2022-02-27 23:45:18,266 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/26 is now RUNNING
+2022-02-27 23:45:18,267 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/3 is now RUNNING
+2022-02-27 23:45:18,268 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/0 is now RUNNING
+2022-02-27 23:45:18,269 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/1 is now RUNNING
+2022-02-27 23:45:18,270 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/5 is now RUNNING
+2022-02-27 23:45:18,270 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/28 is now RUNNING
+2022-02-27 23:45:18,271 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/29 is now RUNNING
+2022-02-27 23:45:18,272 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/21 is now RUNNING
+2022-02-27 23:45:18,273 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/4 is now RUNNING
+2022-02-27 23:45:18,274 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/7 is now RUNNING
+2022-02-27 23:45:18,275 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/2 is now RUNNING
+2022-02-27 23:45:18,275 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/8 is now RUNNING
+2022-02-27 23:45:18,276 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/9 is now RUNNING
+2022-02-27 23:45:18,277 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/6 is now RUNNING
+2022-02-27 23:45:18,277 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/18 is now RUNNING
+2022-02-27 23:45:18,278 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/12 is now RUNNING
+2022-02-27 23:45:18,278 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/17 is now RUNNING
+2022-02-27 23:45:18,279 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/13 is now RUNNING
+2022-02-27 23:45:18,280 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/10 is now RUNNING
+2022-02-27 23:45:18,280 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/16 is now RUNNING
+2022-02-27 23:45:18,281 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/19 is now RUNNING
+2022-02-27 23:45:18,281 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/11 is now RUNNING
+2022-02-27 23:45:18,282 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/14 is now RUNNING
+2022-02-27 23:45:18,282 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/15 is now RUNNING
+2022-02-27 23:45:18,283 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/43 is now RUNNING
+2022-02-27 23:45:18,283 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/41 is now RUNNING
+2022-02-27 23:45:18,283 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/42 is now RUNNING
+2022-02-27 23:45:18,284 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/44 is now RUNNING
+2022-02-27 23:45:18,284 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/40 is now RUNNING
+2022-02-27 23:45:18,285 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/47 is now RUNNING
+2022-02-27 23:45:18,285 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/45 is now RUNNING
+2022-02-27 23:45:18,285 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/49 is now RUNNING
+2022-02-27 23:45:18,286 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/48 is now RUNNING
+2022-02-27 23:45:18,286 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/46 is now RUNNING
+2022-02-27 23:45:18,287 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/34 is now RUNNING
+2022-02-27 23:45:18,287 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/31 is now RUNNING
+2022-02-27 23:45:18,287 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/33 is now RUNNING
+2022-02-27 23:45:18,288 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/32 is now RUNNING
+2022-02-27 23:45:18,288 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/36 is now RUNNING
+2022-02-27 23:45:18,288 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/35 is now RUNNING
+2022-02-27 23:45:18,288 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/37 is now RUNNING
+2022-02-27 23:45:18,289 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/39 is now RUNNING
+2022-02-27 23:45:18,289 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/38 is now RUNNING
+2022-02-27 23:45:18,290 INFO client.StandaloneAppClient$ClientEndpoint: Executor updated: app-20220227234518-0002/30 is now RUNNING
+2022-02-27 23:45:18,402 INFO handler.ContextHandler: Started o.s.j.s.ServletContextHandler@5f36c8e3{/metrics/json,null,AVAILABLE,@Spark}
+2022-02-27 23:45:18,439 INFO cluster.StandaloneSchedulerBackend: SchedulerBackend is ready for scheduling beginning after reached minRegisteredResourcesRatio: 0.0
+2022-02-27 23:45:18,449 WARN spark.SparkContext: Using an existing SparkContext; some configuration may not take effect.
+2022-02-28 00:09:43,692 ERROR scheduler.TaskSchedulerImpl: Lost executor 29 on 10.22.5.29: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,727 WARN scheduler.TaskSetManager: Lost task 200.0 in stage 3.0 (TID 804) (10.22.5.29 executor 29): ExecutorLostFailure (executor 29 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,733 WARN scheduler.TaskSetManager: Lost task 550.0 in stage 3.0 (TID 1154) (10.22.5.29 executor 29): ExecutorLostFailure (executor 29 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,733 WARN scheduler.TaskSetManager: Lost task 400.0 in stage 3.0 (TID 1004) (10.22.5.29 executor 29): ExecutorLostFailure (executor 29 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,733 WARN scheduler.TaskSetManager: Lost task 50.0 in stage 3.0 (TID 654) (10.22.5.29 executor 29): ExecutorLostFailure (executor 29 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,734 WARN scheduler.TaskSetManager: Lost task 250.0 in stage 3.0 (TID 854) (10.22.5.29 executor 29): ExecutorLostFailure (executor 29 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,734 WARN scheduler.TaskSetManager: Lost task 450.0 in stage 3.0 (TID 1054) (10.22.5.29 executor 29): ExecutorLostFailure (executor 29 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,734 WARN scheduler.TaskSetManager: Lost task 100.0 in stage 3.0 (TID 704) (10.22.5.29 executor 29): ExecutorLostFailure (executor 29 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,734 WARN scheduler.TaskSetManager: Lost task 300.0 in stage 3.0 (TID 904) (10.22.5.29 executor 29): ExecutorLostFailure (executor 29 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,734 WARN scheduler.TaskSetManager: Lost task 150.0 in stage 3.0 (TID 754) (10.22.5.29 executor 29): ExecutorLostFailure (executor 29 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,734 WARN scheduler.TaskSetManager: Lost task 500.0 in stage 3.0 (TID 1104) (10.22.5.29 executor 29): ExecutorLostFailure (executor 29 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,734 WARN scheduler.TaskSetManager: Lost task 350.0 in stage 3.0 (TID 954) (10.22.5.29 executor 29): ExecutorLostFailure (executor 29 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,734 WARN scheduler.TaskSetManager: Lost task 0.0 in stage 3.0 (TID 604) (10.22.5.29 executor 29): ExecutorLostFailure (executor 29 exited caused by one of the running tasks) Reason: Remote RPC client disassociated. Likely due to containers exceeding thresholds, or network issues. Check driver logs for WARN messages.
+2022-02-28 00:09:43,752 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_9_107 !
+2022-02-28 00:09:43,752 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_9_257 !
+2022-02-28 00:09:43,752 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_12_257 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_9_57 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_9_7 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_12_207 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_12_157 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_9_307 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_12_557 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_12_7 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_9_207 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_9_407 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_9_157 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_12_507 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_9_557 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_9_357 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_12_307 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_12_357 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_9_457 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_9_507 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_12_57 !
+2022-02-28 00:09:43,753 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_12_107 !
+2022-02-28 00:09:43,755 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_12_457 !
+2022-02-28 00:09:43,755 WARN storage.BlockManagerMasterEndpoint: No more replicas available for rdd_12_407 !
+slurmstepd: error: *** JOB 10051849 ON exp-5-29 CANCELLED AT 2022-02-28T00:12:56 ***
