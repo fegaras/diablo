@@ -271,7 +271,7 @@ object ComprehensionTranslator {
                    val ndims = dn+sn
                    val vars = 1.to(ndims).map(x => newvar).toList
                    val xv = newvar    // the vector variable that contains the liftedVars values
-                   val all_dims = tile_dimensions(dn,dims(0))++tile_dimensions(sn,dims(1))
+                   val all_dims = tile_dimensions(dn,dims.head)++tile_dimensions(sn,dims(1))
                    // the map index in row-major format
                    val idx = all_dims.tail.zipWithIndex.foldLeft[Expr](Var("i1")) {
                                 case (r,(e,i))
@@ -290,7 +290,7 @@ object ComprehensionTranslator {
                                                }
                    val size = all_dims.reduce[Expr]{ case (x,y) => MethodCall(x,"*",List(y)) }
                    val dsize = if (dn==0) IntConst(0)
-                               else tile_dimensions(dn,dims(0)).reduce[Expr] {
+                               else tile_dimensions(dn,dims.head).reduce[Expr] {
                                        case (x,y) => MethodCall(x,"*",List(y))
                                     }
                    val ssize = if (sn==0) IntConst(0)
@@ -410,7 +410,7 @@ object ComprehensionTranslator {
                    val ndims = dn+sn
                    val vars = 1.to(ndims).map(x => newvar).toList
                    val xv = newvar    // the vector variable that contains the liftedVars values
-                   val all_dims = tile_dimensions(dn,dims(0))++tile_dimensions(sn,dims(1))
+                   val all_dims = tile_dimensions(dn,dims.head)++tile_dimensions(sn,dims(1))
                    // the map index in row-major format
                    val idx = all_dims.tail.zipWithIndex.foldLeft[Expr](Var("i1")) {
                                 case (r,(e,i))
@@ -485,7 +485,7 @@ object ComprehensionTranslator {
                                     val iv = newvar
                                     val ivars = tuple(1.to(ndims).map(i => Var("i"+i)).toList)
                                     val pvars = tuple(1.to(ndims).map(i => VarPat("i"+i)).toList)
-                                    val dense_dims = List(Tuple(tile_dimensions(dn,dims(0))
+                                    val dense_dims = List(Tuple(tile_dimensions(dn,dims.head)
                                                                 ++tile_dimensions(sn,dims(1))),
                                                           Tuple(Nil))
                                     // copy the dense result to a sparse tensor
@@ -589,7 +589,7 @@ object ComprehensionTranslator {
   def let_bindings ( vars: Set[String], qs: List[Qualifier] ): List[Qualifier]
     = qs.foldRight[(Set[String],List[Qualifier])] (vars,Nil) {
         case (q@LetBinding(p,e),(s,r))
-          if !patvars(p).toSet.intersect(s).isEmpty
+          if patvars(p).toSet.intersect(s).nonEmpty
           => (s++freevars(e),q::r)
         case (_,(s,r)) => (s,r)
       }._2
@@ -953,13 +953,19 @@ object ComprehensionTranslator {
                                     n3)))
           case Generator(TuplePat(List(p,pv)),Lift(tensor,e))
             if isTensor(tensor)
-            => patvars(p).zipWithIndex.
-                  map{ case (i,k) => Generator(VarPat(prefix("coord",i)),
-                                          Range(IntConst(0),
-                                                MethodCall(MethodCall(Nth(e,k+1),
-                                                                      "-",List(IntConst(1))),
-                                                           "/",List(IntConst(block_dim_size))),
-                                                IntConst(1))) }
+            => val (dn,sn) = tensor_dims(tensor)
+               val vdims = (if (dn==1) List(Nth(e,1))
+                            else (1.to(dn)).map( i => Nth(Nth(e,1),i))).toList ++
+                           (if (sn==1) List(Nth(e,2))
+                            else (1.to(sn)).map( i => Nth(Nth(e,2),i))).toList
+               (patvars(p) zip vdims).
+                   map { case (v,dim)
+                           => Generator(VarPat(prefix("coord",v)),
+                                        Range(IntConst(0),
+                                              MethodCall(MethodCall(dim,
+                                                                    "-",List(IntConst(1))),
+                                                         "/",List(IntConst(block_dim_size))),
+                                              IntConst(1))) }
           case LetBinding(p,e)
             if freevars(e).toSet.intersect(local_vars).isEmpty
             => List(q)
@@ -1070,7 +1076,7 @@ object ComprehensionTranslator {
   // the last tile size is dim % block_dim_size
   def tile_dimensions ( vars: List[String], dims: List[Expr], dn: Int, sn: Int,
                         shuffle: Boolean = false ): List[Qualifier] = {
-    val ds = tile_dimensions(dn,dims(0))++tile_dimensions(sn,dims(1))
+    val ds = tile_dimensions(dn,dims.head)++tile_dimensions(sn,dims(1))
     (vars zip ds).map {
           case (i,d)
             => LetBinding(VarPat(prefix("size",i)),
@@ -1143,6 +1149,8 @@ object ComprehensionTranslator {
                              ++ is.map( i => VarPat(prefix("size",i)) ))
                val nc = Comprehension(toExpr(p),
                                       rdd_qualifiers(qs,vars)++tbinds)
+               if (trace) println("Parallelizing the in-memory comprehension:\n"
+                                  +Pretty.print(nc))
                val rdd = flatMap(Lambda(p,Seq(List(tuple(List(tuple(tile_coords),tile))))),
                                  MethodCall(Var("spark_context"),
                                             "parallelize",
@@ -1187,7 +1195,7 @@ object ComprehensionTranslator {
                            MethodCall(gk.foldLeft[Expr](k){ case (r,(v,e)) => subst(v,e,r) },
                                       op,List(N))
                       }
-             val all_dims = tile_dimensions(dn,dims(0))++tile_dimensions(sn,dims(1))
+             val all_dims = tile_dimensions(dn,dims.head)++tile_dimensions(sn,dims(1))
              // generate all the unique block coordinates from the current block coordinates
              //   used by the comprehension keys
              val unique_coords
@@ -1211,8 +1219,8 @@ object ComprehensionTranslator {
              val tile = Store(tile_type(block,tp),List(tp),tile_dims,
                               Comprehension(Tuple(List(Tuple(gkeys("%")),h)),
                                             tile_qualifiers(qs,vars,true)++tqs))
-            if (trace) println("Comprehension that does not preserve tilling:\n"
-                               +Pretty.print(Comprehension(Tuple(List(tuple(vs.map(Var)),tile)),rqs)))
+             if (trace) println("Comprehension that does not preserve tilling:\n"
+                                +Pretty.print(Comprehension(Tuple(List(tuple(vs.map(Var)),tile)),rqs)))
              val Comprehension(nhs,nqs) = optimize(Comprehension(Tuple(List(tuple(vs.map(Var)),tile)),rqs))
              val rdd = if (is_rdd_comprehension(qs))
                          translate_dataset(nhs,nqs,vars)
@@ -1351,6 +1359,11 @@ object ComprehensionTranslator {
                        val mapper = if (liftedTile != toExpr(rval))
                                       Some(Lambda(rval,liftedTile))
                                     else None
+                       if (trace) println("Comprehension without group-by:\n"
+                                          +Pretty.print(Comprehension(Tuple(List(toExpr(tile_coords),tuple(tiles))),
+                                                             (rqs:+LetBinding(tile_coords,coord_gb_key))++tbinds))
+                                          +"\nAccumulator:\n"+Pretty.print(md)
+                                          +"\nMapper:\n"+Pretty.print(mapper))
                        // translate it to DataFrames SQL
                        val sql = translate_sql(Tuple(List(toExpr(tile_coords),tuple(tiles))),
                                                (rqs:+LetBinding(tile_coords,coord_gb_key))++tbinds,
@@ -1433,16 +1446,13 @@ object ComprehensionTranslator {
                                tp: Type, dims: List[Expr] ): Option[Expr]
     = if (!groupByJoin) None
       else findGroupByJoin(qs) match {
-         case Some((g1@Generator(p1,d1))::(g2@Generator(p2,d2))
-                   ::(cs:+(g@GroupByQual(p,k@Tuple(List(gx,gy))))))
+         case Some(List(g1@Generator(p1,d1),g2@Generator(p2,d2),
+                        jc@Predicate(MethodCall(Var(v1),"==",List(Var(v2)))),
+                        g@GroupByQual(p,k@Tuple(List(gx,gy)))))
            => val N = IntConst(block_dim_size)
               val qvars = qual_vars(qs)
-              val jt1 = cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
-                                  => if (contains(e1,patvars(p1).toSet,qvars)) e1 else e2
-                                case _ => d1 }
-              val jt2 = cs.map{ case Predicate(MethodCall(e1,"==",List(e2)))
-                                  => if (contains(e1,patvars(p2).toSet,qvars)) e1 else e2
-                                case _ => d1 }
+              val jt1 = if (patvars(p1).contains(v1)) v1 else v2
+              val jt2 = if (patvars(p1).contains(v1)) v2 else v1
               val (ngx,ngy) = if (contains(gx,patvars(p1).toSet,qvars)) (gx,gy) else (gy,gx)
               val (r,_::s) = qs.span(_ != g)
               val groupByVars = patvars(p)
@@ -1451,49 +1461,73 @@ object ComprehensionTranslator {
               val rt = findReducedTerms(yieldReductions(Comprehension(hs,s),usedVars),
                                         usedVars)
               val c = Comprehension(Tuple(List(toExpr(p),tuple(rt.map(_._2)))),
-                                    List(Generator(TuplePat(List(VarPat("k1"),
+                                    List(Generator(TuplePat(List(VarPat(prefix("coord",jt1)),
                                                         tuple(tile_values(p1)
                                                                .map(v => VarPat(prefix("tile",v)))))),
                                                    Var("__v1")),
-                                         Generator(TuplePat(List(VarPat("k2"),
+                                         Generator(TuplePat(List(VarPat(prefix("coord",jt2)),
                                                         tuple(tile_values(p2)
                                                                .map(v => VarPat(prefix("tile",v)))))),
                                                    Var("__v2")),
-                                         Predicate(MethodCall(Var("k1"),"==",List(Var("k2")))))++
+                                         Predicate(MethodCall(Var(prefix("coord",jt1)),
+                                                              "==",List(Var(prefix("coord",jt2))))))++
                                     tile_qualifiers(r,vars):+g)
               val tensor = tile_type(block,tp)
               val (dn,sn) = tensor_dims(tensor)
               val vdims = 1.to(dims.length).map(i => N).toList
               val tile_dims = List(tuple(vdims.take(dn)),tuple(vdims.takeRight(sn)))
               val tile = Store(tile_type(block,tp),List(tp),tile_dims,c)
-              def num_of_tiles ( size: Expr )
-                = MethodCall(MethodCall(MethodCall(size,"+",List(IntConst(block_dim_size-1))),
-                             "/",List(N)),"-",List(IntConst(1)))
               val kv = newvar
-              val left_size::right_size::_ = dims
+              val grid_size = IntConst(Math.sqrt(number_of_partitions).toInt-1)
               val left = translate_rdd(Tuple(List(Tuple(List(ngx,Var(kv))),
-                                                  Tuple(List(tuple(jt1),
+                                                  Tuple(List(Var(jt1),
                                                              tuple(tile_values(p1).map(Var)))))),
                                        List(Generator(p1,d1),
                                             Generator(VarPat(kv),
-                                                      Range(IntConst(0),
-                                                            num_of_tiles(right_size),
+                                                      Range(IntConst(0),grid_size,
                                                             IntConst(1)))),vars)
               val right = translate_rdd(Tuple(List(Tuple(List(Var(kv),ngy)),
-                                                   Tuple(List(tuple(jt2),
+                                                   Tuple(List(Var(jt2),
                                                               tuple(tile_values(p2).map(Var)))))),
                                         List(Generator(p2,d2),
                                              Generator(VarPat(kv),
-                                                       Range(IntConst(0),
-                                                             num_of_tiles(left_size),
+                                                       Range(IntConst(0),grid_size,
                                                              IntConst(1)))),vars)
+              if (trace) {
+                println("Using SUMMA groupBy-join:\nLeft:\n"+Pretty.print(Comprehension(
+                             Tuple(List(Tuple(List(ngx,Var(kv))),
+                                        Tuple(List(Var(jt1),
+                                                   tuple(tile_values(p1).map(Var)))))),
+                             List(Generator(p1,d1),
+                                  Generator(VarPat(kv),
+                                            Range(IntConst(0),grid_size,
+                                                  IntConst(1))))))
+                        +"\nRight:\n"+Pretty.print(Comprehension(
+                             Tuple(List(Tuple(List(Var(kv),ngy)),
+                                        Tuple(List(Var(jt2),
+                                                   tuple(tile_values(p2).map(Var)))))),
+                             List(Generator(p2,d2),
+                                  Generator(VarPat(kv),
+                                            Range(IntConst(0),grid_size,
+                                                  IntConst(1)))))))
+                val nq = Generator(TuplePat(List(tuple(groupByVars.map{ v => VarPat(prefix("coord",v)) }),
+                                                 TuplePat(List(VarPat("__v1"),VarPat("__v2"))))),
+                                   Lift("rdd",MethodCall(Var("left"),"cogroup",List(Var("right")))))
+                val rdd_qs = rdd_qualifiers(qs.flatMap( q => if (List(g,g2,jc).contains(q)) Nil
+                                                             else if (q==g1) List(nq) else List(q) ),
+                                            vars)
+                println("\nGroupBy-Join:\n"+Pretty.print(Comprehension(
+                             Tuple(List(tuple(groupByVars.map{ v => Var(prefix("coord",v)) }),tile)),
+                             rdd_qs)))
+              }
               val nq = Generator(TuplePat(List(tuple(groupByVars.map{ v => VarPat(prefix("coord",v)) }),
                                                TuplePat(List(VarPat("__v1"),VarPat("__v2"))))),
                                  Lift("rdd",MethodCall(left,"cogroup",List(right))))
-              val rdd = translate_rdd(Tuple(List(toExpr(p),tile)),
-                                      rdd_qualifiers(qs.flatMap( q => if ((g::g2::cs).contains(q)) Nil
-                                                                      else if (q==g1) List(nq) else List(q) ),
-                                                     vars),vars)
+              val rdd_qs = rdd_qualifiers(qs.flatMap( q => if (List(g,g2,jc).contains(q)) Nil
+                                                           else if (q==g1) List(nq) else List(q) ),
+                                          vars)
+              val rdd = translate_rdd(Tuple(List(tuple(groupByVars.map{ v => Var(prefix("coord",v)) }),tile)),
+                                      rdd_qs,vars)
               Some(tuple(dims:+rdd))
          case _ => None
     }

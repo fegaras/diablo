@@ -39,7 +39,7 @@ package object diablo extends diablo.ArrayFunctions {
   // a Spark DataFrame with type information at compile-time
   type DiabloDataFrame[T] = org.apache.spark.sql.DataFrame
 
-  var collectionClass = rddClass
+  var collectionClass: String = rddClass
 
   var spark_context: SparkContext = _
 

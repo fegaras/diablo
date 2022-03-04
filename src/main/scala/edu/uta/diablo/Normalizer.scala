@@ -174,21 +174,6 @@ object Normalizer {
           => if (List("-","/").contains(op))
                inverse(x,src,MethodCall(y,op,List(dst)))
              else inverse(x,src,MethodCall(dst,inverses(op),List(y)))
-/*
-        case MethodCall(u,op,List(c))
-          if (inverses.contains(op) && isConstant(c))
-          => inverse(u,src,MethodCall(dst,inverses(op),List(c)))
-        case MethodCall(c,op,List(u))
-          if (inverses.contains(op) && isConstant(c))
-          => inverse(u,src,MethodCall(dst,inverses(op),List(c)))
-        case MethodCall(x,op,List(y))
-          if (inverses.contains(op) && freevars(x).contains(src)
-              && !freevars(y).contains(src))
-          => inverse(x,src,MethodCall(dst,inverses(op),List(y)))
-        case MethodCall(y,"+",List(x))   // needs more cases
-          if (freevars(x).contains(src) && !freevars(y).contains(src))
-          => inverse(x,src,MethodCall(dst,"-",List(y)))
-*/
         case _ => None
       }
 

@@ -226,7 +226,7 @@ object SQLGenerator {
                val nv = newvar
                (Call(fname,List(Tuple(args))),   // put args in a tuple
                 List(Block(List(Def(fname,List((nv,tuple(type_env.map(_._2)))),tp,
-                                    MatchE(Var(nv),List(Case(tuple(fs.map(VarPat(_))),
+                                    MatchE(Var(nv),List(Case(tuple(fs.map(VarPat)),
                                                              BoolConst(true),e)))),
                                 rf))))
              } else (Call(fname,args),

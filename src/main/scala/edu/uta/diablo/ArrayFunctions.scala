@@ -486,39 +486,20 @@ trait ArrayFunctions {
     s
   }
 
-  def binarySearch[@specialized T] ( key: Int, from: Int, to: Int,
-                                     rows: Array[Int], values: Array[T], zero: T ): T = {
-    var low = from
-    var high = to-1
-    while (low <= high) {
-      val mid = (low + high) >>> 1
-      val d = rows(mid)
-      if (d == key)
-        return values(mid)
-      else if (d > key)
-        high = mid - 1
-      else if (d < key)
-        low = mid + 1
-    }
-    zero
+  /* binary search rows for key between the indices from (inclusive) and to (exclusive) */
+  def binarySearch[T] ( key: Int, from: Int, to: Int,
+                        rows: Array[Int], values: Array[T], zero: T ): T = {
+    val row = java.util.Arrays.binarySearch(rows,from,to,key)
+    if (row < 0)
+      zero
+    else values(row)
   }
 
-  def binarySearch ( key: Int, from: Int, to: Int, rows: Array[Int] ): Boolean = {
-    var low = from
-    var high = to-1
-    while (low <= high) {
-      val mid = (low + high) >>> 1
-      val d = rows(mid)
-      if (d == key)
-        return true
-      else if (d > key)
-        high = mid - 1
-      else if (d < key)
-        low = mid + 1
-    }
-    false
-  }
+  /* binary search rows for key between the indices from (inclusive) and to (exclusive) */
+  def binarySearch ( key: Int, from: Int, to: Int, rows: Array[Int] ): Boolean
+    = java.util.Arrays.binarySearch(rows,from,to,key) >= 0
 
+  /* sort both rows and values starting from from */
   def sort[T] ( from: Int, rows: mutable.ArrayBuffer[Int], values: mutable.ArrayBuffer[T] ) {
     val len = values.length-from
     if (len <= 1)
@@ -538,6 +519,7 @@ trait ArrayFunctions {
     }
   }
 
+  /* sort rows starting from from */
   def sort ( from: Int, rows: mutable.ArrayBuffer[Int] ) {
     val len = rows.length-from
     if (len <= 1)
