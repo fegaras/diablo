@@ -157,21 +157,21 @@ object Normalizer {
              Comprehension(substS(h,env),nqs)
       }
 
-  val inverses = Map( "+"->"-", "*"->"/", "-"->"+", "/"->"*" )
+  val inverses = Map( "+"->"-", "*"->"/", "-"->"+" )
 
   /* for dst=e(src), find g such that src=g(dst) */
   @tailrec
   def inverse ( e: Expr, src: String, dst: Expr ): Option[Expr]
     = e match {
         case Var(v)
-          if v==src
+          if v == src
           => Some(dst)
         case MethodCall(x,op,List(y))
           if inverses.contains(op) && freevars(x).contains(src) && !freevars(y).contains(src)
           => inverse(x,src,MethodCall(dst,inverses(op),List(y)))
         case MethodCall(y,op,List(x))
           if inverses.contains(op) && freevars(x).contains(src) && !freevars(y).contains(src)
-          => if (List("-","/").contains(op))
+          => if (op == "-")
                inverse(x,src,MethodCall(y,op,List(dst)))
              else inverse(x,src,MethodCall(dst,inverses(op),List(y)))
         case _ => None
