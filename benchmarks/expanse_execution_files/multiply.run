@@ -56,9 +56,9 @@ for I in `ls $SPARK_HOME/jars/*.jar -I *unsafe*`; do
 done
 
 repeat=4
-sp = 0.01
+sp=0.01
 for ((i=2; i<=7; i++)); do
-    n = $((i*5000))
+    n=$((i*5000))
     spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $n $sp
 done
 
