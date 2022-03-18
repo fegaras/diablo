@@ -82,7 +82,7 @@ object Parser extends StandardTokenParsers {
 
   /* groups of infix operator precedence, from low to high */
   val operator_precedence: List[Parser[String]]
-      = List( "..", "||", "^", "&&"|"&", "<="|">="|"<"|">", "=="|"!=", "+"|"-", "*"|"/"|"%", ":", "=" )
+      = List( "..", "||", "^", "&&"|"&", "<="|">="|"<"|">", "=="|"!=", "+"|"-", "*"|"/"|"%", "=" )
 
   /* all infix operators not listed in operator_precedence have the same highest precedence */  
   val infixOpr: Parser[String]
@@ -229,10 +229,15 @@ object Parser extends StandardTokenParsers {
         | "var" ~ ident ~ ":" ~ stype ~ opt("=" ~ expr) ^^
           { case _~v~_~t~None => VarDecl(v,t,Seq(Nil))
             case _~v~_~t~Some(_~e) => VarDecl(v,t,Seq(List(e))) }
+        | "var" ~ ident ~ "=" ~ expr ^^
+          { case _~v~_~e => VarDecl(v,AnyType(),Seq(List(e))) }
         | dest ~ incrOpr ~ expr ^^
           { case d~op~e => Assign(d,Seq(List(MethodCall(d,op.init,List(e))))) }
-        | "if" ~ "(" ~ expr ~ ")" ~ expr ~ "else" ~ expr ^^
-          { case _~_~p~_~t~_~e => IfE(p,t,e) }
+        | "if" ~ "(" ~ expr ~ ")" ~ expr ~ opt("else" ~ expr) ^^
+          { case _~_~p~_~t~Some(_~e) => IfE(p,t,e)
+            case _~_~p~_~t~None => IfE(p,t,Block(Nil)) }
+        | "while" ~ "(" ~ expr ~ ")" ~ expr ^^
+          { case _~_~p~_~s => While(p,s) }
         | "(" ~ repsep( pat, "," ) ~ ")" ~ "=>" ~ expr ^^
           { case _~ps~_~_~b => Lambda(TuplePat(ps),b) }
         | "(" ~ expr ~ ")" ^^
@@ -254,6 +259,8 @@ object Parser extends StandardTokenParsers {
                            else Block(ss.map{ case s~_ => s }) }
         | ident ~ "=>" ~ expr ^^
           { case v~_~b => Lambda(VarPat(v),b) }
+        | ident ~ ":" ~ stype ^^
+          { case v~_~t => Coerce(Var(v),t) }
         | "[" ~ repsep( expr, "," ) ~ "]" ^^
           { case _~es~_ => Seq(es) }
         | ident ~ "(" ~ repsep( expr, "," ) ~ ")" ^^
@@ -264,7 +271,7 @@ object Parser extends StandardTokenParsers {
           { case op~_~e => reduce(op,e) }
         | ident ^^
           { s => Var(s) }
-        | double ^^
+         | double ^^
           { s => DoubleConst(s) }
         | long ^^
           { s => LongConst(s) }

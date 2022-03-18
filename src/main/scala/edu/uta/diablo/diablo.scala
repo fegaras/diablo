@@ -93,21 +93,23 @@ package object diablo extends diablo.ArrayFunctions {
   def parami_impl( c: whitebox.Context )(x: c.Expr[Int], b: c.Expr[Int] ): c.Expr[Unit] = {
     import c.universe._
     val Literal(Constant(bv:Int)) = b.tree
-    x.tree.toString.split('.').last match {
+    val s = x.tree.toString.split('.').last
+    s match {
        case "block_dim_size" => block_dim_size = bv
        case "number_of_partitions" => number_of_partitions = bv
        case p => throw new Error("Wrong param: "+p)
     }
-    c.Expr[Unit](q"()")
+    c.Expr[Unit](q"$x = $b")
    }
 
   /** set compilation parameters */
   def parami ( x:Int, b: Int ): Unit = macro parami_impl
 
-  def param_impl( c: whitebox.Context )(x: c.Expr[Boolean], b: c.Expr[Boolean] ): c.Expr[Unit] = {
+  def param_impl ( c: whitebox.Context ) ( x: c.Expr[Boolean], b: c.Expr[Boolean] ): c.Expr[Unit] = {
     import c.universe._
     val Literal(Constant(bv:Boolean)) = b.tree
-    x.tree.toString.split('.').last match {
+    val s = x.tree.toString.split('.').last 
+    s match {
        case "trace" => trace = bv
        case "groupByJoin" => groupByJoin = bv
        case "parallel" => parallel = bv
@@ -116,7 +118,7 @@ package object diablo extends diablo.ArrayFunctions {
             collectionClass = if (data_frames) datasetClass else rddClass
        case p => throw new Error("Wrong param: "+p)
     }
-    c.Expr[Unit](q"()")
+    c.Expr[Unit](q"$x = $b")
    }
 
   /** set compilation parameters */

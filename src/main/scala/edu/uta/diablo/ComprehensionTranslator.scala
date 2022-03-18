@@ -1378,17 +1378,21 @@ object ComprehensionTranslator {
                                  }
                        store("dataset",List(tileType(block,tp)),dims,ds)
                    } else {
+                       val rbknc = optimize(translate(MethodCall(Store("rdd",Nil,Nil,nc),
+                                                                 "reduceByKey",
+                                                                 List(md,IntConst(number_of_partitions))),
+                                                      vars))
+                       val all_dims = tile_dimensions(dn,dims.head)++tile_dimensions(sn,dims(1))
+                       // check for groupBy join
+                       val rbk = group_by_join(rbknc,toExpr(tile_coords),all_dims.head) match {
+                                   case Some(ne) => ne
+                                   case _ => rbknc
+                                 }
                        val rdd = block_array_assignment match {
                                    case Some(array)
                                      => val dest = Nth(array,3)
-                                        Call("outerJoin",
-                                             List(dest,
-                                                  MethodCall(Store("rdd",Nil,Nil,nc),
-                                                             "reduceByKey",
-                                                             List(md,IntConst(number_of_partitions))),
-                                                  md))
-                                   case _ => MethodCall(Store("rdd",Nil,Nil,nc),
-                                                        "reduceByKey",List(md,IntConst(number_of_partitions)))
+                                        Call("outerJoin",List(dest,rbk,md))
+                                   case _ => rbk
                                  }
                        val rval = tuple(env.map(x => VarPat(x._2)))
                        val pvars = patvars(p).map(Var)
@@ -1405,132 +1409,54 @@ object ComprehensionTranslator {
           }
     }
 
-
 /* -------------------- GroupBy Join using the SUMMA algorithm -----------------------------------------*/
 
-  def findJoinGBKeys ( xs: Set[String], ys: Set[String], qs: List[Qualifier] ): Option[List[Qualifier]] = {
-    val qvars = qual_vars(qs)
-    matchQ(qs,{ case Predicate(MethodCall(e1,"==",List(e2)))
-                    => ((contains(e1,xs,qvars) && contains(e2,ys,qvars))
-                        || (contains(e2,xs,qvars) && contains(e1,ys,qvars)))
-                  case GroupByQual(p,Tuple(List(gx,gy)))
-                    if ((contains(gx,xs,qvars) && contains(gy,ys,qvars))
-                        || (contains(gy,xs,qvars) && contains(gx,ys,qvars)))
-                    => true
-                  case _ => false },
-                { case (p@Predicate(MethodCall(e1,"==",List(e2))))::s
-                    => findJoinGBKeys(xs,ys,s) match {
-                          case None => None
-                          case Some(l) => Some(p::l)
-                       }
-                  case (g@GroupByQual(p,Tuple(List(gx,gy))))::_
-                    => Some(List(g))
-                  case _::_ => None
-                })
-  }
-
-  def findGroupByJoin ( qs: List[Qualifier] ): Option[List[Qualifier]]
-    = if (qs.map{ case Generator(_,u) if isTiled(u) => 1; case _ => 0 }.sum != 2) None
-      else matchQ(qs,{ case Generator(_,e1) if isTiled(e1) => true; case _ => false },
-                { case (g1@Generator(p1,e1))::r1
-                    => matchQ(r1,{ case Generator(_,e2) if isTiled(e2) => true; case _ => false },
-                                 { case (g2@Generator(p2,e2))::r2
-                                     => findJoinGBKeys(patvars(p1).toSet,patvars(p2).toSet,r2) match {
-                                           case Some(l) => Some(g1::g2::l)
-                                           case _ => None
-                                        }
-                                  case _ => None })
-                  case _ => None })
-
-  def translate_groupby_join ( block: String, hs: Expr, qs: List[Qualifier], vars: List[String],
-                               tp: Type, dims: List[Expr] ): Option[Expr]
-    = if (!groupByJoin) None
-      else findGroupByJoin(qs) match {
-         case Some(List(g1@Generator(p1,d1),g2@Generator(p2,d2),
-                        jc@Predicate(MethodCall(Var(v1),"==",List(Var(v2)))),
-                        g@GroupByQual(p,k@Tuple(List(gx,gy)))))
-           => val N = IntConst(block_dim_size)
-              val qvars = qual_vars(qs)
-              val jt1 = if (patvars(p1).contains(v1)) v1 else v2
-              val jt2 = if (patvars(p1).contains(v1)) v2 else v1
-              val (ngx,ngy) = if (contains(gx,patvars(p1).toSet,qvars)) (gx,gy) else (gy,gx)
-              val (r,_::s) = qs.span(_ != g)
-              val groupByVars = patvars(p)
-              val usedVars = freevars(Comprehension(hs,s),groupByVars)
-                                    .intersect(comprVars(r)).distinct
-              val rt = findReducedTerms(yieldReductions(Comprehension(hs,s),usedVars),
-                                        usedVars)
-              val c = Comprehension(Tuple(List(toExpr(p),tuple(rt.map(_._2)))),
-                                    List(Generator(TuplePat(List(VarPat(prefix("coord",jt1)),
-                                                        tuple(tile_values(p1)
-                                                               .map(v => VarPat(prefix("tile",v)))))),
-                                                   Var("__v1")),
-                                         Generator(TuplePat(List(VarPat(prefix("coord",jt2)),
-                                                        tuple(tile_values(p2)
-                                                               .map(v => VarPat(prefix("tile",v)))))),
-                                                   Var("__v2")),
-                                         Predicate(MethodCall(Var(prefix("coord",jt1)),
-                                                              "==",List(Var(prefix("coord",jt2))))))++
-                                    tile_qualifiers(r,vars):+g)
-              val tensor = tile_type(block,tp)
-              val (dn,sn) = tensor_dims(tensor)
-              val vdims = 1.to(dims.length).map(i => N).toList
-              val tile_dims = List(tuple(vdims.take(dn)),tuple(vdims.takeRight(sn)))
-              val tile = Store(tile_type(block,tp),List(tp),tile_dims,c)
-              val kv = newvar
-              val grid_size = IntConst(Math.sqrt(number_of_partitions).toInt-1)
-              val left = translate_rdd(Tuple(List(Tuple(List(ngx,Var(kv))),
-                                                  Tuple(List(Var(jt1),
-                                                             tuple(tile_values(p1).map(Var)))))),
-                                       List(Generator(p1,d1),
-                                            Generator(VarPat(kv),
-                                                      Range(IntConst(0),grid_size,
-                                                            IntConst(1)))),vars)
-              val right = translate_rdd(Tuple(List(Tuple(List(Var(kv),ngy)),
-                                                   Tuple(List(Var(jt2),
-                                                              tuple(tile_values(p2).map(Var)))))),
-                                        List(Generator(p2,d2),
-                                             Generator(VarPat(kv),
-                                                       Range(IntConst(0),grid_size,
-                                                             IntConst(1)))),vars)
-              if (trace) {
-                println("Using SUMMA groupBy-join:\nLeft:\n"+Pretty.print(Comprehension(
-                             Tuple(List(Tuple(List(ngx,Var(kv))),
-                                        Tuple(List(Var(jt1),
-                                                   tuple(tile_values(p1).map(Var)))))),
-                             List(Generator(p1,d1),
-                                  Generator(VarPat(kv),
-                                            Range(IntConst(0),grid_size,
-                                                  IntConst(1))))))
-                        +"\nRight:\n"+Pretty.print(Comprehension(
-                             Tuple(List(Tuple(List(Var(kv),ngy)),
-                                        Tuple(List(Var(jt2),
-                                                   tuple(tile_values(p2).map(Var)))))),
-                             List(Generator(p2,d2),
-                                  Generator(VarPat(kv),
-                                            Range(IntConst(0),grid_size,
-                                                  IntConst(1)))))))
-                val nq = Generator(TuplePat(List(tuple(groupByVars.map{ v => VarPat(prefix("coord",v)) }),
-                                                 TuplePat(List(VarPat("__v1"),VarPat("__v2"))))),
-                                   Lift("rdd",MethodCall(Var("left"),"cogroup",List(Var("right")))))
-                val rdd_qs = rdd_qualifiers(qs.flatMap( q => if (List(g,g2,jc).contains(q)) Nil
-                                                             else if (q==g1) List(nq) else List(q) ),
-                                            vars)
-                println("\nGroupBy-Join:\n"+Pretty.print(Comprehension(
-                             Tuple(List(tuple(groupByVars.map{ v => Var(prefix("coord",v)) }),tile)),
-                             rdd_qs)))
-              }
-              val nq = Generator(TuplePat(List(tuple(groupByVars.map{ v => VarPat(prefix("coord",v)) }),
-                                               TuplePat(List(VarPat("__v1"),VarPat("__v2"))))),
-                                 Lift("rdd",MethodCall(left,"cogroup",List(right))))
-              val rdd_qs = rdd_qualifiers(qs.flatMap( q => if (List(g,g2,jc).contains(q)) Nil
-                                                           else if (q==g1) List(nq) else List(q) ),
-                                          vars)
-              val rdd = translate_rdd(Tuple(List(tuple(groupByVars.map{ v => Var(prefix("coord",v)) }),tile)),
-                                      rdd_qs,vars)
-              Some(tuple(dims:+rdd))
-         case _ => None
+  // convert a join followed by groupBy to an optimal groupBy-join (SUMMA algorithm)
+  def group_by_join ( e: Expr, gbkey: Expr, left_rows: Expr ): Option[Expr] = {
+    def depends ( e: Expr, p: Pattern ): Boolean = freevars(e).toSet.subsetOf(patvars(p).toSet)
+    (e,gbkey) match {
+      case (MethodCall(flatMap(Lambda(TuplePat(List(_,pa)),IfE(_,plus,_)),
+                               MethodCall(flatMap(Lambda(px,Seq(List(Tuple(List(jx,bx))))),
+                                                  x),
+                                          "join",List(flatMap(Lambda(py,Seq(List(Tuple(List(jy,by))))),
+                                                              y),
+                                                      partitions))),
+                       "reduceByKey",List(Lambda(pg,prod),_)),
+            Tuple(List(gx,gy)))
+        if groupByJoin && (depends(gx,px) && depends(gy,py) || (depends(gy,px) && depends(gx,py)))
+        => val (gtx,gty) = if (depends(gx,px)) (gx,gy) else (gy,gx)
+           // grid dimension so that each grid cell is handled by one Spark executor
+           val grid_dim =  Math.sqrt(number_of_partitions).toInt
+           // each grid cell contains grid_blocks*grid_blocks tensors
+           val grid_blocks = MethodCall(Var("Math"),"max",
+                                List(IntConst(1),
+                                     MethodCall(MethodCall(Var("Math"),"ceil",
+                                        List(MethodCall(left_rows,"/",
+                                                List(DoubleConst(block_dim_size*grid_dim*1.0))))),
+                                                "toInt",null)))
+           val kv = newvar
+           // replicate each tensor grid_dim times (sent to different grid cells)
+           val left = flatMap(Lambda(px,flatMap(Lambda(VarPat(kv),
+                                           Seq(List(Tuple(List(Tuple(List(Var(kv),
+                                                                          MethodCall(gtx,"%",List(IntConst(grid_dim))))),
+                                                               Tuple(List(Tuple(List(jx,gx)),bx))))))),
+                                                Range(IntConst(0),IntConst(grid_dim-1),IntConst(1)))),
+                              x)
+           val right = flatMap(Lambda(py,flatMap(Lambda(VarPat(kv),
+                                            Seq(List(Tuple(List(Tuple(List(MethodCall(gty,"%",List(IntConst(grid_dim))),
+                                                                           Var(kv))),
+                                                                Tuple(List(Tuple(List(jy,gy)),by))))))),
+                                                 Range(IntConst(0),IntConst(grid_dim-1),IntConst(1)))),
+                               y)
+           Some(flatMap(Lambda(TuplePat(List(TuplePat(List(VarPat("_cell_i"),VarPat("_cell_j"))),
+                                             TuplePat(List(VarPat("as"),VarPat("bs"))))),
+                               Call("groupByJoin_mapper",
+                                    List(Var("as"),Var("bs"),IntConst(grid_dim),grid_blocks,
+                                         Lambda(pa,plus),Lambda(pg,prod)))),
+                        MethodCall(left,"cogroup",List(right,partitions))))
+      case _ => None
     }
+  }
 
 
 /* -------------------- translate block tensor comprehensions -----------------------------------------*/
@@ -1546,9 +1472,6 @@ object ComprehensionTranslator {
       case Tuple(List(p,_))   // a tiled comprehension that doesn't preserve tiling
         if shuffles_tiles(p,qs)
         => shuffle_tiles(block,hs,qs,vars,tp,dims)
-      case _    // groupBy join
-        if { QLcache = translate_groupby_join(block,hs,qs,vars,tp,dims); QLcache.nonEmpty }
-        => QLcache.get
       case Tuple(List(kp,_))   // group-by tiled comprehension with group-by-key == comprehension key
         if hasGroupByTiling(qs,kp)
         => groupBy_tiles(block,hs,qs,vars,tp,dims)

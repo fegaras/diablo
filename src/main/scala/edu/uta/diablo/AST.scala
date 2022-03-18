@@ -558,4 +558,38 @@ object AST {
       setPos(dst,src.pos)
     dst
   }
+
+  def type2string ( tp: Type ): String
+    = tp match {
+      case StorageType(_,_,_)
+        => type2string(Typechecker.unfold_storage_type(tp))
+      case TupleType(List(t))
+        => type2string(t)
+      case TupleType(Nil)
+        => "EmptyTuple"
+      case TupleType(cs)
+        => "("+cs.map(type2string).mkString(",")+")"
+      case RecordType(cs) if cs.nonEmpty
+        => "("+cs.values.map(type2string).toList.mkString(",")+")"
+      case ParametricType(n,cs) if cs.nonEmpty
+        => n+"["+cs.map(type2string).mkString(",")+"]"
+      case ParametricType(n,Nil)
+        => n
+      case ArrayType(d,t)
+        => (0 until d).foldLeft(type2string(t)) { case (r,_) => s"Array[$r]" }
+      case MapType(k,v)
+        => "Map["+type2string(k)+","+type2string(v)+"]"
+      case SeqType(t)
+        => "List["+type2string(t)+"]"
+      case FunctionType(dt,rt)
+        => type2string(dt)+"=>"+type2string(rt)
+      case BasicType(n)
+        => n
+      case TypeParameter(v)
+        => v
+      case AnyType()
+        => "Any"
+      case _ => "Any"
+    }
+
 }

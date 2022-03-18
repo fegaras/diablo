@@ -55,13 +55,25 @@ object Multiply {
                    .map{ case (i,j) => ((i,j),randomTile(if ((i+1)*N > rows) rows%N else N,
                                                          if ((j+1)*N > cols) cols%N else N)) }
     }
-
+/*
     def randomTileSparse ( nd: Int, md: Int ): SparseMatrix = {
       val max = 10
       val rand = new Random()
       var entries: Array[(Int,Int,Double)] = Array()
       for(i <- 0 to nd-1; j <- 0 to md-1) {
         if(rand.nextDouble() <= sparsity) entries = entries :+ (i,j,rand.nextDouble()*max)
+      }
+      SparseMatrix.fromCOO(nd,md,entries)
+    }
+*/
+
+    def randomTileSparse ( nd: Int, md: Int ): SparseMatrix = {
+      val max = 10
+      val rand = new Random()
+      var entries = scala.collection.mutable.ArrayBuffer[(Int,Int,Double)]()
+      for (i <- 0 to nd-1; j <- 0 to md-1) {
+        if (rand.nextDouble() <= sparsity)
+          entries += ((i,j,rand.nextDouble()*max))
       }
       SparseMatrix.fromCOO(nd,md,entries)
     }
@@ -268,16 +280,21 @@ object Multiply {
       println("tries=%d %.3f secs".format(i,s))
     }
 
+/*
     test("MLlib Multiply dense-dense",testMultiplyMLlibDenseDense)
     test("MLlib Multiply sparse-dense",testMultiplyMLlibSparseDense)
+*/
     test("MLlib Multiply sparse-sparse",testMultiplyMLlibSparseSparse)
+/*
     test("DIABLO Multiply dense-dense giving dense",testMultiplyDiabloDAC)
     test("DIABLO Multiply sparse-dense giving dense",testMultiplyDiabloDACsparseDense)
+*/
     test("DIABLO Multiply sparse-sparse giving dense",testMultiplyDiabloDACsparse)
+/*
     test("DIABLO Multiply dense-dense giving sparse",testMultiplyDiabloDACsparseOut)
     test("DIABLO Multiply sparse-dense giving sparse",testMultiplyDiabloDACsparseDenseSparseOut)
     test("DIABLO Multiply sparse-sparse giving sparse",testMultiplyDiabloDACsparseSparseSparseOut)
-
+*/
     spark_context.stop()
   }
 }

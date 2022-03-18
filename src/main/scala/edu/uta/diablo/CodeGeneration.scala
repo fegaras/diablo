@@ -543,6 +543,21 @@ abstract class CodeGeneration {
            if (zero == Var("Nil"))
                q"merge_tensors($xc,$yc,_++_,$zc)"
            else q"merge_tensors($xc,$yc,($nx:$tp,$ny:$tp) => $bc,$zc)"
+      case Call("groupByJoin_mapper",
+                List(as,bs,gd,gb,Lambda(pa,plus),
+                     Lambda(pp@TuplePat(List(VarPat(vx),VarPat(vy))),prod)))
+        => val (tq"($ai,$atp)",asc) = typedCode(as,env)
+           val (tq"($bi,$btp)",bsc) = typedCode(bs,env)
+           val gdc = codeGen(gd,env)
+           val gbc = codeGen(gb,env)
+           val vxc = TermName(vx)
+           val vyc = TermName(vy)
+           val (tq"($rkp,$rtp)",plusc) = typedCode(plus,add(pa,tq"($atp,$btp)",env))
+           val pac = code(pa)
+           val prodc = codeGen(prod,add(pp,tq"($rtp,$rtp)",env))
+           q"""groupByJoin_mapper($asc,$bsc,$gdc,$gbc,
+                                  (x:$atp,y:$btp) => (x,y) match { case $pac => $plusc },
+                                  ($vxc:$rtp,$vyc:$rtp) => $prodc)"""
       case Call("unique_values",List(Lambda(p@VarPat(v),b)))
         => val bc = codeGen(b,add(p,tq"Int",env))
            val vc = TermName(v)

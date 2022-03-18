@@ -403,12 +403,15 @@ object Multiply {
     // matrix multiplication of tiled matrices using groupBy-join - hand-written
     def testMultiplyCodeGBJ (): Double = {
       val t = System.currentTimeMillis()
+      val cn = Math.ceil(n*1.0/N).toInt
       try {
         val C = ((n,n),et,
-                 AA._3.flatMap{ case ((i,k),a) => (0 to n/N).map(j => ((i,j),(k,a))) }
-                          .cogroup( BB._3.flatMap{ case ((k,j),b) => (0 to m/N).map(i => ((i,j),(k,b))) } )
-                          .mapValues{ case (as,bs)
-                                     => val c = Array.ofDim[Double](N*N)
+                 AA._3.flatMap{ case ((i,k),a) => (0 until cn).map(j => ((i,j),(k,a))) }
+                  .cogroup( BB._3.flatMap{ case ((kk,j),b) => (0 until cn).map(i => ((i,j),(kk,b))) } )
+                  .flatMap{ case ((ci,cj),(as,bs))
+                              => if (as.isEmpty || bs.isEmpty)
+                                   Nil
+                                 else { val c = Array.ofDim[Double](N*N)
                                         var ns = 0; var ms = 0
                                         for { (k1,((na,ma),_,a)) <- as
                                               (k2,((nb,mb),_,b)) <- bs if k2 == k1
@@ -416,7 +419,7 @@ object Multiply {
                                            var k = 0
                                            ns = na
                                            ms = mb
-                                           while (k<ma) {
+                                           while (k<ma && k<nb) {
                                              var j = 0
                                              while (j<mb) {
                                                c(i*ms+j) += a(i*ma+k)*b(k*mb+j)
@@ -425,7 +428,8 @@ object Multiply {
                                              k += 1
                                            }
                                         }
-                                        ((ns,ms),et,Array.tabulate(ns*ms){ i => c(i) })
+                                        List(((ci,cj),((ns,ms),et,Array.tabulate(ns*ms){ i => c(i) })))
+                                      }
                                     })
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
@@ -505,7 +509,7 @@ object Multiply {
     println("@@@@ dense matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
     val sparse_tile = q("tensor(N)(N)[ ((i,j),random()) | i <- 0..(N-1), j <- 0..(N-1), random() >  (1.0-sparsity)*10 ]")
     val sparse_tile_size = sizeof(sparse_tile).toDouble
-    println("@@@@ sparse matrix size: %.2f MB".format(sparse_tile_size*(n/N)*(m/N)/(1024.0*1024.0)))
+    println("@@@@ sparsity: %.3f,  sparse matrix size: %.2f MB".format(sparsity,sparse_tile_size*(n/N)*(m/N)/(1024.0*1024.0)))
 
     def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()

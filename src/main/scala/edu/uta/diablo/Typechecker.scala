@@ -509,6 +509,8 @@ object Typechecker {
                        else throw new Error("Function "+f+" cannot be applied to "+arg+" of type "+tp);
                   case _ => throw new Error("Expected a function "+f)
                }
+          case Coerce(x,tp)
+            => tp
           case Lambda(p,b)   // fix: needs type inference
             => val tp = TypeParameter(newvar)
                FunctionType(tp,typecheck(b,bindPattern(p,tp,env)))

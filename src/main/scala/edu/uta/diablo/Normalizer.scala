@@ -279,9 +279,14 @@ object Normalizer {
         if inverse(ie,i,v).isDefined
         => val Some(nv) = inverse(ie,i,v)
            Let(p,nv,IfE(Call("inRange",List(Var(i),n1,n2,n3)),b,nb))
+      case flatMap(Lambda(p,Seq(List(u))),x)
+        if toExpr(p) == u
+        => normalize(x)
+/*
       case flatMap(Lambda(VarPat(v),Seq(List(Var(w)))),x)
         if v == w
         => normalize(x)
+*/
       case flatMap(Lambda(VarPat(v),Let(p,Var(w),b)),x)
         if v == w && occurrences(v,b) == 0
         => normalize(flatMap(Lambda(p,b),x))
