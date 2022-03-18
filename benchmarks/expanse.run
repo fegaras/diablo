@@ -58,28 +58,28 @@ done
 repeat=4
 
 for ((i=1; i<=5; i++)); do
-    n = $(i*10000)
-    sp = 0.01
+    n=$((i*10000))
+    sp=0.01
     spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Add --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $sp
 done
 
 for ((i=2; i<=7; i++)); do
-    n = $(i*5000)
-    sp = 0.01
+    n=$((i*5000))
+    sp=0.01
     spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Multiply --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $sp
 done
 
 for ((i=1; i<=5; i++)); do
-    n = $(i*10000)
-    m = $n
-    d = 10
-    sp = 0.01
+    n=$((i*10000))
+    m=$n
+    d=10
+    sp=0.01
     spark-submit --jars ${DIABLO_HOME}/lib/diablo.jar --class Factorization --master $MASTER $SPARK_OPTIONS test.jar $repeat $n $m $d $sp
 done
 
 hdfs dfs -mkdir -p /user/$USER
 for ((i=1; i<=5; i++)); do
-    n = $(i*10000)
+    n=$((i*10000))
     hdfs dfs -put data_$n/lr_input1.txt /user/$USER/lr_input1.txt
     hdfs dfs -put data_$n/lr_output1.txt /user/$USER/lr_output1.txt
     hdfs dfs -put data_$n/lr_input2.txt /user/$USER/lr_input2.txt
@@ -88,7 +88,7 @@ for ((i=1; i<=5; i++)); do
 done
 
 for ((i=1; i<=5; i++)); do
-    n = $(i*50000)
+    n=$((i*50000))
     hdfs dfs -put X_train.txt /user/$USER/X_train.txt
     hdfs dfs -put y_train.txt /user/$USER/y_train.txt
     hdfs dfs -put X_test.txt /user/$USER/X_test.txt
