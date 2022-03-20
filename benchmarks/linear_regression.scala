@@ -37,12 +37,13 @@ object LinearRegression extends Serializable {
     parami(block_dim_size,1000)
     val repeats = args(0).toInt
     val N = 1000
+	val validate = false
 	
-    val lrate = 0.0005
+    val lrate = 1.0
     val total_size = args(1).toInt
     val n = (0.8*total_size).toInt
     val test_size = total_size-n
-    val m = 10
+    val m = 100
     val numIter = 10
     val rand = new Random()
     val X_train = spark_context.textFile(args(2))
@@ -66,9 +67,10 @@ object LinearRegression extends Serializable {
     	val output2 = y_test
 		val A = q("tensor*(n,m)[((i,j),v) | ((i,j),v) <- input1 ]")
 		A._3.cache
+		val B = q("tensor*(n)[(i,v) | (i,v) <- output1]")
+		B._3.cache
 		val t = System.currentTimeMillis()
     	val cost = q("""
-			var B = tensor*(n)[(i,v) | (i,v) <- output1];
 			var W = tensor*(m)[(i,v) | (i,v) <- theta];
 			var itr = 0;
 			while (itr < numIter) {
@@ -78,11 +80,14 @@ object LinearRegression extends Serializable {
 				W = tensor*(m)[(i,a-(1.0/n)*lrate*b) | (i,a) <- W, (ii,b) <- d_theta, i==ii];
 			  	itr += 1;
 			};
-			var A1 = tensor*(test_size,m)[((i,j),v) | ((i,j),v) <- input2];
-			var B1 = tensor*(test_size)[(i,v) | (i,v) <- output2];
-			var x_theta = tensor*(test_size)[(i,+/v) | ((i,j),a) <- A1, (jj,w) <- W, j==jj, let v=w*a, group by i];
-			var x_theta_minus_y = tensor*(test_size)[(i,a-b) | (i,a) <- x_theta, (ii,b) <- B1, i==ii];
-			var cost_val = +/[ v | (i, xty) <- x_theta_minus_y, let v = (0.5/test_size)*xty*xty];
+			var cost_val = 0.0;
+			if(validate) {
+				var A1 = tensor*(test_size,m)[((i,j),v) | ((i,j),v) <- input2];
+				var B1 = tensor*(test_size)[(i,v) | (i,v) <- output2];
+				var x_theta = tensor*(test_size)[(i,+/v) | ((i,j),a) <- A1, (jj,w) <- W, j==jj, let v=w*a, group by i];
+				var x_theta_minus_y = tensor*(test_size)[(i,a-b) | (i,a) <- x_theta, (ii,b) <- B1, i==ii];
+				cost_val = +/[ v | (i, xty) <- x_theta_minus_y, let v = (0.5/test_size)*xty*xty];
+			}
 			cost_val;
 		""")
 	  	println("Cost: "+cost)
@@ -121,14 +126,16 @@ object LinearRegression extends Serializable {
           .setRegParam(1.0)
 
         val lrModel = lr.fit(training_data)
-
-		val test_data = spark.sql("select Y_test_d._2 as label, X_test_d._2 as features from X_test_d join Y_test_d on X_test_d._1=Y_test_d._1")
-			.rdd.map{row => LabeledPoint(
-		  	row.getAs[Double]("label"),
-		  	row.getAs[org.apache.spark.ml.linalg.Vector]("features")
-		)}.toDF.cache()
-		val predictions = lrModel.transform(test_data)
-		predictions.rdd.count()
+		if(validate) {
+			val test_data = spark.sql("select Y_test_d._2 as label, X_test_d._2 as features from X_test_d join Y_test_d on X_test_d._1=Y_test_d._1")
+				.rdd.map{row => LabeledPoint(
+				row.getAs[Double]("label"),
+				row.getAs[org.apache.spark.ml.linalg.Vector]("features")
+			)}.toDF.cache()
+			val predictions = lrModel.transform(test_data)
+			predictions.rdd.count()
+			println(lrModel.evaluate(test_data).meanSquaredError)
+		}
 	  	(System.currentTimeMillis()-t)/1000.0
     }
 	def test ( name: String, f: => Double ) {
