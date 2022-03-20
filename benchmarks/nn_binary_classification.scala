@@ -35,12 +35,13 @@ object NeuralNetwork extends Serializable {
 		parami(block_dim_size,1000)
 		val repeats = args(0).toInt
 		val N = 1000
+		val validate = false
 		
 		val learning_rate = 2.0
 		val total_size = args(1).toInt
 		val n = (0.8*total_size).toInt
 		val test_size = total_size - n
-		val m = 2
+		val m = 3
 		val epochs = 10
 
 		val input1 = spark_context.textFile(args(2))
@@ -69,7 +70,7 @@ object NeuralNetwork extends Serializable {
 		for ((i,v) <- input4.collect)
 			Y_test(i) = v
 
-		val nn_architecture = List((2, 25), (25, 1))
+		val nn_architecture = List((m, 8), (8, 1))
 		
 		def mat_multiply(A: Array[Double], B: Array[Double], a_n:Int, a_m:Int, b_m:Int): Array[Double] = {
 			var res = Array.tabulate(a_n*b_m){i => 0.0}
@@ -110,16 +111,13 @@ object NeuralNetwork extends Serializable {
 		def random(): Double = (rand.nextDouble()-0.5)*0.2
 
 		var weights: Array[Array[Double]] = Array()
-		var biases: Array[Array[Double]] = Array()
 		
-		for (idx <- 0 until 2) {
+		for (idx <- 0 until nn_architecture.size) {
 			val layer_input_size = nn_architecture(idx)._1
 			val layer_output_size = nn_architecture(idx)._2
 			
-			val W = Array.tabulate(layer_output_size * layer_input_size){i => random()}
+			val W = Array.tabulate(layer_input_size*layer_output_size){i => random()}
 			weights = weights ++ Array(W)
-			val B = Array.tabulate(layer_output_size * 1){i => random()}
-			biases = biases ++ Array(B)
 		}
 		
 		def getMax(z: Double) = math.max(0.0,z)
@@ -136,87 +134,185 @@ object NeuralNetwork extends Serializable {
 			val layer1 = nn_architecture(0)._2
 			val layer2 = nn_architecture(1)._2
 			
-			val weights1 = spark_context.parallelize(for(i <- 0 to layer1-1; j <- 0 to m-1) yield ((i,j),weights(0)(i*m+j))).cache()
-			val weights2 = spark_context.parallelize(for(i <- 0 to layer2-1; j <- 0 to layer1-1) yield ((i,j),weights(1)(i*layer1+j))).cache()
-			val bias1 = spark_context.parallelize(for(i <- 0 to layer1-1) yield (i,biases(0)(i))).cache()
-			val bias2 = spark_context.parallelize(for(i <- 0 to layer2-1) yield (i,biases(1)(i))).cache()
-			val X_d = q("tensor*(m,n)[ ((i,j),v) | ((j,i),v) <- X_1 ]")
+			val weights1 = spark_context.parallelize(for(i <- 0 to m-1; j <- 0 to layer1-1) yield ((i,j),weights(0)(i*layer1+j))).cache()
+			val weights2 = spark_context.parallelize(for(i <- 0 to layer1-1; j <- 0 to layer2-1) yield ((i,j),weights(1)(i*layer2+j))).cache()
+			val X_d = q("tensor*(n,m)[ ((i,j),v) | ((i,j),v) <- X_1 ]")
 			X_d._3.cache
-			val Y_d = q("tensor*(n)[ (i,v) | (i,v) <- y_1 ]")
+			val Y_d = q("tensor*(n,1)[ ((i,j),v) | (i,v) <- y_1, j <- 0..0 ]")
 			Y_d._3.cache
-			val X_test_d = q("tensor*(m)(test_size)[ ((i,j),v) | ((j,i),v) <- X_2 ]")
+			val X_test_d = q("tensor*(test_size,m)[ ((i,j),v) | ((i,j),v) <- X_2 ]")
 			X_test_d._3.cache
-			val Y_test_d = q("tensor*(test_size)[ (i,v) | (i,v) <- y_2 ]")
+			val Y_test_d = q("tensor*(test_size,1)[ ((i,j),v) | (i,v) <- y_2, j <- 0..0 ]")
 			Y_test_d._3.cache
 			val t = System.currentTimeMillis()
 			val Y_hat = q("""
-				var w1 = tensor*(layer1,m)[ ((i,j),v) | ((i,j),v) <- weights1 ];
-				var b1 = tensor*(layer1)[(i,v) | (i,v) <- bias1 ];
-				var w2 = tensor*(layer2,layer1)[((i,j),v) | ((i,j),v) <- weights2 ];
-				var b2 = tensor*(layer2)[(i,v) | (i,v) <- bias2 ];
+				var w1 = tensor*(m,layer1)[ ((i,j),v) | ((i,j),v) <- weights1 ];
+				var w2 = tensor*(layer1,layer2)[((i,j),v) | ((i,j),v) <- weights2 ];
+				cache(w1);
+				cache(w2);
 				var itr = 0;
 				while(itr < epochs) {
-					var tmp_Z1 = tensor*(layer1,n)[ ((i,j),+/v) | ((i,k),w) <- w1, ((kk,j),a) <- X_d,
+					var Z_curr1 = tensor*(n,layer1)[ ((i,j),+/v) | ((i,k),a) <- X_d, ((kk,j),w) <- w1,
 		                                       kk == k, let v = w*a, group by (i,j) ];
-		            var Z_curr1 = tensor*(layer1,n)[ ((i,j),z+b) | ((i,j),z) <- tmp_Z1, (ii,b) <- b1,
-		                                       i == ii];
-		            var A_curr1 = tensor*(layer1,n)[ ((i,j),getMax(z)) | ((i,j),z) <- Z_curr1 ];
+		            var A_curr1 = tensor*(n,layer1)[ ((i,j),getMax(z)) | ((i,j),z) <- Z_curr1 ];
 		            
-		            var tmp_Z2 = tensor*(layer2,n)[ ((i,j),+/v) | ((i,k),w) <- w2, ((kk,j),a) <- A_curr1,
+		            var Z_curr2 = tensor*(n,layer2)[ ((i,j),+/v) | ((i,k),a) <- A_curr1, ((kk,j),w) <- w2,
 		                                       kk == k, let v = w*a, group by (i,j) ];
-		            var Z_curr2 = tensor*(n)[ (j,+/v) | ((i,j),z) <- tmp_Z2, (ii,b) <- b2,
-		                                       i == ii, let v = z+b, group by j];
-		            var A_curr2 = tensor*(n)[ (i,1/(1+getExp(-z))) | (i,z) <- Z_curr2 ];
-					var dA_curr = tensor*(n)[ (i,((-y/y_hat)+(1-y)/(1-y_hat))) | (i,y) <- Y_d, (ii,y_hat) <- A_curr2,
-                    							i == ii ];
-                 	var dZ_curr_1 = tensor*(n)[ (i, dA*sig*(1-sig)) | (i,dA) <- dA_curr, (ii,z) <- Z_curr2,
-                    							i == ii, let sig = 1/(1+getExp(-z)) ];
+		            var A_curr2 = tensor*(n,layer2)[ ((i,j),1/(1+getExp(-z))) | ((i,j),z) <- Z_curr2 ];
+					var dA_curr = tensor*(n,layer2)[ ((i,j),((-y/y_hat)+(1-y)/(1-y_hat))) | ((i,j),y) <- Y_d, ((ii,jj),y_hat) <- A_curr2,
+                    							i == ii, j == jj ];
+                 	var dZ_curr = tensor*(n,layer2)[ ((i,j), dA*sig*(1-sig)) | ((i,j),dA) <- dA_curr, ((ii,jj),z) <- Z_curr2,
+                    							i == ii, j == jj, let sig = 1/(1+getExp(-z)) ];
+                    var dW_curr = tensor*(layer1,layer2)[ ((j,jj), +/v) | ((i,j),a) <- A_curr1, ((ii,jj),z) <- dZ_curr,
+                    							i == ii, let v = z*a, group by (j,jj) ];
                     
-                    var dZ_curr = tensor*(layer2,n)[ ((i,j), v1) | i <- 0..0, (j,v1) <- dZ_curr_1];
-                    var dW_curr = tensor*(layer2,layer1)[ ((i,ii), +/v) | ((i,j),z) <- dZ_curr, ((ii,jj),a) <- A_curr1,
-                    							j == jj, let v = z*a, group by (i,ii) ];
-                    var db_curr = tensor*(layer2)[ (i, +/z) | ((i,j),z) <- dZ_curr, group by i ];
-                    
-                    var w2_update = tensor*(layer2,layer1)[((i,j),w-learning_rate*dw/n) | ((i,j),w) <- w2, ((ii,jj),dw) <- dW_curr,
+                    var w2_update = tensor*(layer1,layer2)[((i,j),w-learning_rate*dw/n) | ((i,j),w) <- w2, ((ii,jj),dw) <- dW_curr,
                     							i==ii, j==jj ];
-                   	var b2_update = tensor*(layer2)[(i,b-learning_rate*db/n) | (i,b) <- b2, (ii,db) <- db_curr,
-                    							i==ii ];
                     
-                    var dA_curr2 = tensor*(layer1,n)[ ((j,jj),+/v) | ((i,j),w) <- w2, ((ii,jj),z) <- dZ_curr,
-                    							i == ii, let v = w*z, group by (j,jj) ];
-                 	var dZ_curr2 = tensor*(layer1,n)[ ((i,j), v) | ((i,j),z) <- Z_curr1, ((ii,jj),a) <- dA_curr2,
+                    var dA_curr2 = tensor*(n,layer1)[ ((i,ii),+/v) | ((i,j),z) <- dZ_curr, ((ii,jj),w) <- w2,
+                    							j == jj, let v = w*z, group by (i,ii) ];
+                 	var dZ_curr2 = tensor*(n,layer1)[ ((i,j), v) | ((i,j),z) <- Z_curr1, ((ii,jj),a) <- dA_curr2,
 												i == ii, j == jj, let v = getVal(z,a) ];
-                    var dW_curr2 = tensor*(layer1,m)[ ((i,ii), +/v) | ((i,j),z) <- dZ_curr2, ((ii,jj),a) <- X_d,
-                    							j == jj, let v = z*a, group by (i,ii) ];
-                    var db_curr2 = tensor*(layer1)[ (i, +/z) | ((i,j),z) <- dZ_curr2, group by i ];
+                    var dW_curr2 = tensor*(m,layer1)[ ((j,jj), +/v) | ((i,j),a) <- X_d, ((ii,jj),z) <- dZ_curr2,
+                    							i == ii, let v = z*a, group by (j,jj) ];
                     
-                    var w1_update = tensor*(layer1,m)[((i,j),w-learning_rate*dw/n) | ((i,j),w) <- w1, ((ii,jj),dw) <- dW_curr2,
+                    var w1_update = tensor*(m,layer1)[((i,j),w-learning_rate*dw/n) | ((i,j),w) <- w1, ((ii,jj),dw) <- dW_curr2,
                     							i==ii, j==jj ];
-                   	var b1_update = tensor*(layer1)[(i,b-learning_rate*db/n) | (i,b) <- b1, (ii,db) <- db_curr2,
-                    							i==ii ];
                     w2 = w2_update;
-                    b2 = b2_update;
                     w1 = w1_update;
-                    b1 = b1_update;
-                    							
+					cache(w1);
+					cache(w2);
 					itr += 1;
 				}
-				var tmp_Z1 = tensor*(layer1,test_size)[ ((i,j),+/v) | ((i,k),w) <- w1, ((kk,j),a) <- X_test_d,
-                                           kk == k, let v = w*a, group by (i,j) ];
-                var Z_curr1 = tensor*(layer1,test_size)[ ((i,j),z+b) | ((i,j),z) <- tmp_Z1, (ii,b) <- b1,
-                                           i == ii];
-                var A_curr1 = tensor*(layer1,test_size)[ ((i,j),getMax(z)) | ((i,j),z) <- Z_curr1 ];
-                
-                var tmp_Z2 = tensor*(layer2,test_size)[ ((i,j),+/v) | ((i,k),w) <- w2, ((kk,j),a) <- A_curr1,
-                                           kk == k, let v = w*a, group by (i,j) ];
-                var Z_curr2 = tensor*(test_size)[ (j,+/v) | ((i,j),z) <- tmp_Z2, (ii,b) <- b2,
-                                           i == ii, let v = z+b, group by j];
-                var A_curr2 = tensor*(test_size)[ (i,1/(1+getExp(-z))) | (i,z) <- Z_curr2 ];
-                rdd[ (i,v) | (i,v) <- A_curr2 ];
+				var ret = tensor*(test_size,1)[ ((i,j),random()) | i <- 0..(test_size-1), j <- 0..0 ];
+				if(validate) {
+					var Z_curr1 = tensor*(test_size,layer1)[ ((i,j),+/v) | ((i,k),a) <- X_test_d, ((kk,j),w) <- w1,
+		                                       kk == k, let v = w*a, group by (i,j) ];
+		            var A_curr1 = tensor*(test_size,layer1)[ ((i,j),getMax(z)) | ((i,j),z) <- Z_curr1 ];
+		            
+		            var Z_curr2 = tensor*(test_size,layer2)[ ((i,j),+/v) | ((i,k),a) <- A_curr1, ((kk,j),w) <- w2,
+		                                       kk == k, let v = w*a, group by (i,j) ];
+		            var A_curr2 = tensor*(test_size,layer2)[ ((i,j),1/(1+getExp(-z))) | ((i,j),z) <- Z_curr2 ];
+					ret = A_curr2;
+				}
+				rdd[ ((i,j),v) | ((i,j),v) <- ret ];
 			""")
-			val Y_pred = Y_hat.map{ case (i,y) => (i, if(y > 0.5) 1 else 0)}
-			val count = Y_pred.join(input4).map{ case (i, (y1, y2)) => if(y1==y2) 1.0 else 0.0}.reduce(_+_)
-			println("Test Accuracy: "+count/test_size)
+			if(validate) {
+				val Y_pred = Y_hat.map{ case ((i,j),y) => (i, if(y > 0.5) 1 else 0)}
+				val count = Y_pred.join(input4).map{ case (i, (y1, y2)) => if(y1==y2) 1.0 else 0.0}.reduce(_+_)
+				println("Test Accuracy: "+count/test_size)
+			}
+		  	(System.currentTimeMillis()-t)/1000.0
+		}
+
+		def testDiabloNN1(): Double = {
+			var cost_history = Array.tabulate(epochs){i => 0.0}
+			var acc_history = Array.tabulate(epochs){i => 0.0}
+			val X_1 = input1
+			val y_1 = input2
+			val X_2 = input3
+			val y_2 = input4
+			val number_of_layers = nn_architecture.size
+			val layer1 = nn_architecture(0)._2
+			val layer2 = nn_architecture(1)._2
+
+			val weights1 = spark_context.parallelize(for(i <- 0 to m-1; j <- 0 to layer1-1) yield ((i,j),weights(0)(i*layer1+j))).cache()
+			val weights2 = spark_context.parallelize(for(i <- 0 to layer1-1; j <- 0 to layer2-1) yield ((i,j),weights(1)(i*layer2+j))).cache()
+			val X_d = q("tensor*(n,m)[ ((i,j),v) | ((i,j),v) <- X_1 ]")
+			X_d._3.cache
+			val Y_d = q("tensor*(n,1)[ ((i,j),v) | (i,v) <- y_1, j <- 0..0 ]")
+			Y_d._3.cache
+			val X_test_d = q("tensor*(test_size,m)[ ((i,j),v) | ((i,j),v) <- X_2 ]")
+			X_test_d._3.cache
+			val Y_test_d = q("tensor*(test_size,1)[ ((i,j),v) | (i,v) <- y_2, j <- 0..0 ]")
+			Y_test_d._3.cache
+			var w_arr: Array[RDD[((Int,Int),Double)]] = Array()
+			for (idx <- 0 until number_of_layers) {
+				val layer1 = nn_architecture(idx)._1
+				val layer2 = nn_architecture(idx)._2
+				val weights1 = spark_context.parallelize(for(i <- 0 to layer1-1; j <- 0 to layer2-1) yield ((i,j),weights(idx)(i*layer2+j))).cache()
+				w_arr = w_arr :+ weights1
+			}
+			var Z_arr: Array[RDD[((Int, Int), Double)]] = Array.ofDim[RDD[((Int, Int), Double)]](number_of_layers)
+			var A_arr: Array[RDD[((Int, Int), Double)]] = Array.ofDim[RDD[((Int, Int), Double)]](number_of_layers)
+			
+			val t = System.currentTimeMillis()
+			for(itr <- 0 until epochs) {
+				var A_curr1 = X_d
+				for(l <- 0 to number_of_layers-1) {
+					A_arr(l) = q("rdd[ ((i,j),v) | ((i,j),v) <- A_curr1 ]")
+					var w1 = w_arr(l)
+					val m1 = nn_architecture(l)._1
+					val m2 = nn_architecture(l)._2
+					var w2 = q("tensor*(m1,m2)[ ((i,j),w) | ((i,j),w) <- w1]")
+					w2._3.cache
+					var Z_curr1 = q("""tensor*(n,m2)[ ((i,j),+/v) | ((i,k),a) <- A_curr1, ((kk,j),w) <- w2,
+											kk == k, let v = w*a, group by (i,j) ]""")
+					Z_curr1._3.cache
+					if(l == number_of_layers-1) {
+						A_curr1 = q("""tensor*(n,m2)[ ((i,j),1/(1+getExp(-z))) | ((i,j),z) <- Z_curr1 ]""")
+					}
+					else {
+						A_curr1 = q("""tensor*(n,m2)[ ((i,j),getMax(z)) | ((i,j),z) <- Z_curr1 ]""")
+					}
+					A_curr1._3.cache
+					Z_arr(l) = q("rdd[ ((i,j),v) | ((i,j),v) <- Z_curr1 ]")
+				}
+				var dA_prev = q("""tensor*(n,1)[ ((i,j),((-y/y_hat)+(1-y)/(1-y_hat))) | ((i,j),y) <- Y_d, ((ii,jj),y_hat) <- A_curr1,
+                    							i == ii, j == jj ]""")
+				for(l <- 0 to number_of_layers-1) {
+					var idx = number_of_layers - 1 - l
+					var dA_curr = dA_prev
+					val m1 = nn_architecture(idx)._1
+					val m2 = nn_architecture(idx)._2
+					val Z_curr1 = Z_arr(idx)
+					val A_curr1 = A_arr(idx)
+					val Z_curr2 = q("tensor*(n,m2)[ ((i,j),v) | ((i,j),v) <- Z_curr1 ]")
+					val A_curr2 = q("tensor*(n,m1)[ ((i,j),v) | ((i,j),v) <- A_curr1 ]")
+					val w1 = w_arr(idx)
+					var w2 = q("tensor*(m1,m2)[ ((i,j),w) | ((i,j),w) <- w1]")
+					w2._3.cache
+					var dZ_curr = q("""tensor*(n,m2)[ ((i,j), v) | ((i,j),a) <- dA_curr, ((ii,jj),z) <- Z_curr2,
+											i == ii, j == jj, let v = getVal(z,a) ]""")
+					if(idx == number_of_layers - 1) {
+						dZ_curr = q("""tensor*(n,m2)[ ((i,j), dA*sig*(1-sig)) | ((i,j),dA) <- dA_curr, ((ii,jj),z) <- Z_curr2,
+											i == ii, j == jj, let sig = 1/(1+getExp(-z)) ]""")
+					}
+					dZ_curr._3.cache
+					var dW_curr = q("""tensor*(m1,m2)[ ((j,jj), +/v) | ((i,j),a) <- A_curr2, ((ii,jj),z) <- dZ_curr,
+											i == ii, let v = z*a, group by (j,jj) ]""")
+					dW_curr._3.cache
+					dA_prev = q("""tensor*(n,m1)[ ((i,ii),+/v) | ((i,j),z) <- dZ_curr, ((ii,jj),w) <- w2,
+											j == jj, let v = w*z, group by (i,ii) ]""")
+					dA_prev._3.cache
+					var w_update = q("""tensor*(m1,m2)[((i,j),w-learning_rate*dw/n) | ((i,j),w) <- w2, ((ii,jj),dw) <- dW_curr,
+											i==ii, j==jj ]""")
+					w_update._3.cache
+					w_arr(idx) = q("rdd[ ((i,j),v) | ((i,j),v) <- w_update ]")
+					w_arr(idx).cache
+				}
+			}
+			if(validate) {
+				var A_curr1 = X_test_d
+				for(l <- 0 to number_of_layers-1) {
+					var w1 = w_arr(l)
+					val m1 = nn_architecture(l)._1
+					val m2 = nn_architecture(l)._2
+					var w2 = q("tensor*(m1,m2)[ ((i,j),w) | ((i,j),w) <- w1]")
+					var Z_curr1 = q("""tensor*(test_size,m2)[ ((i,j),+/v) | ((i,k),a) <- A_curr1, ((kk,j),w) <- w2,
+											kk == k, let v = w*a, group by (i,j) ]""")
+					if(l == number_of_layers-1) {
+						A_curr1 = q("""tensor*(test_size,m2)[ ((i,j),1/(1+getExp(-z))) | ((i,j),z) <- Z_curr1 ]""")
+					}
+					else {
+						A_curr1 = q("""tensor*(test_size,m2)[ ((i,j),getMax(z)) | ((i,j),z) <- Z_curr1 ]""")
+					}
+				}
+				val Y_hat = q("rdd[ ((i,j),v) | ((i,j),v) <- A_curr1 ]")
+				val Y_pred = Y_hat.map{ case ((i,j),y) => (i, if(y > 0.5) 1 else 0)}
+				val count = Y_pred.join(input4).map{ case (i, (y1, y2)) => if(y1==y2) 1.0 else 0.0}.reduce(_+_)
+				println("Test Accuracy: "+count/test_size)
+			}
 		  	(System.currentTimeMillis()-t)/1000.0
 		}
 		
@@ -256,15 +352,17 @@ object NeuralNetwork extends Serializable {
 			// Fit the model
 			val lrModel = lr.fit(training_data)
 
-			val test_data = spark.sql("select Y_test_d._2 as label, X_test_d._2 as features from X_test_d join Y_test_d on X_test_d._1=Y_test_d._1")
-				.rdd.map{row => LabeledPoint(
-			  	row.getAs[Double]("label"),
-			  	row.getAs[org.apache.spark.ml.linalg.Vector]("features")
-			)}.toDF.cache()
-			val predictions = lrModel.transform(test_data)
-			val evaluator = new BinaryClassificationEvaluator()
-			val accuracy = evaluator.evaluate(predictions)
-			println("Test Accuracy: "+accuracy)
+			if(validate) {
+				val test_data = spark.sql("select Y_test_d._2 as label, X_test_d._2 as features from X_test_d join Y_test_d on X_test_d._1=Y_test_d._1")
+					.rdd.map{row => LabeledPoint(
+					row.getAs[Double]("label"),
+					row.getAs[org.apache.spark.ml.linalg.Vector]("features")
+				)}.toDF.cache()
+				val predictions = lrModel.transform(test_data)
+				val evaluator = new BinaryClassificationEvaluator()
+				val accuracy = evaluator.evaluate(predictions)
+				println("Test Accuracy: "+accuracy)
+			}
 			(System.currentTimeMillis()-t)/1000.0
 		}
 
@@ -277,17 +375,18 @@ object NeuralNetwork extends Serializable {
 				val t = f
 				j += 1
 				if (t > 0.0) {   // if f didn't crash
+					if(i > 0) s += t
 					i += 1
 					println("Try: "+i+"/"+j+" time: "+t)
-					s += t
 				}
 			}
-			if (i > 0) s = s/i
+			if (i > 0) s = s/(i-1)
 			print("*** %s cores=%d n=%d m=%d N=%d ".format(name,cores,total_size,m,N))
 			println("tries=%d %.3f secs".format(i,s))
 		}
 
 		test("Diablo Comprehension Neural Network",testDiabloNN)
+		test("Diablo Comprehension Neural Network loops",testDiabloNN1)
 		test("MLlib Logistic Regression Neural Network",testMLlibNN)
 		
 		spark_context.stop()
