@@ -80,16 +80,39 @@ object Multiply {
                                                          if ((j+1)*N > cols) cols%N else N)) }
     }
 
+    def randomTileSparse ( nd: Int, md: Int ): SparseMatrix = {
+      val max = 10
+      val rand = new Random()
+      var entries = scala.collection.mutable.ArrayBuffer[(Int,Int,Double)]()
+      for (i <- 0 to nd-1; j <- 0 to md-1) {
+        if (rand.nextDouble() <= sparsity)
+          entries += ((i,j,rand.nextDouble()*max))
+      }
+      SparseMatrix.fromCOO(nd,md,entries)
+    }
+
+    def randomSparseMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
+      val l = Random.shuffle((0 until (rows+N-1)/N).toList)
+      val r = Random.shuffle((0 until (cols+N-1)/N).toList)
+      spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
+            .map{ case (i,j) => ((i,j),randomTileSparse(if ((i+1)*N > rows) rows%N else N,
+                              if ((j+1)*N > cols) cols%N else N)) }
+    }
+
     val Am = randomMatrix(n,m).cache()
     val Bm = randomMatrix(m,n).cache()
 
     val A = new BlockMatrix(Am,N,N)
     val B = new BlockMatrix(Bm,N,N)
 
+    val AS = randomSparseMatrix(n,m).cache()
+    val BS = randomSparseMatrix(m,n).cache()
+
+    val ASparse = new BlockMatrix(AS,N,N).cache
+    val BSparse = new BlockMatrix(BS,N,N).cache
+
     type tiled_matrix = ((Int,Int),EmptyTuple,RDD[((Int,Int),((Int,Int),EmptyTuple,Array[Double]))])
-
     val et = EmptyTuple()
-
     // dense block tensors
     val AA = ((n,m),et,Am.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
     val BB = ((m,n),et,Bm.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
@@ -134,11 +157,31 @@ object Multiply {
                         m.rowsPerBlock,m.colsPerBlock)
 
     // matrix multiplication of tiled matrices in MLlib.linalg
-    def testMultiplyMLlib (): Double = {
+    def testMultiplyMLlibDenseDense (): Double = {
       val t = System.currentTimeMillis()
       try {
         val C = A.multiply(B)
         val x = C.blocks.count
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix multiplication of Sparse-Dense tiled matrices in MLlib.linalg
+    def testMultiplyMLlibSparseDense (): Double = {
+      val t = System.currentTimeMillis()
+      try {
+      val C = ASparse.multiply(B)
+      val x = C.blocks.count
+      } catch { case x: Throwable => println(x); return -1.0 }
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
+    // matrix multiplication of Sparse-Sparse tiled matrices in MLlib.linalg
+    def testMultiplyMLlibSparseSparse (): Double = {
+      val t = System.currentTimeMillis()
+      try {
+      val C = ASparse.multiply(BSparse)
+      val x = C.blocks.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -531,7 +574,9 @@ object Multiply {
     }
 
     //test("DIABLO IJV Multiply",testMultiplyIJV)
-    test("MLlib Multiply",testMultiplyMLlib)
+    test("MLlib Multiply dense-dense",testMultiplyMLlibDenseDense)
+    test("MLlib Multiply sparse-dense",testMultiplyMLlibSparseDense)
+    test("MLlib Multiply sparse-sparse",testMultiplyMLlibSparseSparse)
     test("DIABLO Multiply",testMultiplyDiabloDAC)
     test("DIABLO Multiply SQL",testMultiplyDiabloDF)
     //test("DIABLO Multiply Sequential",testMultiplyDiabloDACs)

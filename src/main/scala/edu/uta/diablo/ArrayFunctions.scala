@@ -21,8 +21,14 @@ import org.apache.spark.rdd.RDD
 
 trait ArrayFunctions {
 
+  /* The size of an object */
+  def sizeof ( x: AnyRef ): Long = {
+    import org.apache.spark.util.SizeEstimator.estimate
+    estimate(x)
+  }
+
   // An outer-join for 1-1 join relationship
-  @inline
+  @specialized
   def outerJoin[K:ClassTag,T:ClassTag] ( xrdd: RDD[(K,T)], yrdd: RDD[(K,T)],
                                          f: (T,T) => T ): RDD[(K,T)]
     = xrdd.fullOuterJoin(yrdd,number_of_partitions).map {
@@ -35,7 +41,7 @@ trait ArrayFunctions {
       }
 
   // convert a dense array to a tensor (dense dimensions dn>0 & sparse dimensions sn>0)
-  @inline
+  @specialized
   def array2tensor[T:ClassTag] ( dn: Int, sn: Int, zero: T, buffer: Array[T] ): (Array[Int],Array[Int],Array[T]) = {
     val splits = 10
     val split_size = (dn-1)/splits+1
@@ -43,8 +49,8 @@ trait ArrayFunctions {
     val sparseV = Array.ofDim[mutable.ArrayBuffer[Int]](splits)
     val valuesV = Array.ofDim[mutable.ArrayBuffer[T]](splits)
     for ( i <- 0 until splits ) {
-      sparseV(i) = new mutable.ArrayBuffer[Int]()
-      valuesV(i) = new mutable.ArrayBuffer[T]()
+      sparseV(i) = new mutable.ArrayBuffer[Int](block_dim_size)
+      valuesV(i) = new mutable.ArrayBuffer[T](block_dim_size)
     }
     (0 until splits).par.foreach {
       s => var i = 0
@@ -86,14 +92,13 @@ trait ArrayFunctions {
   }
 
   // convert a dense boolean array to a boolean tensor (dense dimensions dn>0 & sparse dimensions sn>0)
-  @inline
   def array2tensor_bool ( dn: Int, sn: Int, buffer: Array[Boolean] ): (Array[Int],Array[Int]) = {
     val splits = 10
     val split_size = (dn-1)/splits+1
     val dense = Array.ofDim[Int](dn+1)
     val sparseV = Array.ofDim[mutable.ArrayBuffer[Int]](splits)
     for ( i <- 0 until splits )
-      sparseV(i) = new mutable.ArrayBuffer[Int]()
+      sparseV(i) = new mutable.ArrayBuffer[Int](block_dim_size)
     (0 until splits).par.foreach {
       s => var i = 0
            while ( i < split_size ) {
@@ -129,10 +134,10 @@ trait ArrayFunctions {
   }
 
   // convert a dense array to a sparse tensor (dense dimensions dn=0 & sparse dimensions sn>0)
-  @inline
+  @specialized
   def array2tensor[T:ClassTag] ( sn: Int, zero: T, buffer: Array[T] ): (Array[Int],Array[T]) = {
-    val sparse = new mutable.ArrayBuffer[Int]()
-    val values = new mutable.ArrayBuffer[T]()
+    val sparse = new mutable.ArrayBuffer[Int](block_dim_size)
+    val values = new mutable.ArrayBuffer[T](block_dim_size)
     var j = 0
     while ( j < sn ) {
       val v = buffer(j)
@@ -146,9 +151,8 @@ trait ArrayFunctions {
   }
 
   // convert a dense boolean array to a sparse boolean tensor (dense dimensions dn=0 & sparse dimensions sn>0)
-  @inline
   def array2tensor_bool ( sn: Int, buffer: Array[Boolean] ): Array[Int] = {
-    val sparse = new mutable.ArrayBuffer[Int]()
+    val sparse = new mutable.ArrayBuffer[Int](block_dim_size)
     var j = 0
     while ( j < sn ) {
       if ( buffer(j) )
@@ -157,25 +161,10 @@ trait ArrayFunctions {
     }
     sparse.toArray
   }
-/*
+
   // merge two dense tensors using the monoid op/zero
-  @inline
+  @specialized
   def merge_tensors[T:ClassTag] ( X: Array[T], Y: Array[T], op: (T,T) => T, zero: T ): Array[T] = {
-    val len = Math.max(X.length,Y.length)
-    val values = Array.ofDim[T](len)
-    0.until(len).par.foreach {
-      i => values(i) = if (i < X.length)
-                         if (i < Y.length)
-                           op(X(i),Y(i))
-                         else X(i)
-                       else Y(i)
-    }
-    values
-  }
-*/
-  // merge two dense tensors using the monoid op/zero
-  def merge_tensors[T:ClassTag] ( X: Array[T], Y: Array[T], op: (T,T) => T, zero: T ): Array[T] = {
-  @inline
     val len = Math.min(X.length,Y.length)
     val values = Array.ofDim[T](X.length)
     0.until(len).par.foreach {
@@ -185,15 +174,15 @@ trait ArrayFunctions {
   }
 
   // merge two tensors using the monoid op/zero
-  @inline
+  @specialized
   def merge_tensors[T:ClassTag] ( X: (Array[Int],Array[Int],Array[T]),
                                   Y: (Array[Int],Array[Int],Array[T]),
                                   op: (T,T) => T, zero: T ): (Array[Int],Array[Int],Array[T]) = {
     var i = 0
     val len = Math.min(X._1.length,Y._1.length)-1
     val dense = Array.ofDim[Int](len+1)
-    val sparse = new mutable.ArrayBuffer[Int]()
-    val values = new mutable.ArrayBuffer[T]()
+    val sparse = new mutable.ArrayBuffer[Int](block_dim_size)
+    val values = new mutable.ArrayBuffer[T](block_dim_size)
     while (i < len) {
       var xn = X._1(i)
       var yn = Y._1(i)
@@ -245,13 +234,12 @@ trait ArrayFunctions {
   }
 
   // merge two boolean tensors using the monoid op/zero
-  @inline
   def merge_tensors ( X: (Array[Int],Array[Int]), Y: (Array[Int],Array[Int]),
                       op: (Boolean,Boolean) => Boolean, zero: Boolean ): (Array[Int],Array[Int]) = {
     var i = 0
     val len = Math.min(X._1.length,Y._1.length)-1
     val dense = Array.ofDim[Int](len+1)
-    val sparse = new mutable.ArrayBuffer[Int]()
+    val sparse = new mutable.ArrayBuffer[Int](block_dim_size)
     while (i < len) {
       var xn = X._1(i)
       var yn = Y._1(i)
@@ -293,12 +281,12 @@ trait ArrayFunctions {
   }
 
   // merge two sparse tensors using the monoid op/zero
-  @inline
+  @specialized
   def merge_tensors[T:ClassTag]
           ( X: (Array[Int],Array[T]), Y: (Array[Int],Array[T]),
             op: (T,T) => T, zero: T ): (Array[Int],Array[T]) = {
-    val sparse = new mutable.ArrayBuffer[Int]()
-    val values = new mutable.ArrayBuffer[T]()
+    val sparse = new mutable.ArrayBuffer[Int](block_dim_size)
+    val values = new mutable.ArrayBuffer[T](block_dim_size)
     var xn = 0
     var yn = 0
     while (xn < X._1.length && yn < Y._1.length) {
@@ -346,10 +334,9 @@ trait ArrayFunctions {
   }
 
   // merge two boolean sparse tensors using the monoid op/zero
-  @inline
   def merge_tensors ( X: Array[Int], Y: Array[Int],
                       op: (Boolean,Boolean) => Boolean, zero: Boolean ): Array[Int] = {
-    val sparse = new mutable.ArrayBuffer[Int]()
+    val sparse = new mutable.ArrayBuffer[Int](block_dim_size)
     var xn = 0
     var yn = 0
     while (xn < X.length && yn < Y.length) {
@@ -388,7 +375,7 @@ trait ArrayFunctions {
 
   // Create a dense array and initialize it with the values of the tensor init (if not null).
   // It converts the sparse tensor init to a complete dense array where missing values are zero
-  @inline
+  @specialized
   def array_buffer[T:ClassTag] ( dsize: Int, ssize: Int, zero: T,
                                  init: (Array[Int],Array[Int],Array[T]) = null ): Array[T] = {
     val buffer: Array[T] = Array.tabulate[T](dsize*ssize)( i => zero )
@@ -408,7 +395,6 @@ trait ArrayFunctions {
 
   // Create a dense boolean array and initialize it with the values of the boolean tensor init (if not null).
   // It converts the sparse tensor init to a complete dense array where missing values are zero
-  @inline
   def array_buffer_bool ( dsize: Int, ssize: Int, init: (Array[Int],Array[Int]) = null ): Array[Boolean] = {
     val buffer: Array[Boolean] = Array.tabulate(dsize*ssize)( i => false )
     if (init != null) {
@@ -427,7 +413,7 @@ trait ArrayFunctions {
 
   // Create a dense array and initialize it with the values of the sparse tensor init (if not null).
   // It converts the sparse tensor init to a complete dense array where missing values are zero
-  @inline
+  @specialized
   def array_buffer_sparse[T:ClassTag] ( ssize: Int, zero: T, init: (Array[Int],Array[T]) = null ): Array[T] = {
     val buffer: Array[T] = Array.tabulate[T](ssize)( i => zero )
     if (init != null) {
@@ -441,7 +427,6 @@ trait ArrayFunctions {
 
   // Create a dense boolean array and initialize it with the values of the sparse boolean tensor init (if not null).
   // It converts the sparse tensor init to a complete dense array where missing values are zero
-  @inline
   def array_buffer_sparse_bool ( ssize: Int, init: Array[Int] = null ): Array[Boolean] = {
     val buffer: Array[Boolean] = Array.tabulate(ssize)( i => false )
     if (init != null) {
@@ -453,14 +438,14 @@ trait ArrayFunctions {
     buffer
   }
 
-  @inline
+  @specialized
   def array_buffer_dense[T:ClassTag] ( dsize: Int, zero: T, init: Array[T] = null ): Array[T] = {
     if (init == null)
       Array.tabulate[T](dsize)( i => zero )
     else init.clone
   }
 
-  @inline
+  @specialized
   def arraySet[T] ( b: mutable.ArrayBuffer[T], i: Int, v: T ) {
     var j = b.length
     while (j <= i) {
@@ -469,15 +454,12 @@ trait ArrayFunctions {
     }
   }
 
-  @inline
   def range ( n1: Long, n2: Long, n3: Long ): List[Long]
     = n1.to(n2,n3).toList
 
-  @inline
   def inRange ( i: Long, n1: Long, n2: Long, n3: Long ): Boolean
     = i>=n1 && i<= n2 && (i-n1)%n3 == 0
 
-  @inline
   def unique_values ( f: Int => Int ): mutable.HashSet[Int] = {
     val s = mutable.HashSet[Int]()
     var i = 0
@@ -488,7 +470,6 @@ trait ArrayFunctions {
     s
   }
 
-  @inline
   def unique_values ( f: (Int,Int) => Int ): mutable.HashSet[Int] = {
     var s = mutable.HashSet[Int]()
     var i = 0
@@ -503,7 +484,6 @@ trait ArrayFunctions {
     s
   }
 
-  @inline
   def unique_values ( f: (Int,Int,Int) => Int ): mutable.HashSet[Int] = {
     var s = mutable.HashSet[Int]()
     var i = 0
@@ -522,8 +502,8 @@ trait ArrayFunctions {
     s
   }
 
-  @inline
   /* binary search rows for key between the indices from (inclusive) and to (exclusive) */
+  @specialized
   def binarySearch[T] ( key: Int, from: Int, to: Int,
                         rows: Array[Int], values: Array[T], zero: T ): T = {
     val row = java.util.Arrays.binarySearch(rows,from,to,key)
@@ -533,12 +513,10 @@ trait ArrayFunctions {
   }
 
   /* binary search rows for key between the indices from (inclusive) and to (exclusive) */
-  @inline
   def binarySearch ( key: Int, from: Int, to: Int, rows: Array[Int] ): Boolean
     = java.util.Arrays.binarySearch(rows,from,to,key) >= 0
 
   /* sort both rows and values starting from from */
-  @inline
   def sort[T] ( from: Int, rows: mutable.ArrayBuffer[Int], values: mutable.ArrayBuffer[T] ) {
     val len = values.length-from
     if (len <= 1)
@@ -559,7 +537,6 @@ trait ArrayFunctions {
   }
 
   /* sort rows starting from from */
-  @inline
   def sort ( from: Int, rows: mutable.ArrayBuffer[Int] ) {
     val len = rows.length-from
     if (len <= 1)
@@ -579,7 +556,7 @@ trait ArrayFunctions {
   }
 
   /* map code after cogroup (for each executor) in a groubBy join */
-  @inline
+  @specialized
   def groupByJoin_mapper[K,T,S,R]
         ( left: Traversable[((K,Int),T)],      // left tensors
           right: Traversable[((K,Int),S)],     // right tensors
@@ -591,17 +568,19 @@ trait ArrayFunctions {
     = if (left.isEmpty || right.isEmpty)
         Nil
       else {
+          val aright = right.toArray
           val grid = Array.ofDim[((Int,Int),R)](grid_blocks*grid_blocks)
           for { ((jx,gx),ta) <- left
-                ((jy,gy),tb) <- right if jx == jy } {
-             val loc = gx%grid_blocks*grid_blocks+gy%grid_blocks
-             val prods = mult(ta,tb)
-             if (prods.nonEmpty)
-               grid(loc) = ((gx,gy),
-                            if (grid(loc) == null)
-                              prods.head._2
-                            else combine(grid(loc)._2,prods.head._2))
-          }
+                ((jy,gy),tb) <- aright }
+             if (jx == jy) {
+                val loc = gx%grid_blocks*grid_blocks+gy%grid_blocks
+                val prods = mult(ta,tb)
+                if (prods.nonEmpty)
+                   grid(loc) = ((gx,gy),
+                                if (grid(loc) == null)
+                                  prods.head._2
+                                else combine(grid(loc)._2,prods.head._2))
+             }
           grid.toList.filter{ _ != null }
       }
 
