@@ -144,12 +144,12 @@ object NeuralNetwork extends Serializable {
 			X_test_d._3.cache
 			val Y_test_d = q("tensor*(test_size,1)[ ((i,j),v) | (i,v) <- y_2, j <- 0..0 ]")
 			Y_test_d._3.cache
+			var w1 = q("tensor*(m,layer1)[ ((i,j),v) | ((i,j),v) <- weights1 ]")
+			w1._3.cache
+			var w2 = q("tensor*(layer1,layer2)[((i,j),v) | ((i,j),v) <- weights2 ]")
+			w2._3.cache
 			val t = System.currentTimeMillis()
 			val Y_hat = q("""
-				var w1 = tensor*(m,layer1)[ ((i,j),v) | ((i,j),v) <- weights1 ];
-				var w2 = tensor*(layer1,layer2)[((i,j),v) | ((i,j),v) <- weights2 ];
-				cache(w1);
-				cache(w2);
 				var itr = 0;
 				while(itr < epochs) {
 					var Z_curr1 = tensor*(n,layer1)[ ((i,j),+/v) | ((i,k),a) <- X_d, ((kk,j),w) <- w1,
@@ -197,6 +197,8 @@ object NeuralNetwork extends Serializable {
 				}
 				rdd[ ((i,j),v) | ((i,j),v) <- ret ];
 			""")
+			w1._3.count
+			w2._3.count
 			if(validate) {
 				val Y_pred = Y_hat.map{ case ((i,j),y) => (i, if(y > 0.5) 1 else 0)}
 				val count = Y_pred.join(input4).map{ case (i, (y1, y2)) => if(y1==y2) 1.0 else 0.0}.reduce(_+_)
@@ -292,6 +294,8 @@ object NeuralNetwork extends Serializable {
 					w_arr(idx).cache
 				}
 			}
+			for(l <- 0 to number_of_layers-1)
+				w_arr(l).count
 			if(validate) {
 				var A_curr1 = X_test_d
 				for(l <- 0 to number_of_layers-1) {
@@ -351,7 +355,7 @@ object NeuralNetwork extends Serializable {
 
 			// Fit the model
 			val lrModel = lr.fit(training_data)
-
+			lrModel.summary.accuracy
 			if(validate) {
 				val test_data = spark.sql("select Y_test_d._2 as label, X_test_d._2 as features from X_test_d join Y_test_d on X_test_d._1=Y_test_d._1")
 					.rdd.map{row => LabeledPoint(
