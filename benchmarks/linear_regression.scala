@@ -69,28 +69,32 @@ object LinearRegression extends Serializable {
 		A._3.cache
 		val B = q("tensor*(n)[(i,v) | (i,v) <- output1]")
 		B._3.cache
+		var W = q("tensor*(m)[(i,v) | (i,v) <- theta]")
+		W._3.cache
 		val t = System.currentTimeMillis()
-    	val cost = q("""
-			var W = tensor*(m)[(i,v) | (i,v) <- theta];
+    	q("""
 			var itr = 0;
 			while (itr < numIter) {
 				var x_theta = tensor*(n)[(i,+/v) | ((i,j),a) <- A, (jj,w) <- W, j==jj, let v=w*a, group by i];
 				var x_theta_minus_y = tensor*(n)[(i,a-b) | (i,a) <- x_theta, (ii,b) <- B, i==ii];
 				var d_theta = tensor*(m)[(j,+/v) | ((i,j),a) <- A, (ii,b) <- x_theta_minus_y, i==ii, let v=a*b, group by j];
 				W = tensor*(m)[(i,a-(1.0/n)*lrate*b) | (i,a) <- W, (ii,b) <- d_theta, i==ii];
+				cache(W);
 			  	itr += 1;
 			};
-			var cost_val = 0.0;
-			if(validate) {
+		""")
+		if(validate) {
+			val cost = q("""
 				var A1 = tensor*(test_size,m)[((i,j),v) | ((i,j),v) <- input2];
 				var B1 = tensor*(test_size)[(i,v) | (i,v) <- output2];
 				var x_theta = tensor*(test_size)[(i,+/v) | ((i,j),a) <- A1, (jj,w) <- W, j==jj, let v=w*a, group by i];
 				var x_theta_minus_y = tensor*(test_size)[(i,a-b) | (i,a) <- x_theta, (ii,b) <- B1, i==ii];
-				cost_val = +/[ v | (i, xty) <- x_theta_minus_y, let v = (0.5/test_size)*xty*xty];
-			}
-			cost_val;
-		""")
-	  	println("Cost: "+cost)
+				var cost_val = +/[ v | (i, xty) <- x_theta_minus_y, let v = (0.5/test_size)*xty*xty];
+				cost_val;
+			""")
+			println("Cost: "+cost)
+		}
+		W._3.count
 	  	(System.currentTimeMillis()-t)/1000.0
     }
 
@@ -126,6 +130,7 @@ object LinearRegression extends Serializable {
           .setRegParam(1.0)
 
         val lrModel = lr.fit(training_data)
+		println(lrModel.summary.meanSquaredError)
 		if(validate) {
 			val test_data = spark.sql("select Y_test_d._2 as label, X_test_d._2 as features from X_test_d join Y_test_d on X_test_d._1=Y_test_d._1")
 				.rdd.map{row => LabeledPoint(
