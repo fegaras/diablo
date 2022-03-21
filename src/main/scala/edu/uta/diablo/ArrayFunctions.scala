@@ -561,7 +561,8 @@ trait ArrayFunctions {
         ( left: Traversable[((K,Int),T)],      // left tensors
           right: Traversable[((K,Int),S)],     // right tensors
           grid_dim: Int,                       // using a grid of size grid_dim*grid_dim
-          grid_blocks: Int,                    // each grid cell contains grid_blocks*grid_blocks tensors
+          left_blocks: Int,                    // each grid cell contains left_blocks*right_blocks tensors
+          right_blocks: Int,
           mult: (T,S) => List[((Int,Int),R)],  // multiply two tensors
           combine: (R,R) => R                  // add two tensors
         ): List[((Int,Int),R)]
@@ -570,20 +571,18 @@ trait ArrayFunctions {
       else {
           val aleft = left.toArray
           val aright = right.toArray
-          val grid = Array.ofDim[((Int,Int),R)](grid_blocks*grid_blocks)
-          for { i <- (0 until grid_blocks).par
-                ((jx,gx),ta) <- aleft if gx%grid_blocks == i
+          var grid = mutable.Map[(Int,Int),R]()
+          for { i <- (0 until left_blocks).par
+                ((jx,gx),ta) <- aleft if gx%left_blocks == i
                 ((jy,gy),tb) <- aright }
              if (jx == jy) {
-                val loc = i*grid_blocks+gy%grid_blocks
                 val prods = mult(ta,tb)
                 if (prods.nonEmpty)
-                   grid(loc) = ((gx,gy),
-                                if (grid(loc) == null)
-                                  prods.head._2
-                                else combine(grid(loc)._2,prods.head._2))
+                  if (grid.contains((gx,gy)))
+                    grid += ((gx,gy)->combine(grid((gx,gy)),prods.head._2))
+                  else grid += ((gx,gy)->prods.head._2)
              }
-          grid.toList.filter{ _ != null }
+          grid.toList
       }
 
   def update_array[T] ( a: Object, u: T ): T = u

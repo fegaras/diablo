@@ -1384,7 +1384,7 @@ object ComprehensionTranslator {
                                                       vars))
                        val all_dims = tile_dimensions(dn,dims.head)++tile_dimensions(sn,dims(1))
                        // check for groupBy join
-                       val rbk = group_by_join(rbknc,toExpr(tile_coords),all_dims.head) match {
+                       val rbk = group_by_join(rbknc,toExpr(tile_coords),all_dims.head,all_dims(1)) match {
                                    case Some(ne) => ne
                                    case _ => rbknc
                                  }
@@ -1412,26 +1412,32 @@ object ComprehensionTranslator {
 /* -------------------- GroupBy Join using the SUMMA algorithm -----------------------------------------*/
 
   // convert a join followed by groupBy to an optimal groupBy-join (SUMMA algorithm)
-  def group_by_join ( e: Expr, gbkey: Expr, left_rows: Expr ): Option[Expr] = {
+  def group_by_join ( e: Expr, gbkey: Expr, left_rows: Expr, right_cols: Expr ): Option[Expr] = {
     def depends ( e: Expr, p: Pattern ): Boolean = freevars(e).toSet.subsetOf(patvars(p).toSet)
     (e,gbkey) match {
-      case (MethodCall(flatMap(Lambda(TuplePat(List(_,pa)),IfE(_,plus,_)),
+      case (MethodCall(flatMap(Lambda(TuplePat(List(_,pg)),IfE(_,prod,_)),
                                MethodCall(flatMap(Lambda(px,Seq(List(Tuple(List(jx,bx))))),
                                                   x),
                                           "join",List(flatMap(Lambda(py,Seq(List(Tuple(List(jy,by))))),
                                                               y),
                                                       partitions))),
-                       "reduceByKey",List(Lambda(pg,prod),_)),
+                       "reduceByKey",List(Lambda(pa,plus),_)),
             Tuple(List(gx,gy)))
         if groupByJoin && (depends(gx,px) && depends(gy,py) || (depends(gy,px) && depends(gx,py)))
         => val (gtx,gty) = if (depends(gx,px)) (gx,gy) else (gy,gx)
            // grid dimension so that each grid cell is handled by one Spark executor
            val grid_dim =  Math.sqrt(number_of_partitions).toInt
            // each grid cell contains grid_blocks*grid_blocks tensors
-           val grid_blocks = MethodCall(Var("Math"),"max",
+           val left_blocks = MethodCall(Var("Math"),"max",
                                 List(IntConst(1),
                                      MethodCall(MethodCall(Var("Math"),"ceil",
                                         List(MethodCall(left_rows,"/",
+                                                List(DoubleConst(block_dim_size*grid_dim*1.0))))),
+                                                "toInt",null)))
+           val right_blocks = MethodCall(Var("Math"),"max",
+                                List(IntConst(1),
+                                     MethodCall(MethodCall(Var("Math"),"ceil",
+                                        List(MethodCall(right_cols,"/",
                                                 List(DoubleConst(block_dim_size*grid_dim*1.0))))),
                                                 "toInt",null)))
            val kv = newvar
@@ -1439,20 +1445,21 @@ object ComprehensionTranslator {
            val left = flatMap(Lambda(px,flatMap(Lambda(VarPat(kv),
                                            Seq(List(Tuple(List(Tuple(List(Var(kv),
                                                                           MethodCall(gtx,"%",List(IntConst(grid_dim))))),
-                                                               Tuple(List(Tuple(List(jx,gx)),bx))))))),
+                                                               Tuple(List(Tuple(List(jx,gtx)),bx))))))),
                                                 Range(IntConst(0),IntConst(grid_dim-1),IntConst(1)))),
                               x)
            val right = flatMap(Lambda(py,flatMap(Lambda(VarPat(kv),
                                             Seq(List(Tuple(List(Tuple(List(MethodCall(gty,"%",List(IntConst(grid_dim))),
                                                                            Var(kv))),
-                                                                Tuple(List(Tuple(List(jy,gy)),by))))))),
+                                                                Tuple(List(Tuple(List(jy,gty)),by))))))),
                                                  Range(IntConst(0),IntConst(grid_dim-1),IntConst(1)))),
                                y)
            Some(flatMap(Lambda(TuplePat(List(TuplePat(List(VarPat("_cell_i"),VarPat("_cell_j"))),
                                              TuplePat(List(VarPat("as"),VarPat("bs"))))),
                                Call("groupByJoin_mapper",
-                                    List(Var("as"),Var("bs"),IntConst(grid_dim),grid_blocks,
-                                         Lambda(pa,plus),Lambda(pg,prod)))),
+                                    List(Var("as"),Var("bs"),IntConst(grid_dim),
+                                         left_blocks,right_blocks,
+                                         Lambda(pg,prod),Lambda(pa,plus)))),
                         MethodCall(left,"cogroup",List(right,partitions))))
       case _ => None
     }
