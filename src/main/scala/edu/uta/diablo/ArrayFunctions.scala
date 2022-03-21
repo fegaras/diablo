@@ -568,12 +568,14 @@ trait ArrayFunctions {
     = if (left.isEmpty || right.isEmpty)
         Nil
       else {
+          val aleft = left.toArray
           val aright = right.toArray
           val grid = Array.ofDim[((Int,Int),R)](grid_blocks*grid_blocks)
-          for { ((jx,gx),ta) <- left
+          for { i <- (0 until grid_blocks).par
+                ((jx,gx),ta) <- aleft if gx%grid_blocks == i
                 ((jy,gy),tb) <- aright }
              if (jx == jy) {
-                val loc = gx%grid_blocks*grid_blocks+gy%grid_blocks
+                val loc = i*grid_blocks+gy%grid_blocks
                 val prods = mult(ta,tb)
                 if (prods.nonEmpty)
                    grid(loc) = ((gx,gy),
