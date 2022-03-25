@@ -560,30 +560,32 @@ trait ArrayFunctions {
   def groupByJoin_mapper[K,T,S,R]
         ( left: Traversable[((K,Int),T)],      // left tensors
           right: Traversable[((K,Int),S)],     // right tensors
-          grid_dim: Int,                       // using a grid of size grid_dim*grid_dim
           left_blocks: Int,                    // each grid cell contains left_blocks*right_blocks tensors
-          right_blocks: Int,
           mult: (T,S) => List[((Int,Int),R)],  // multiply two tensors
           combine: (R,R) => R                  // add two tensors
         ): List[((Int,Int),R)]
-    = if (left.isEmpty || right.isEmpty)
-        Nil
-      else {
-          val aleft = left.toArray
+      = { val aleft = left.toArray
           val aright = right.toArray
-          var grid = mutable.Map[(Int,Int),R]()
+          val grid = mutable.HashMap[(Int,Int),R]()
           for { i <- (0 until left_blocks).par
                 ((jx,gx),ta) <- aleft if gx%left_blocks == i
-                ((jy,gy),tb) <- aright }
-             if (jx == jy) {
-                val prods = mult(ta,tb)
-                if (prods.nonEmpty)
-                  if (grid.contains((gx,gy)))
-                    grid += ((gx,gy)->combine(grid((gx,gy)),prods.head._2))
-                  else grid += ((gx,gy)->prods.head._2)
-             }
+                ((jy,gy),tb) <- aright if jx == jy } {
+              val prods = mult(ta,tb)
+              val key = (gx,gy)
+              if (prods.nonEmpty) {
+                val tile = grid.synchronized {
+                               grid.getOrElse(key,null)
+                           }
+                val sum = if (tile != null)
+                            combine(tile.asInstanceOf[R],prods.head._2)
+                          else prods.head._2
+                grid.synchronized {
+                    grid += (key -> sum)
+                }
+              }
+          }
           grid.toList
-      }
+        }
 
   def update_array[T] ( a: Object, u: T ): T = u
 

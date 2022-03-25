@@ -1409,6 +1409,7 @@ object ComprehensionTranslator {
           }
     }
 
+
 /* -------------------- GroupBy Join using the SUMMA algorithm -----------------------------------------*/
 
   // convert a join followed by groupBy to an optimal groupBy-join (SUMMA algorithm)
@@ -1426,7 +1427,7 @@ object ComprehensionTranslator {
         if groupByJoin && (depends(gx,px) && depends(gy,py) || (depends(gy,px) && depends(gx,py)))
         => val (gtx,gty) = if (depends(gx,px)) (gx,gy) else (gy,gx)
            // grid dimension so that each grid cell is handled by one Spark executor
-           val grid_dim =  Math.sqrt(number_of_partitions).toInt
+           val grid_dim = Math.sqrt(number_of_partitions).toInt
            // each grid cell contains grid_blocks*grid_blocks tensors
            val left_blocks = MethodCall(Var("Math"),"max",
                                 List(IntConst(1),
@@ -1457,10 +1458,10 @@ object ComprehensionTranslator {
            Some(flatMap(Lambda(TuplePat(List(TuplePat(List(VarPat("_cell_i"),VarPat("_cell_j"))),
                                              TuplePat(List(VarPat("as"),VarPat("bs"))))),
                                Call("groupByJoin_mapper",
-                                    List(Var("as"),Var("bs"),IntConst(grid_dim),
-                                         left_blocks,right_blocks,
+                                    List(Var("as"),Var("bs"),left_blocks,
                                          Lambda(pg,prod),Lambda(pa,plus)))),
-                        MethodCall(left,"cogroup",List(right,partitions))))
+                        MethodCall(left,"cogroup",List(right,IntConst(grid_dim*grid_dim)))))
+                        //MethodCall(left,"cogroup",List(right,partitions))))
       case _ => None
     }
   }

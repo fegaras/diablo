@@ -75,7 +75,8 @@ object Multiply {
     def randomMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
       val l = Random.shuffle((0 until (rows+N-1)/N).toList)
       val r = Random.shuffle((0 until (cols+N-1)/N).toList)
-      spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
+      spark_context.parallelize(for { i <- l; j <- r } yield (i,j),
+                                number_of_partitions)
                    .map{ case (i,j) => ((i,j),randomTile(if ((i+1)*N > rows) rows%N else N,
                                                          if ((j+1)*N > cols) cols%N else N)) }
     }
@@ -94,7 +95,8 @@ object Multiply {
     def randomSparseMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
       val l = Random.shuffle((0 until (rows+N-1)/N).toList)
       val r = Random.shuffle((0 until (cols+N-1)/N).toList)
-      spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
+      spark_context.parallelize(for { i <- l; j <- r } yield (i,j),
+                                number_of_partitions)
             .map{ case (i,j) => ((i,j),randomTileSparse(if ((i+1)*N > rows) rows%N else N,
                               if ((j+1)*N > cols) cols%N else N)) }
     }
