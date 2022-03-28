@@ -7,10 +7,10 @@ import org.apache.spark.sql.expressions.Aggregator
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.mllib.linalg.distributed._
 import org.apache.spark.mllib.linalg._
-import org.apache.spark.ml.classification.LogisticRegression
 import org.apache.spark.ml.feature.LabeledPoint
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.ml.evaluation.BinaryClassificationEvaluator
+import org.apache.spark.ml.classification.MultilayerPerceptronClassifier
+import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
 import org.apache.log4j._
 import org.apache.hadoop.fs._
 import scala.collection.Seq
@@ -35,7 +35,7 @@ object NeuralNetwork extends Serializable {
 		parami(block_dim_size,1000)
 		val repeats = args(0).toInt
 		val N = 1000
-		val validate = false
+		val validate = true
 		
 		val learning_rate = 2.0
 		val total_size = args(1).toInt
@@ -44,16 +44,16 @@ object NeuralNetwork extends Serializable {
 		val m = 3
 		val epochs = 10
 
-		val input1 = spark_context.textFile(args(2))
+		val input1 = spark_context.textFile(args(2),number_of_partitions)
 		          .map( line => { val a = line.split(",").toList
 		          				((a(0).toInt,a(1).toInt),a(2).toDouble)} ).cache
-		val input2 = spark_context.textFile(args(3))
+		val input2 = spark_context.textFile(args(3),number_of_partitions)
 		          .map( line => { val a = line.split(",").toList
 		                         (a(0).toInt,a(1).toDouble) } ).cache
-		val input3 = spark_context.textFile(args(4))
+		val input3 = spark_context.textFile(args(4),number_of_partitions)
 		          .map( line => { val a = line.split(",").toList
 		          				((a(0).toInt,a(1).toInt),a(2).toDouble) } ).cache
-		val input4 = spark_context.textFile(args(5))
+		val input4 = spark_context.textFile(args(5),number_of_partitions)
 		          .map( line => { val a = line.split(",").toList
 		                         (a(0).toInt,a(1).toDouble) } ).cache
 		
@@ -125,89 +125,6 @@ object NeuralNetwork extends Serializable {
 		def getVal(z: Double, a: Double) = if(z <= 0.0) 0.0 else a
 
 		def testDiabloNN(): Double = {
-			var cost_history = Array.tabulate(epochs){i => 0.0}
-			var acc_history = Array.tabulate(epochs){i => 0.0}
-			val X_1 = input1
-			val y_1 = input2
-			val X_2 = input3
-			val y_2 = input4
-			val layer1 = nn_architecture(0)._2
-			val layer2 = nn_architecture(1)._2
-			
-			val weights1 = spark_context.parallelize(for(i <- 0 to m-1; j <- 0 to layer1-1) yield ((i,j),weights(0)(i*layer1+j))).cache()
-			val weights2 = spark_context.parallelize(for(i <- 0 to layer1-1; j <- 0 to layer2-1) yield ((i,j),weights(1)(i*layer2+j))).cache()
-			val X_d = q("tensor*(n,m)[ ((i,j),v) | ((i,j),v) <- X_1 ]")
-			X_d._3.cache
-			val Y_d = q("tensor*(n,1)[ ((i,j),v) | (i,v) <- y_1, j <- 0..0 ]")
-			Y_d._3.cache
-			val X_test_d = q("tensor*(test_size,m)[ ((i,j),v) | ((i,j),v) <- X_2 ]")
-			X_test_d._3.cache
-			val Y_test_d = q("tensor*(test_size,1)[ ((i,j),v) | (i,v) <- y_2, j <- 0..0 ]")
-			Y_test_d._3.cache
-			var w1 = q("tensor*(m,layer1)[ ((i,j),v) | ((i,j),v) <- weights1 ]")
-			w1._3.cache
-			var w2 = q("tensor*(layer1,layer2)[((i,j),v) | ((i,j),v) <- weights2 ]")
-			w2._3.cache
-			val t = System.currentTimeMillis()
-			val Y_hat = q("""
-				var itr = 0;
-				while(itr < epochs) {
-					var Z_curr1 = tensor*(n,layer1)[ ((i,j),+/v) | ((i,k),a) <- X_d, ((kk,j),w) <- w1,
-		                                       kk == k, let v = w*a, group by (i,j) ];
-		            var A_curr1 = tensor*(n,layer1)[ ((i,j),getMax(z)) | ((i,j),z) <- Z_curr1 ];
-		            
-		            var Z_curr2 = tensor*(n,layer2)[ ((i,j),+/v) | ((i,k),a) <- A_curr1, ((kk,j),w) <- w2,
-		                                       kk == k, let v = w*a, group by (i,j) ];
-		            var A_curr2 = tensor*(n,layer2)[ ((i,j),1/(1+getExp(-z))) | ((i,j),z) <- Z_curr2 ];
-					var dA_curr = tensor*(n,layer2)[ ((i,j),((-y/y_hat)+(1-y)/(1-y_hat))) | ((i,j),y) <- Y_d, ((ii,jj),y_hat) <- A_curr2,
-                    							i == ii, j == jj ];
-                 	var dZ_curr = tensor*(n,layer2)[ ((i,j), dA*sig*(1-sig)) | ((i,j),dA) <- dA_curr, ((ii,jj),z) <- Z_curr2,
-                    							i == ii, j == jj, let sig = 1/(1+getExp(-z)) ];
-                    var dW_curr = tensor*(layer1,layer2)[ ((j,jj), +/v) | ((i,j),a) <- A_curr1, ((ii,jj),z) <- dZ_curr,
-                    							i == ii, let v = z*a, group by (j,jj) ];
-                    
-                    var w2_update = tensor*(layer1,layer2)[((i,j),w-learning_rate*dw/n) | ((i,j),w) <- w2, ((ii,jj),dw) <- dW_curr,
-                    							i==ii, j==jj ];
-                    
-                    var dA_curr2 = tensor*(n,layer1)[ ((i,ii),+/v) | ((i,j),z) <- dZ_curr, ((ii,jj),w) <- w2,
-                    							j == jj, let v = w*z, group by (i,ii) ];
-                 	var dZ_curr2 = tensor*(n,layer1)[ ((i,j), v) | ((i,j),z) <- Z_curr1, ((ii,jj),a) <- dA_curr2,
-												i == ii, j == jj, let v = getVal(z,a) ];
-                    var dW_curr2 = tensor*(m,layer1)[ ((j,jj), +/v) | ((i,j),a) <- X_d, ((ii,jj),z) <- dZ_curr2,
-                    							i == ii, let v = z*a, group by (j,jj) ];
-                    
-                    var w1_update = tensor*(m,layer1)[((i,j),w-learning_rate*dw/n) | ((i,j),w) <- w1, ((ii,jj),dw) <- dW_curr2,
-                    							i==ii, j==jj ];
-                    w2 = w2_update;
-                    w1 = w1_update;
-					cache(w1);
-					cache(w2);
-					itr += 1;
-				}
-				var ret = tensor*(test_size,1)[ ((i,j),random()) | i <- 0..(test_size-1), j <- 0..0 ];
-				if(validate) {
-					var Z_curr1 = tensor*(test_size,layer1)[ ((i,j),+/v) | ((i,k),a) <- X_test_d, ((kk,j),w) <- w1,
-		                                       kk == k, let v = w*a, group by (i,j) ];
-		            var A_curr1 = tensor*(test_size,layer1)[ ((i,j),getMax(z)) | ((i,j),z) <- Z_curr1 ];
-		            
-		            var Z_curr2 = tensor*(test_size,layer2)[ ((i,j),+/v) | ((i,k),a) <- A_curr1, ((kk,j),w) <- w2,
-		                                       kk == k, let v = w*a, group by (i,j) ];
-		            var A_curr2 = tensor*(test_size,layer2)[ ((i,j),1/(1+getExp(-z))) | ((i,j),z) <- Z_curr2 ];
-					ret = A_curr2;
-				}
-				rdd[ ((i,j),v) | ((i,j),v) <- ret ];
-			""")
-			w1._3.count
-			w2._3.count
-			if(validate) {
-				val Y_pred = Y_hat.map{ case ((i,j),y) => (i, if(y > 0.5) 1 else 0)}
-				val count = Y_pred.join(input4).map{ case (i, (y1, y2)) => if(y1==y2) 1.0 else 0.0}.reduce(_+_)
-				println("Test Accuracy: "+count/test_size)
-			}
-		  	(System.currentTimeMillis()-t)/1000.0
-		}
-
-		def testDiabloNN1(): Double = {
 			var cost_history = Array.tabulate(epochs){i => 0.0}
 			var acc_history = Array.tabulate(epochs){i => 0.0}
 			val X_1 = input1
@@ -322,10 +239,10 @@ object NeuralNetwork extends Serializable {
 		
 		val spark = SparkSession.builder().config(conf).getOrCreate()
 		import spark.implicits._
-		
+
 		def testMLlibNN(): Double = {
 			def vect ( a: Iterable[Double] ): org.apache.spark.ml.linalg.Vector = {
-			  val s = Array.ofDim[Double](n*m)
+			  val s = Array.ofDim[Double](m)
 			  var count = 0
 			  for(x <- a) {
 				s(count) = x
@@ -347,23 +264,28 @@ object NeuralNetwork extends Serializable {
 			  	row.getAs[org.apache.spark.ml.linalg.Vector]("features")
 			)}.toDF.cache()
 
-			val t = System.currentTimeMillis()
-			val lr = new LogisticRegression()
-			  .setMaxIter(epochs)
-			  .setRegParam(0.3)
-			  .setElasticNetParam(0.8)
+			val layers = Array[Int](m, 8, 2)
 
-			// Fit the model
-			val lrModel = lr.fit(training_data)
-			lrModel.summary.accuracy
+			// create the trainer and set its parameters
+			val trainer = new MultilayerPerceptronClassifier()
+				.setLayers(layers)
+				.setBlockSize(N)
+				.setSeed(1234L)
+				.setMaxIter(epochs)
+
+			val t = System.currentTimeMillis()
+			// train the model
+			val model = trainer.fit(training_data)
+
+			// compute accuracy on the test set
 			if(validate) {
 				val test_data = spark.sql("select Y_test_d._2 as label, X_test_d._2 as features from X_test_d join Y_test_d on X_test_d._1=Y_test_d._1")
 					.rdd.map{row => LabeledPoint(
 					row.getAs[Double]("label"),
 					row.getAs[org.apache.spark.ml.linalg.Vector]("features")
 				)}.toDF.cache()
-				val predictions = lrModel.transform(test_data)
-				val evaluator = new BinaryClassificationEvaluator()
+				val predictions = model.transform(test_data)
+				val evaluator = new MulticlassClassificationEvaluator().setMetricName("accuracy")
 				val accuracy = evaluator.evaluate(predictions)
 				println("Test Accuracy: "+accuracy)
 			}
@@ -390,8 +312,7 @@ object NeuralNetwork extends Serializable {
 		}
 
 		test("Diablo Comprehension Neural Network",testDiabloNN)
-		test("Diablo Comprehension Neural Network loops",testDiabloNN1)
-		test("MLlib Logistic Regression Neural Network",testMLlibNN)
+		test("MLlib Neural Network",testMLlibNN)
 		
 		spark_context.stop()
 	}

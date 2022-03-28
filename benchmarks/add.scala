@@ -147,8 +147,9 @@ object Add {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    // matrix addition of tiled matrices using Diablo array comprehensions (in RDD)
-    def testAddDiabloDAC: Double = {
+    // matrix addition of dense-dense tiled matrices using Diablo groupBy-join giving dense
+    def testAddDiabloDACGBJ: Double = {
+      param(groupByJoin,true)
       val t = System.currentTimeMillis()
       try {
         val C = q("""
@@ -156,11 +157,13 @@ object Add {
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
+      param(groupByJoin,false)
       (System.currentTimeMillis()-t)/1000.0
     }
 
     // matrix addition of sparse tiled matrices using Diablo array comprehensions
-    def testAddDiabloDACsparse (): Double = {
+    def testAddDiabloDACsparseGBJ (): Double = {
+      param(groupByJoin,true)
       val t = System.currentTimeMillis()
       try {
         val C = q("""
@@ -168,11 +171,13 @@ object Add {
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
+      param(groupByJoin,false)
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    // matrix addition of sparse-dense tiled matrices using Diablo array comprehensions
-    def testAddDiabloDACsparseDense (): Double = {
+    // matrix addition of sparse-dense tiled matrices using Diablo groupBy-join giving dense
+    def testAddDiabloDACsparseDenseGBJ (): Double = {
+      param(groupByJoin,true)
       val t = System.currentTimeMillis()
       try {
         val C = q("""
@@ -180,42 +185,7 @@ object Add {
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
-      (System.currentTimeMillis()-t)/1000.0
-    }
-
-    // matrix addition of dense-dense tiled matrices giving a sparse matrix using Diablo array comprehensions
-    def testAddDiabloDACdenseSparseOut (): Double = {
-      val t = System.currentTimeMillis()
-      try {
-        val C = q("""
-                  tensor*(n)(m)[ ((i,j),a+b) | ((i,j),a) <= AA, ((ii,jj),b) <- BB, ii == i, jj == j ];
-                  """)
-        C._3.count()
-      } catch { case x: Throwable => println(x); return -1.0 }
-      (System.currentTimeMillis()-t)/1000.0
-    }
-
-    // matrix addition of sparse-dense tiled matrices giving a sparse matrix using Diablo array comprehensions
-    def testAddDiabloDACsparseDenseSparseOut (): Double = {
-      val t = System.currentTimeMillis()
-      try {
-        val C = q("""
-                  tensor*(n)(m)[ ((i,j),a+b) | ((i,j),a) <= Az, ((ii,jj),b) <- BB, ii == i, jj == j ];
-                  """)
-        C._3.count()
-      } catch { case x: Throwable => println(x); return -1.0 }
-      (System.currentTimeMillis()-t)/1000.0
-    }
-
-    // matrix addition of sparse-sparse tiled matrices giving a sparse matrix using Diablo array comprehensions
-    def testAddDiabloDACsparseSparseSparseOut (): Double = {
-      val t = System.currentTimeMillis()
-      try {
-        val C = q("""
-                  tensor*(n)(m)[ ((i,j),a+b) | ((i,j),a) <= Az, ((ii,jj),b) <= Bz, ii == i, jj == j ];
-                  """)
-        C._3.count()
-      } catch { case x: Throwable => println(x); return -1.0 }
+      param(groupByJoin,false)
       (System.currentTimeMillis()-t)/1000.0
     }
 
@@ -224,7 +194,7 @@ object Add {
     println("@@@@ dense matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
     val sparse_tile = q("tensor(N)(N)[ ((i,j),random()) | i <- 0..(N-1), j <- 0..(N-1), random() > (1-sparsity)*10 ]")
     val sparse_tile_size = sizeof(sparse_tile).toDouble
-    println("@@@@ sparse matrix size: %.2f MB".format(sparse_tile_size*(n/N)*(m/N)/(1024.0*1024.0)))
+    println("@@@@ sparsity: %.2f, sparse matrix size: %.2f MB".format(sparsity,sparse_tile_size*(n/N)*(m/N)/(1024.0*1024.0)))
 
     def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()
@@ -248,12 +218,9 @@ object Add {
     test("MLlib Add dense-dense",testAddMLlibDenseDense)
     test("MLlib Add sparse-dense",testAddMLlibSparseDense)
     test("MLlib Add sparse-sparse",testAddMLlibSparseSparse)
-    test("DIABLO Add dense-dense giving dense",testAddDiabloDAC)
-    test("DIABLO Add sparse-dense giving dense",testAddDiabloDACsparseDense)
-    test("DIABLO Add sparse-sparse giving dense",testAddDiabloDACsparse)
-    test("DIABLO Add dense-dense giving sparse",testAddDiabloDACdenseSparseOut)
-    test("DIABLO Add sparse-dense giving sparse",testAddDiabloDACsparseDenseSparseOut)
-    test("DIABLO Add sparse-sparse giving sparse",testAddDiabloDACsparseSparseSparseOut)
+    test("DIABLO Add dense-dense giving dense",testAddDiabloDACGBJ)
+    test("DIABLO Add sparse-dense giving dense",testAddDiabloDACsparseDenseGBJ)
+    test("DIABLO Add sparse-sparse giving dense",testAddDiabloDACsparseGBJ)
 
     spark_context.stop()
   }

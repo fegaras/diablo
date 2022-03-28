@@ -45,7 +45,7 @@ object Factorization extends Serializable {
     def randomMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
       val l = Random.shuffle((0 until (rows+N-1)/N).toList)
       val r = Random.shuffle((0 until (cols+N-1)/N).toList)
-      spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
+      spark_context.parallelize(for { i <- l; j <- r } yield (i,j),number_of_partitions)
                    .map{ case (i,j) => ((i,j),randomTile(if ((i+1)*N > rows) rows%N else N,
                                                          if ((j+1)*N > cols) cols%N else N)) }
     }
@@ -63,7 +63,7 @@ object Factorization extends Serializable {
     def randomSparseMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
       val l = Random.shuffle((0 until (rows+N-1)/N).toList)
       val r = Random.shuffle((0 until (cols+N-1)/N).toList)
-      spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
+      spark_context.parallelize(for { i <- l; j <- r } yield (i,j),number_of_partitions)
                    .map{ case (i,j) => ((i,j),randomTileSparse(if ((i+1)*N > rows) rows%N else N,
                                                          if ((j+1)*N > cols) cols%N else N)) }
     }
@@ -132,6 +132,7 @@ object Factorization extends Serializable {
 
     // Diablo Factorization Dense to Dense-Dense
     def testFactorizationDiablo (): Double = {
+      param(groupByJoin,true)
       var E = RR
       var P = PPinit
       var Q = QQinit
@@ -156,11 +157,13 @@ object Factorization extends Serializable {
           """)
         val x = p2._3.count+q2._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
+      param(groupByJoin,false)
       (System.currentTimeMillis()-t)/1000.0
     }
 
     // Diablo Factorization Sparse to Dense-Dense
     def testFactorizationDiabloSparseToDense(): Double = {
+      param(groupByJoin,true)
       var E = RSparse
       var P = PPinit
       var Q = QQinit
@@ -185,6 +188,7 @@ object Factorization extends Serializable {
           """)
         val x = p2._3.count+q2._3.count
       } catch { case x: Throwable => println(x); return -1.0 }
+      param(groupByJoin,false)
       (System.currentTimeMillis()-t)/1000.0
     }
 
@@ -219,7 +223,7 @@ object Factorization extends Serializable {
     println("@@@@ dense matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
     val sparse_tile = q("tensor(N)(N)[ ((i,j),random()) | i <- 0..(N-1), j <- 0..(N-1), random() > (1-sparsity)*10 ]")
     val sparse_tile_size = sizeof(sparse_tile).toDouble
-    println("@@@@ sparse matrix size: %.2f MB".format(sparse_tile_size*(n/N)*(m/N)/(1024.0*1024.0)))
+    println("@@@@ sparsity: %.2f, sparse matrix size: %.2f MB".format(sparsity,sparse_tile_size*(n/N)*(m/N)/(1024.0*1024.0)))
 
     def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()

@@ -51,21 +51,21 @@ object Multiply {
     def randomMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
       val l = Random.shuffle((0 until (rows+N-1)/N).toList)
       val r = Random.shuffle((0 until (cols+N-1)/N).toList)
-      spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
+      spark_context.parallelize(for { i <- l; j <- r } yield (i,j),number_of_partitions)
                    .map{ case (i,j) => ((i,j),randomTile(if ((i+1)*N > rows) rows%N else N,
                                                          if ((j+1)*N > cols) cols%N else N)) }
     }
-/*
-    def randomTileSparse ( nd: Int, md: Int ): SparseMatrix = {
+
+    /*def randomTileSparse ( nd: Int, md: Int ): SparseMatrix = {
       val max = 10
       val rand = new Random()
       var entries: Array[(Int,Int,Double)] = Array()
       for(i <- 0 to nd-1; j <- 0 to md-1) {
         if(rand.nextDouble() <= sparsity) entries = entries :+ (i,j,rand.nextDouble()*max)
       }
+      println(entries.size)
       SparseMatrix.fromCOO(nd,md,entries)
-    }
-*/
+    }*/
 
     def randomTileSparse ( nd: Int, md: Int ): SparseMatrix = {
       val max = 10
@@ -81,7 +81,7 @@ object Multiply {
     def randomSparseMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
       val l = Random.shuffle((0 until (rows+N-1)/N).toList)
       val r = Random.shuffle((0 until (cols+N-1)/N).toList)
-      spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
+      spark_context.parallelize(for { i <- l; j <- r } yield (i,j),number_of_partitions)
             .map{ case (i,j) => ((i,j),randomTileSparse(if ((i+1)*N > rows) rows%N else N,
                               if ((j+1)*N > cols) cols%N else N)) }
     }
@@ -109,10 +109,10 @@ object Multiply {
     val rand = new Random()
     def random () = rand.nextDouble()*10
 
-    // sparse block tensors with 99% zeros
-    val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > (1.0-sparsity)*10 ]")
+    // sparse block tensors with ((1-sparsity)*100)% zeros
+    val Az = q("tensor*(n)(m)[ ((i,j),AA[i,j]) | i <- 0..(n-1), j <- 0..(m-1), random() > (1.0-sparsity)*10 ]")
     Az._3.cache
-    val Bz = q("tensor*(m)(n)[ ((i,j),random()) | i <- 0..(m-1), j <- 0..(n-1), random() > (1.0-sparsity)*10 ]")
+    val Bz = q("tensor*(m)(n)[ ((i,j),BB[i,j]) | i <- 0..(m-1), j <- 0..(n-1), random() > (1.0-sparsity)*10 ]")
     Bz._3.cache
 
     def validate ( M: tiled_matrix ) = {
@@ -167,8 +167,9 @@ object Multiply {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    // matrix multiplication of tiled matrices using Diablo array comprehensions (in RDD)
-    def testMultiplyDiabloDAC (): Double = {
+    // matrix multiplication of dense-dense tiled matrices using Diablo groupBy-join giving dense
+    def testMultiplyDiabloDACGBJ (): Double = {
+      param(groupByJoin,true)
       val t = System.currentTimeMillis()
       try {
         val C = q("""
@@ -176,6 +177,7 @@ object Multiply {
                   """)
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
+      param(groupByJoin,false)
       (System.currentTimeMillis()-t)/1000.0
     }
 
@@ -193,20 +195,9 @@ object Multiply {
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    // matrix multiplication of sparse tiled matrices using Diablo array comprehensions
-    def testMultiplyDiabloDACsparse (): Double = {
-      val t = System.currentTimeMillis()
-      try {
-        val C = q("""
-                  tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- Az, ((kk,j),b) <- Bz, k == kk, let c = a*b, group by (i,j) ]
-                  """)
-        C._3.count()
-      } catch { case x: Throwable => println(x); return -1.0 }
-      (System.currentTimeMillis()-t)/1000.0
-    }
-
-    // matrix multiplication of sparse-dense tiled matrices using Diablo array comprehensions
-    def testMultiplyDiabloDACsparseDense (): Double = {
+    // matrix multiplication of sparse-dense tiled matrices using Diablo groupBy-join giving dense
+    def testMultiplyDiabloDACsparseDenseGBJ (): Double = {
+      param(groupByJoin,true)
       val t = System.currentTimeMillis()
       try {
         val C = q("""
@@ -214,42 +205,21 @@ object Multiply {
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
+      param(groupByJoin,false)
       (System.currentTimeMillis()-t)/1000.0
     }
 
-    // matrix multiplication of dense tiled matrices giving a sparse matrix using Diablo array comprehensions
-    def testMultiplyDiabloDACsparseOut (): Double = {
+    // matrix multiplication of tiled matrices using Diablo groupBy-join on sparse matrices giving dense
+    def testMultiplyDiabloDACsparseGBJ (): Double = {
+      param(groupByJoin,true)
       val t = System.currentTimeMillis()
       try {
         val C = q("""
-                  tensor*(n)(n)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
+                  tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- Az, ((kk,j),b) <- Bz, k == kk, let c = a*b, group by (i,j) ];
                   """)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
-      (System.currentTimeMillis()-t)/1000.0
-    }
-
-    // matrix multiplication of sparse-dense tiled matrices giving a sparse matrix using Diablo array comprehensions
-    def testMultiplyDiabloDACsparseDenseSparseOut (): Double = {
-      val t = System.currentTimeMillis()
-      try {
-        val C = q("""
-                  tensor*(n)(n)[ ((i,j),+/c) | ((i,k),a) <- Az, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
-                  """)
-        C._3.count()
-      } catch { case x: Throwable => println(x); return -1.0 }
-      (System.currentTimeMillis()-t)/1000.0
-    }
-
-    // matrix multiplication of sparse-sparse tiled matrices giving a sparse matrix using Diablo array comprehensions
-    def testMultiplyDiabloDACsparseSparseSparseOut (): Double = {
-      val t = System.currentTimeMillis()
-      try {
-        val C = q("""
-                  tensor*(n)(n)[ ((i,j),+/c) | ((i,k),a) <- Az, ((kk,j),b) <- Bz, k == kk, let c = a*b, group by (i,j) ]
-                  """)
-        C._3.count()
-      } catch { case x: Throwable => println(x); return -1.0 }
+      param(groupByJoin,false)
       (System.currentTimeMillis()-t)/1000.0
     }
 
@@ -258,7 +228,7 @@ object Multiply {
     println("@@@@ dense matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
     val sparse_tile = q("tensor(N)(N)[ ((i,j),random()) | i <- 0..(N-1), j <- 0..(N-1), random() > (1-sparsity)*10 ]")
     val sparse_tile_size = sizeof(sparse_tile).toDouble
-    println("@@@@ sparse matrix size: %.2f MB".format(sparse_tile_size*(n/N)*(m/N)/(1024.0*1024.0)))
+    println("@@@@ sparsity: %.2f, sparse matrix size: %.2f MB".format(sparsity,sparse_tile_size*(n/N)*(m/N)/(1024.0*1024.0)))
 
     def test ( name: String, f: => Double ) {
       val cores = Runtime.getRuntime().availableProcessors()
@@ -279,22 +249,14 @@ object Multiply {
       print("*** %s n=%d m=%d N=%d ".format(name,n,m,N))
       println("tries=%d %.3f secs".format(i,s))
     }
-
-/*
+ 
     test("MLlib Multiply dense-dense",testMultiplyMLlibDenseDense)
     test("MLlib Multiply sparse-dense",testMultiplyMLlibSparseDense)
-*/
     test("MLlib Multiply sparse-sparse",testMultiplyMLlibSparseSparse)
-/*
-    test("DIABLO Multiply dense-dense giving dense",testMultiplyDiabloDAC)
-    test("DIABLO Multiply sparse-dense giving dense",testMultiplyDiabloDACsparseDense)
-*/
-    test("DIABLO Multiply sparse-sparse giving dense",testMultiplyDiabloDACsparse)
-/*
-    test("DIABLO Multiply dense-dense giving sparse",testMultiplyDiabloDACsparseOut)
-    test("DIABLO Multiply sparse-dense giving sparse",testMultiplyDiabloDACsparseDenseSparseOut)
-    test("DIABLO Multiply sparse-sparse giving sparse",testMultiplyDiabloDACsparseSparseSparseOut)
-*/
+    test("DIABLO Multiply dense-dense giving dense",testMultiplyDiabloDACGBJ)
+    test("DIABLO Multiply sparse-dense giving dense",testMultiplyDiabloDACsparseDenseGBJ)
+    test("DIABLO Multiply sparse-sparse giving dense",testMultiplyDiabloDACsparseGBJ)
+
     spark_context.stop()
   }
 }
