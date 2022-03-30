@@ -39,28 +39,28 @@ object LinearRegression extends Serializable {
     val N = 1000
 	val validate = false
 	
-    val lrate = 1.0
+    val lrate = 0.5
     val total_size = args(1).toInt
     val n = (0.8*total_size).toInt
     val test_size = total_size-n
-    val m = 100
+    val m = 101
     val numIter = 10
     val rand = new Random()
-    val X_train = spark_context.textFile(args(2))
+    val X_train = spark_context.textFile(args(2),number_of_partitions)
               .map( line => { val a = line.split(",").toList
               				((a(0).toInt,a(1).toInt),a(2).toDouble)} ).cache
-    val y_train = spark_context.textFile(args(3))
+    val y_train = spark_context.textFile(args(3),number_of_partitions)
               .map( line => { val a = line.split(",").toList
                              (a(0).toInt,a(1).toDouble)} ).cache
-	val X_test = spark_context.textFile(args(4))
+	val X_test = spark_context.textFile(args(4),number_of_partitions)
               .map( line => { val a = line.split(",").toList
               				((a(0).toInt,a(1).toInt),a(2).toDouble)} ).cache
-    val y_test = spark_context.textFile(args(5))
+    val y_test = spark_context.textFile(args(5),number_of_partitions)
               .map( line => { val a = line.split(",").toList
                              (a(0).toInt,a(1).toDouble)} ).cache
     
     def testDiabloLR(): Double = {
-		var theta = spark_context.parallelize(0 to m-1).map(i => (i,1.0)).cache
+		var theta = spark_context.parallelize(0 to m-1).map(i => (i,rand.nextDouble()-0.5)).cache
     	val input1 = X_train
     	val output1 = y_train
     	val input2 = X_test
@@ -100,7 +100,7 @@ object LinearRegression extends Serializable {
 
     def testMLlibLR(): Double = {
     	def vect ( a: Iterable[Double] ): org.apache.spark.ml.linalg.Vector = {
-		  val s = Array.ofDim[Double](n*m)
+		  val s = Array.ofDim[Double](m)
 		  var count = 0
 		  for(x <- a) {
 			s(count) = x
