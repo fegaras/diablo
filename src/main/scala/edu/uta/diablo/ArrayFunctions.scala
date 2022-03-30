@@ -19,6 +19,7 @@ import scala.collection.mutable
 import scala.reflect.ClassTag
 import org.apache.spark.rdd.RDD
 
+
 trait ArrayFunctions {
 
   /* The size of an object */

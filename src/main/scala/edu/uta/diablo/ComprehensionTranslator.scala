@@ -1384,7 +1384,7 @@ object ComprehensionTranslator {
                                                       vars))
                        val all_dims = tile_dimensions(dn,dims.head)++tile_dimensions(sn,dims(1))
                        // check for groupBy join
-                       val rbk = group_by_join(rbknc,toExpr(tile_coords),all_dims.head,all_dims(1)) match {
+                       val rbk = group_by_join(rbknc,toExpr(tile_coords),all_dims) match {
                                    case Some(ne) => ne
                                    case _ => rbknc
                                  }
@@ -1413,7 +1413,7 @@ object ComprehensionTranslator {
 /* -------------------- GroupBy Join using the SUMMA algorithm -----------------------------------------*/
 
   // convert a join followed by groupBy to an optimal groupBy-join (SUMMA algorithm)
-  def group_by_join ( e: Expr, gbkey: Expr, left_rows: Expr, right_cols: Expr ): Option[Expr] = {
+  def group_by_join ( e: Expr, gbkey: Expr, dims: List[Expr] ): Option[Expr] = {
     def depends ( e: Expr, p: Pattern ): Boolean = freevars(e).toSet.subsetOf(patvars(p).toSet)
     (e,gbkey) match {
       case (MethodCall(flatMap(Lambda(TuplePat(List(_,pg)),IfE(_,prod,_)),
@@ -1426,6 +1426,8 @@ object ComprehensionTranslator {
             Tuple(List(gx,gy)))
         if groupByJoin && (depends(gx,px) && depends(gy,py) || (depends(gy,px) && depends(gx,py)))
         => val (gtx,gty) = if (depends(gx,px)) (gx,gy) else (gy,gx)
+           val left_rows = dims.head
+           val right_cols = dims(1)
            // grid dimension so that each grid cell is handled by one Spark executor
            val grid_dim = Math.sqrt(number_of_partitions).toInt
            // each grid cell contains grid_blocks*grid_blocks tensors

@@ -41,13 +41,14 @@ package object diablo extends diablo.ArrayFunctions {
 
   var collectionClass: String = rddClass
 
+  @transient
   var spark_context: SparkContext = _
 
   private var typeMapsLib = false
 
-  def opt ( e: Expr): Expr = Optimizer.optimizeAll(Normalizer.normalizeAll(e))
+  private def opt ( e: Expr): Expr = Optimizer.optimizeAll(Normalizer.normalizeAll(e))
 
-  def q_impl( c: Context )(query: c.Expr[String] ): c.Expr[Any] = {
+  def q_impl ( c: Context ) ( query: c.Expr[String] ): c.Expr[Any] = {
     import c.universe.{Expr=>_,Type=>_,_}
     val context: c.type = c
     val cg = new { val c: context.type = context } with CodeGeneration
