@@ -8,8 +8,9 @@ def createDataset(X, y, n, m, f1, f2):
 	file2 = open(f2,'w+')
 	start = time.time()
 	for i in range(n):
+		file1.write(str(i)+","+str(0)+","+str(1)+"\n")
 		for j in range(m):
-			file1.write(str(i)+","+str(j)+","+str(X[i][j]))
+			file1.write(str(i)+","+str(j+1)+","+str(X[i][j]))
 			if(i < n-1 or j < m-1):
 				file1.write("\n")
 		file2.write(str(i)+","+str(y[i]))
