@@ -37,11 +37,11 @@ object NeuralNetwork extends Serializable {
 		val N = 1000
 		val validate = true
 		
-		val learning_rate = 2.0
+		val learning_rate = 0.1
 		val total_size = args(1).toInt
 		val n = (0.8*total_size).toInt
 		val test_size = total_size - n
-		val m = 3
+		val m = 101
 		val epochs = 10
 
 		val input1 = spark_context.textFile(args(2),number_of_partitions)
@@ -71,42 +71,7 @@ object NeuralNetwork extends Serializable {
 			Y_test(i) = v
 
 		val nn_architecture = List((m, 8), (8, 1))
-		
-		def mat_multiply(A: Array[Double], B: Array[Double], a_n:Int, a_m:Int, b_m:Int): Array[Double] = {
-			var res = Array.tabulate(a_n*b_m){i => 0.0}
-			for (i <- 0 until a_n) {
-		  		for (j <- 0 until b_m) {
-		  			var xt = 0.0
-		  			for (k <- 0 until a_m) {
-		  				xt += A(i*a_m+k) * B(k*b_m+j)
-		  			}
-		  			res(i*b_m+j) += xt
-		  		}
-		  	}
-		  	res
-		}
-		
-		def mat_add(A: Array[Double], B: Array[Double], a_n:Int, a_m:Int): Array[Double] = {
-			var res = Array.tabulate(a_n*a_m){i => 0.0}
-			for (i <- 0 until a_n) {
-		  		for (j <- 0 until a_m) {
-		  			res(i*a_m+j) = A(i*a_m+j) + B(i)
-		  		}
-		  	}
-		  	res
-		}
-		
-		def mat_transpose(A: Array[Double], a_n: Int, a_m: Int): Array[Double] = {
-			var res = Array.tabulate(a_n*a_m){i => 0.0}
-			for (i <- 0 until a_n) {
-		  		for (j <- 0 until a_m) {
-		  			res(j*a_n+i) = A(i*a_m+j)
-		  		}
-		  	}
-		  	res
-		}
-		
-		def ln(x: Double): Double = math.log10(x)/math.log10(math.exp(1.0))
+
 		val rand = new Random()
 		def random(): Double = (rand.nextDouble()-0.5)*0.2
 
@@ -135,8 +100,6 @@ object NeuralNetwork extends Serializable {
 			val layer1 = nn_architecture(0)._2
 			val layer2 = nn_architecture(1)._2
 
-			val weights1 = spark_context.parallelize(for(i <- 0 to m-1; j <- 0 to layer1-1) yield ((i,j),weights(0)(i*layer1+j))).cache()
-			val weights2 = spark_context.parallelize(for(i <- 0 to layer1-1; j <- 0 to layer2-1) yield ((i,j),weights(1)(i*layer2+j))).cache()
 			val X_d = q("tensor*(n,m)[ ((i,j),v) | ((i,j),v) <- X_1 ]")
 			X_d._3.cache
 			val Y_d = q("tensor*(n,1)[ ((i,j),v) | (i,v) <- y_1, j <- 0..0 ]")
@@ -168,16 +131,16 @@ object NeuralNetwork extends Serializable {
 					var Z_curr1 = q("""tensor*(n,m2)[ ((i,j),+/v) | ((i,k),a) <- A_curr1, ((kk,j),w) <- w2,
 											kk == k, let v = w*a, group by (i,j) ]""")
 					Z_curr1._3.cache
-					if(l == number_of_layers-1) {
-						A_curr1 = q("""tensor*(n,m2)[ ((i,j),1/(1+getExp(-z))) | ((i,j),z) <- Z_curr1 ]""")
+					if(l < number_of_layers-1) {
+						A_curr1 = q("""tensor*(n,m2)[ ((i,j),getMax(z)) | ((i,j),z) <- Z_curr1 ]""")
 					}
 					else {
-						A_curr1 = q("""tensor*(n,m2)[ ((i,j),getMax(z)) | ((i,j),z) <- Z_curr1 ]""")
+						A_curr1 = q("""tensor*(n,m2)[ ((i,j),1/(1+getExp(-z))) | ((i,j),z) <- Z_curr1 ]""")
 					}
 					A_curr1._3.cache
 					Z_arr(l) = q("rdd[ ((i,j),v) | ((i,j),v) <- Z_curr1 ]")
 				}
-				var dA_prev = q("""tensor*(n,1)[ ((i,j),((-y/y_hat)+(1-y)/(1-y_hat))) | ((i,j),y) <- Y_d, ((ii,jj),y_hat) <- A_curr1,
+				var dA_prev = q("""tensor*(n,1)[ ((i,j),(2.0/n)*(y_hat-y)) | ((i,j),y) <- Y_d, ((ii,jj),y_hat) <- A_curr1,
                     							i == ii, j == jj ]""")
 				for(l <- 0 to number_of_layers-1) {
 					var idx = number_of_layers - 1 - l
@@ -204,7 +167,7 @@ object NeuralNetwork extends Serializable {
 					dA_prev = q("""tensor*(n,m1)[ ((i,ii),+/v) | ((i,j),z) <- dZ_curr, ((ii,jj),w) <- w2,
 											j == jj, let v = w*z, group by (i,ii) ]""")
 					dA_prev._3.cache
-					var w_update = q("""tensor*(m1,m2)[((i,j),w-learning_rate*dw/n) | ((i,j),w) <- w2, ((ii,jj),dw) <- dW_curr,
+					var w_update = q("""tensor*(m1,m2)[((i,j),w-learning_rate*dw) | ((i,j),w) <- w2, ((ii,jj),dw) <- dW_curr,
 											i==ii, j==jj ]""")
 					w_update._3.cache
 					w_arr(idx) = q("rdd[ ((i,j),v) | ((i,j),v) <- w_update ]")
@@ -222,11 +185,11 @@ object NeuralNetwork extends Serializable {
 					var w2 = q("tensor*(m1,m2)[ ((i,j),w) | ((i,j),w) <- w1]")
 					var Z_curr1 = q("""tensor*(test_size,m2)[ ((i,j),+/v) | ((i,k),a) <- A_curr1, ((kk,j),w) <- w2,
 											kk == k, let v = w*a, group by (i,j) ]""")
-					if(l == number_of_layers-1) {
-						A_curr1 = q("""tensor*(test_size,m2)[ ((i,j),1/(1+getExp(-z))) | ((i,j),z) <- Z_curr1 ]""")
+					if(l < number_of_layers-1) {
+						A_curr1 = q("""tensor*(test_size,m2)[ ((i,j),getMax(z)) | ((i,j),z) <- Z_curr1 ]""")
 					}
 					else {
-						A_curr1 = q("""tensor*(test_size,m2)[ ((i,j),getMax(z)) | ((i,j),z) <- Z_curr1 ]""")
+						A_curr1 = q("""tensor*(test_size,m2)[ ((i,j),1/(1+getExp(-z))) | ((i,j),z) <- Z_curr1 ]""")
 					}
 				}
 				val Y_hat = q("rdd[ ((i,j),v) | ((i,j),v) <- A_curr1 ]")
@@ -239,6 +202,12 @@ object NeuralNetwork extends Serializable {
 		
 		val spark = SparkSession.builder().config(conf).getOrCreate()
 		import spark.implicits._
+
+		// forces df to materialize in memory and evaluate all transformations
+		// (noop write format doesn't have much overhead)
+		def force ( df: DataFrame ) {
+			df.write.mode("overwrite").format("noop").save()
+		}
 
 		def testMLlibNN(): Double = {
 			def vect ( a: Iterable[Double] ): org.apache.spark.ml.linalg.Vector = {
@@ -263,6 +232,7 @@ object NeuralNetwork extends Serializable {
 			  	row.getAs[Double]("label"),
 			  	row.getAs[org.apache.spark.ml.linalg.Vector]("features")
 			)}.toDF.cache()
+			force(training_data)
 
 			val layers = Array[Int](m, 8, 2)
 
@@ -276,6 +246,7 @@ object NeuralNetwork extends Serializable {
 			val t = System.currentTimeMillis()
 			// train the model
 			val model = trainer.fit(training_data)
+			println(model.summary.accuracy)
 
 			// compute accuracy on the test set
 			if(validate) {
@@ -284,6 +255,7 @@ object NeuralNetwork extends Serializable {
 					row.getAs[Double]("label"),
 					row.getAs[org.apache.spark.ml.linalg.Vector]("features")
 				)}.toDF.cache()
+				force(test_data)
 				val predictions = model.transform(test_data)
 				val evaluator = new MulticlassClassificationEvaluator().setMetricName("accuracy")
 				val accuracy = evaluator.evaluate(predictions)
