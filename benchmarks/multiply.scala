@@ -223,6 +223,26 @@ object Multiply {
       (System.currentTimeMillis()-t)/1000.0
     }
 
+    // forces df to materialize in memory and evaluate all transformations
+    // (noop write format doesn't have much overhead)
+    def force ( df: DataFrame ) {
+      df.write.mode("overwrite").format("noop").save()
+    }
+
+    // matrix multiplication of tiled matrices using Diablo Data Frames
+    def testMultiplyDiabloDF (): Double = {
+      param(data_frames,true)
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n,n)[ ((i,j),+/c) | ((i,k),a) <- AA, ((kk,j),b) <- BB, k == kk, let c = a*b, group by (i,j) ]
+                  """)
+        force(C._3)
+      } catch { case x: Throwable => println(x); return -1.0 }
+      param(data_frames,false)
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
     val tile_size = sizeof(((1,1),randomTile(N,N))).toDouble
     println("@@@ number of tiles: "+(n/N)+"*"+(m/N)+" = "+((n/N)*(m/N)))
     println("@@@@ dense matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
@@ -256,6 +276,7 @@ object Multiply {
     test("DIABLO Multiply dense-dense giving dense",testMultiplyDiabloDACGBJ)
     test("DIABLO Multiply sparse-dense giving dense",testMultiplyDiabloDACsparseDenseGBJ)
     test("DIABLO Multiply sparse-sparse giving dense",testMultiplyDiabloDACsparseGBJ)
+    test("DIABLO Multiply dense-dense SQL",testMultiplyDiabloDF)
 
     spark_context.stop()
   }

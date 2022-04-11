@@ -47,7 +47,7 @@ object Add {
     def randomMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
       val l = Random.shuffle((0 until (rows+N-1)/N).toList)
       val r = Random.shuffle((0 until (cols+N-1)/N).toList)
-      spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
+      spark_context.parallelize(for { i <- l; j <- r } yield (i,j),number_of_partitions)
                    .map{ case (i,j) => ((i,j),randomTile(if ((i+1)*N > rows) rows%N else N,
                                                          if ((j+1)*N > cols) cols%N else N)) }
     }
@@ -65,7 +65,7 @@ object Add {
     def randomSparseMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
       val l = Random.shuffle((0 until (rows+N-1)/N).toList)
       val r = Random.shuffle((0 until (cols+N-1)/N).toList)
-      spark_context.parallelize(for { i <- l; j <- r } yield (i,j))
+      spark_context.parallelize(for { i <- l; j <- r } yield (i,j),number_of_partitions)
             .map{ case (i,j) => ((i,j),randomTileSparse(if ((i+1)*N > rows) rows%N else N,
                               if ((j+1)*N > cols) cols%N else N)) }
     }
@@ -109,10 +109,10 @@ object Add {
         for { ((ii,jj),((nd,md),_,a)) <- CC
               i <- 0 until nd
               j <- 0 until md } {
-           val ci = ii*N+nd
-           if (Math.abs(a(i*md+j)-C(ii*N+i,jj*N+j)) > 0.01)
-             println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f"
-                     .format(ii,jj,i,j,a(i*md+j),C(ii*N+i,jj*N+j)))
+          val ci = ii*N+nd
+          if (Math.abs(a(i*md+j)-C(ii*N+i,jj*N+j)) > 0.01)
+            println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f"
+                    .format(ii,jj,i,j,a(i*md+j),C(ii*N+i,jj*N+j)))
         }
       }
     }
@@ -131,7 +131,7 @@ object Add {
     def testAddMLlibSparseDense: Double = {
       val t = System.currentTimeMillis()
       try {
-      val C = ASparse.add(B)
+      val C = A.add(BSparse)
       val x = C.blocks.count
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
@@ -189,6 +189,26 @@ object Add {
       (System.currentTimeMillis()-t)/1000.0
     }
 
+    // forces df to materialize in memory and evaluate all transformations
+    // (noop write format doesn't have much overhead)
+    def force ( df: DataFrame ) {
+      df.write.mode("overwrite").format("noop").save()
+    }
+
+    // matrix addition of dense-dense tiled matrices using Diablo Data Frames
+    def testAddDiabloDF: Double = {
+      param(data_frames,true)
+      val t = System.currentTimeMillis()
+      try {
+        val C = q("""
+                  tensor*(n,m)[ ((i,j),a+b) | ((i,j),a) <- AA, ((ii,jj),b) <- BB, ii == i, jj == j ];
+                  """)
+        force(C._3)
+      } catch { case x: Throwable => println(x); return -1.0 }
+      param(data_frames,false)
+      (System.currentTimeMillis()-t)/1000.0
+    }
+
     val tile_size = sizeof(((1,1),randomTile(N,N))).toDouble
     println("@@@ number of tiles: "+(n/N)+"*"+(m/N)+" = "+((n/N)*(m/N)))
     println("@@@@ dense matrix size: %.2f GB".format(tile_size*(n/N)*(m/N)/(1024.0*1024.0*1024.0)))
@@ -205,7 +225,7 @@ object Add {
         val t = f
         j += 1
         if (t > 0.0) {   // if f didn't crash
-	        if(i > 0) s += t
+          if(i > 0) s += t
           i += 1
           println("Try: "+i+"/"+j+" time: "+t)
         }
@@ -221,6 +241,7 @@ object Add {
     test("DIABLO Add dense-dense giving dense",testAddDiabloDACGBJ)
     test("DIABLO Add sparse-dense giving dense",testAddDiabloDACsparseDenseGBJ)
     test("DIABLO Add sparse-sparse giving dense",testAddDiabloDACsparseGBJ)
+    test("DIABLO Add dense-dense SQL",testAddDiabloDF)
 
     spark_context.stop()
   }
