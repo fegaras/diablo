@@ -21,13 +21,13 @@
   <groupId>edu.uta.diablo</groupId>
   <artifactId>diablo</artifactId>
   <packaging>jar</packaging>
-  <version>0.1</version>
+  <version>0.2</version>
   <name>Array Comprehensions</name>
   <description>DIABLO: a Data-Intensive Array-Based Loop Optimizer</description>
 
   <properties>
-    <scala.version>2.12.12</scala.version>
-    <spark.version>3.1.2</spark.version>
+    <scala.version>2.12.15</scala.version>
+    <spark.version>3.2.1</spark.version>
   </properties>
 
   <dependencies>
@@ -36,6 +36,13 @@
       <artifactId>scala-compiler</artifactId>
       <version>${scala.version}</version>
     </dependency>
+<!-- for Scala 2.13:
+    <dependency>
+      <groupId>org.scala-lang.modules</groupId>
+      <artifactId>scala-parallel-collections_2.13</artifactId>
+      <version>1.0.4</version>
+    </dependency>
+-->
     <dependency>
       <groupId>org.scala-lang.modules</groupId>
       <artifactId>scala-parser-combinators_2.12</artifactId>

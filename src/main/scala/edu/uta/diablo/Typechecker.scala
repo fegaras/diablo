@@ -704,7 +704,7 @@ object Typechecker {
             => return_types match {
                   case rt::_
                     => if (!typeMatch(typecheck(u,env),rt))
-                         throw new Error(s+" must return a value of type: "+rt)
+                         throw new Error(s.toString+" must return a value of type: "+rt)
                   case _ => throw new Error("A Return statement can only appear inside a function body: "+s)
                }
                env
@@ -735,6 +735,6 @@ object Typechecker {
 
     val localEnv: Environment = Map()
 
-    def typecheck ( s: Stmt ) { typecheck(s,Nil,localEnv) }
+    def typecheck ( s: Stmt ): Unit = typecheck(s,Nil,localEnv)
     def typecheck ( e: Expr ): Type = typecheck(e,localEnv)
 }

@@ -73,12 +73,12 @@ object Parser extends StandardTokenParsers {
 
   override val lexical = new MyLexical
 
-  lexical.delimiters += ( "(" , ")" , "[", "]", "{", "}", "," , ":", ";", ".", "=>", "=", "->", "<-",
-                          "||", "&&", "!", "==", "<=", ">=", "<", ">", "!=", "+", "-", "*", "/", "%",
-                          ":=", "#", "^", "|", "&", "..", "::" )
+  lexical.delimiters ++= List( "(" , ")" , "[", "]", "{", "}", "," , ":", ";", ".", "=>", "=", "->", "<-",
+                               "||", "&&", "!", "==", "<=", ">=", "<", ">", "!=", "+", "-", "*", "/", "%",
+                               ":=", "#", "^", "|", "&", "..", "::" )
 
-  lexical.reserved += ( "var", "for", "in", "do", "while", "if", "else", "true", "false", "def", "let",
-                        "return", "typemap", "group", "by", "tensor" )
+  lexical.reserved ++= List( "var", "for", "in", "do", "while", "if", "else", "true", "false", "def", "let",
+                             "return", "typemap", "group", "by", "tensor" )
 
   /* groups of infix operator precedence, from low to high */
   val operator_precedence: List[Parser[String]]
@@ -104,7 +104,7 @@ object Parser extends StandardTokenParsers {
       = positioned(if (level >= precedence.length) conses
                    else infix(level+1) * terms(level))
 
-  def fromRaw ( s: String ): String = s.replaceAllLiterally("""\n""","\n")
+  def fromRaw ( s: String ): String = s.replace("""\n""","\n")
         
   def expr: Parser[Expr]
       = infix(0) | factor
@@ -440,7 +440,7 @@ object Parser extends StandardTokenParsers {
           case m => println(m); Block(Nil)
         }
 
-  def main ( args: Array[String] ) {
+  def main ( args: Array[String] ): Unit = {
     println(Pretty.print(parse(args(0))))
   }
 }

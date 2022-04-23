@@ -30,7 +30,7 @@ object Lifting {
   /** check and construct a new type mapping */
   def typeMap ( typeName: String, typeParams: List[String], params: Map[String,Type],
                 abstractType: Type, storageType: Type, liftedType: Type,
-                view: Lambda, store: Lambda ) {
+                view: Lambda, store: Lambda ): Unit = {
     def storage_type ( tp: Type ): Type
       = tp match {
           case ParametricType(f,ts)

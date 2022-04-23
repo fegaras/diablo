@@ -35,6 +35,8 @@ object Multiply {
 
     val conf = new SparkConf().setAppName("tiles")
     spark_context = new SparkContext(conf)
+    conf.set("spark.serializer","org.apache.spark.serializer.KryoSerializer")
+    conf.set("spark.kryo.registrationRequired","true")
     val spark = SparkSession.builder().config(conf).getOrCreate()
     import spark.implicits._
 
@@ -379,7 +381,9 @@ object Multiply {
                                   }
                                   ((i,j),((na,mb),et,V))
                            }
-                       .reduceByKey{ case (((nx,mx),_,x),(_,_,y))
+                       .reduceByKey{ (tx: ((Int,Int),EmptyTuple,Array[Double]),
+                                      ty: ((Int,Int),EmptyTuple,Array[Double])) => (tx,ty) match {
+                                     case (((nx,mx),_,x),(_,_,y))
                                        => val V = Array.ofDim[Double](nx*mx)
                                           for { i <- (0 until nx).par } {
                                              var j = 0
@@ -389,7 +393,7 @@ object Multiply {
                                              }
                                           }
                                           ((nx,mx),et,V)
-                                   })
+                                   }})
         validate(C)
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
@@ -404,7 +408,7 @@ object Multiply {
                        .join( Bm.map{ case ((kk,j),b) => (kk,(j,b)) } )
                        .map{ case (_,((i,a),(j,b)))
                                => ((i,j),a.multiply(b.asInstanceOf[DenseMatrix])) }
-                       .reduceByKey{ case (x,y)
+                       .reduceByKey{ ( x: DenseMatrix, y: DenseMatrix )
                                        => val V = Array.ofDim[Double](x.numRows*x.numCols)
                                           for { i <- (0 until x.numRows).par
                                                 j <- 0 until x.numCols }
@@ -439,7 +443,7 @@ object Multiply {
                        .join( Bm.map{ case ((kk,j),b) => (kk,(j,b)) } )
                        .map{ case (_,((i,a),(j,b)))
                                => ((i,j),a*b) }
-                       .reduceByKey{ case (x,y) => x+y })
+                       .reduceByKey(_+_))
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0

@@ -294,11 +294,11 @@ object TypeMappings {
     """
   }
 
-  def init () {
+  def init (): Unit = {
     Typechecker.typecheck(Parser.parse(inits))
   }
 
-  def main ( args: Array[String] ) {
+  def main ( args: Array[String] ): Unit = {
      println(tensor(args(0).toInt,args(1).toInt,args(2).toInt == 1))
      println(block_tensor(args(0).toInt,args(1).toInt,"rdd",args(2).toInt == 1))
   }

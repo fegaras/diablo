@@ -632,7 +632,7 @@ object Translator {
         case _ => false
       }
 
-  def validate ( s: Stmt, vars: List[String], read: List[Expr] ) {
+  def validate ( s: Stmt, vars: List[String], read: List[Expr] ): Unit = {
     s match {
       case ForS(v,e1,e2,e3,b)
         => validate(b,v::vars,arrays_read(b))

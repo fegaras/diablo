@@ -521,26 +521,26 @@ object AST {
     accumulateStmt[Position](e,getPos(_),max,zero)
   }
 
-  def setPositions ( e: Expr, pos: Position ) {
+  def setPositions ( e: Expr, pos: Position ): Unit = {
     val npos = if (e.pos == NoPosition) pos else e.pos
     e.pos = npos
     accumulate[Unit](e,setPositions(_,npos),(x:Unit,y:Unit)=>x,())
   }
 
-  def setPositions ( e: Stmt, pos: Position ) {
+  def setPositions ( e: Stmt, pos: Position ): Unit = {
     val npos = if (e.pos == NoPosition) pos else e.pos
     e.pos = npos
     accumulateStmt[Unit](e,setPositions(_,npos),(x:Unit,y:Unit)=>x,())
   }
 
-  def setPos ( e: Expr, pos: Position ) {
+  def setPos ( e: Expr, pos: Position ): Unit = {
     if (e.pos == NoPosition) {
       e.pos = pos
       accumulate[Unit](e,setPos(_,pos),(x:Unit,y:Unit)=>x,())
     }
   }
 
-  def setPos ( e: Stmt, pos: Position ) {
+  def setPos ( e: Stmt, pos: Position ): Unit = {
     if (e.pos == NoPosition) {
       e.pos = pos
       accumulateStmt[Unit](e,setPos(_,pos),(x:Unit,y:Unit)=>x,())

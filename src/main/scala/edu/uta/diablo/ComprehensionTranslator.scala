@@ -1677,9 +1677,9 @@ object ComprehensionTranslator {
   /* parallelize first range flatMap */
   def parallelize ( e: Expr ): Expr
     = e match {
-          case flatMap(f@Lambda(_,b),u@Range(n,m,s))
+          case flatMap(f@Lambda(_,b),Range(n,m,s))
             if !has_side_effects(b)
-            => MethodCall(flatMap(f,MethodCall(u,"par",null)),"toList",null)
+            => MethodCall(flatMap(f,Call("parRange",List(n,m,s))),"toList",null)
           case _ => apply(e,parallelize)
       }
 }

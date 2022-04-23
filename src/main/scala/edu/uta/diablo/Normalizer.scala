@@ -135,7 +135,8 @@ object Normalizer {
                            case TuplePat(ps) => ps.map(fresh).reduce(_++_)
                            case _ => Map() }
              def substS ( e: Expr, env: Map[String,String] ): Expr
-               = substE(e,env.mapValues(Var))
+               = substE(e,env.mapValues(Var).toMap)
+// for Scala 2.13:               = substE(e,env.view.mapValues(Var).toMap)
              val (env,nqs)
                = qs.foldLeft[(Map[String,String],List[Qualifier])] ((Map(),Nil)) {
                     case ((r,s),Generator(p,u))

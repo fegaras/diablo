@@ -6,7 +6,7 @@ It works on Apache Spark and on Scala's Parallel collections.
 
 ### Installation on Spark
 
-DIABLO depends on Scala 2.12.12 and Spark 3.1.2. To compile DIABLO, use ``sbt package`` or ``mvn install``.
+DIABLO depends on Scala 2.12.15, Spark 3.2.1, JDK 11, and sbt 1.6.2. To compile DIABLO, use ``sbt package`` or ``mvn install``.
 To test  on Spark:
 ```bash
 export SPARK_HOME= ... path to Spark home ...

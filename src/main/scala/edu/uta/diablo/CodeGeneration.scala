@@ -45,7 +45,7 @@ abstract class CodeGeneration {
     n.foldLeft("") {
       case (r,d)
         => r+(char_maps.get(d) match {
-                        case Some(s) => '$'+s
+                        case Some(s) => "$"+s
                         case _ => d
                       })
     }
