@@ -705,12 +705,28 @@ object ComprehensionTranslator {
                                           case (r,LetBinding(p,e)) => Let(p,e,r)
                                           case (r,_) => r
                                        }
+/*******************************************************************************/
+                    def size ( e: Expr ): Option[Expr]
+                      = e match {
+                          case Lift("rdd",Nth(x,3))
+                            => Some(Call("array_size",List(Nth(x,1))))
+                          case _ => None
+                        }
+                    val join = (size(d1),size(d2)) match {
+                                  case (Some(s1),Some(s2))
+                                    => Call("diablo_join",
+                                            List(s1,s2,left,nright,
+                                                 IntConst(number_of_partitions)))
+                                  case _ => MethodCall(left,"join",
+                                                       List(nright,IntConst(number_of_partitions)))
+                               }
+/*******************************************************************************/
                           val z = Generator(TuplePat(List(p1,p2)),
                                             Lift("rdd",
                                                  flatMap(Lambda(TuplePat(List(VarPat("_k"),VarPat("_x"))),
                                                                 Seq(List(Var("_x")))),
-                                                         MethodCall(left,"join",List(nright,
-                                                                         IntConst(number_of_partitions))))))
+                                                         MethodCall(left,"join",
+                                                                    List(nright,IntConst(number_of_partitions))))))
                           translate_rdd(hs,qs.flatMap {
                                case Generator(p,_) if p==p1 => List(z) // replace 1st generator with the join
                                case Generator(p,_) if p==p2 => Nil     // remove 2nd generator
@@ -1677,9 +1693,11 @@ object ComprehensionTranslator {
   /* parallelize first range flatMap */
   def parallelize ( e: Expr ): Expr
     = e match {
-          case flatMap(f@Lambda(_,b),Range(n,m,s))
+          case flatMap(f@Lambda(_,b),u@Range(n,m,s))
             if !has_side_effects(b)
-            => MethodCall(flatMap(f,Call("parRange",List(n,m,s))),"toList",null)
+            // parRange doesn't work
+            // => MethodCall(flatMap(f,Call("parRange",List(n,m,s))),"toList",null)
+            => MethodCall(flatMap(f,MethodCall(u,"par",null)),"toList",null)
           case _ => apply(e,parallelize)
       }
 }
