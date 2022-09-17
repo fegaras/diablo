@@ -452,12 +452,50 @@ abstract class CodeGeneration {
          case _ => q"null"
       }
 
+  def getKey ( e: Expr ): Expr
+    = e match {
+        case Seq(List(Tuple(List(k,_))))
+          => k
+        case IfE(_,kt,Seq(Nil))
+          => getKey(kt)
+        case _ => Seq(Nil)
+      }
+
   /** Generate Scala code for expressions */
   def codeGen ( e: Expr, env: Environment ): c.Tree = try {
     e match {
       case flatMap(Lambda(p,Seq(List(b))),x)
         if toExpr(p) == b
         => codeGen(x,env)
+      case flatMap(Lambda(p@TuplePat(List(pk,pv)),Seq(List(b@Tuple(List(k,_))))),
+                   x@groupBy(flatMap(Lambda(_,bx),_)))
+        if mapPreserve && irrefutable(p) && getKey(bx) == k
+         // mapValues maintains partitioning
+        => val pc = code(p)
+           val (tp,xc) = typedCode(x,env)
+           val nv = TermName(c.freshName("_x"))
+           val bc = codeGen(b,add(p,tp,env))
+           q"mapPreservesPartitioning( $xc, ($nv:$tp) => $nv match { case $pc => $bc } )"
+      case flatMap(Lambda(p@TuplePat(List(pk,pv)),Seq(List(b@Tuple(List(k,_))))),
+                   x@MethodCall(flatMap(Lambda(_,bx),_),"reduceByKey",_))
+        if mapPreserve && irrefutable(p) && getKey(bx) == k
+         // mapValues maintains partitioning
+        => val pc = code(p)
+           val (tp,xc) = typedCode(x,env)
+           val nv = TermName(c.freshName("_x"))
+           val bc = codeGen(b,add(p,tp,env))
+           q"mapPreservesPartitioning( $xc, ($nv:$tp) => $nv match { case $pc => $bc } )"
+      case flatMap(Lambda(p@TuplePat(List(pk,pv)),Seq(List(b@Tuple(List(k,_))))),
+                   x@MethodCall(flatMap(Lambda(_,bx),_),
+                                "join",
+                                flatMap(Lambda(_,by),_)::_))
+        if mapPreserve && irrefutable(p) && (getKey(bx) == k || getKey(by) == k)
+         // mapValues maintains partitioning
+        => val pc = code(p)
+           val (tp,xc) = typedCode(x,env)
+           val nv = TermName(c.freshName("_x"))
+           val bc = codeGen(b,add(p,tp,env))
+           q"mapPreservesPartitioning( $xc, ($nv:$tp) => $nv match { case $pc => $bc } )"
       case flatMap(Lambda(p,Seq(List(b))),x)
         if irrefutable(p)
         => val pc = code(p)

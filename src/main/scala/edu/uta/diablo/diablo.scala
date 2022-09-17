@@ -29,6 +29,7 @@ package object diablo extends diablo.ArrayFunctions {
   var block_dim_size = 1000      // size of each dimension of a block tensor
   var number_of_partitions = 10  // num of partitions in shuffling operations
   var data_frames = false        // false for RDD, true for DataFrame
+  var mapPreserve = true         // use a map that preserves partitioning when applicable
 
   val rddClass = "org.apache.spark.rdd.RDD"
   val datasetClass = "edu.uta.diablo.DiabloDataFrame"
@@ -114,6 +115,7 @@ package object diablo extends diablo.ArrayFunctions {
        case "trace" => trace = bv
        case "groupByJoin" => groupByJoin = bv
        case "parallel" => parallel = bv
+       case "mapPreserve" => mapPreserve = bv
        case "data_frames"
          => data_frames = bv
             collectionClass = if (data_frames) datasetClass else rddClass

@@ -32,6 +32,10 @@ trait ArrayFunctions {
     estimate(x)
   }
 
+  // an RDD map that preserves partitioning
+  def mapPreservesPartitioning[V:ClassTag,U:ClassTag] ( rdd: RDD[V], f: V => U ): RDD[U]
+    = rdd.mapPartitions( it => it.map(f), preservesPartitioning = true )
+
   // An outer-join for 1-1 join relationship
   @specialized
   final def outerJoin[K:ClassTag,T:ClassTag] ( xrdd: RDD[(K,T)], yrdd: RDD[(K,T)],
