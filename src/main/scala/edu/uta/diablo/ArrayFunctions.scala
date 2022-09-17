@@ -24,6 +24,7 @@ import scala.collection.parallel.immutable.ParRange
 
 
 trait ArrayFunctions {
+  // parRange doesn't work
   final def parRange ( n: Int, m: Int, s: Int ): ParRange = scala.collection.immutable.Range(n,m,s).par
 
   /* The size of an object */
@@ -31,6 +32,10 @@ trait ArrayFunctions {
     import org.apache.spark.util.SizeEstimator.estimate
     estimate(x)
   }
+
+  def array_size ( x: Int ): Int = x
+  def array_size ( x: (Int,Int) ): Int = x._1*x._2
+  def array_size ( x: (Int,Int,Int) ): Int = x._1*x._2*x._3
 
   // an RDD map that preserves partitioning
   def mapPreservesPartitioning[V:ClassTag,U:ClassTag] ( rdd: RDD[V], f: V => U ): RDD[U]
