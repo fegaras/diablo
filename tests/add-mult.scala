@@ -32,6 +32,7 @@ object AddMult {
     val N = 1000
     val validate_output = false
     parami(number_of_partitions,10)
+    param(groupByJoin,true)
 
     val conf = new SparkConf().setAppName("tiles")
     spark_context = new SparkContext(conf)
@@ -44,120 +45,15 @@ object AddMult {
     conf.set("spark.eventLog.enabled","false")
     LogManager.getRootLogger().setLevel(Level.WARN)
 
-    def randomIJVMatrix ( n: Int, m: Int ): RDD[((Int,Int),Double)] = {
-      val max = 10
-      val l = Random.shuffle((0 until n).toList)
-      val r = Random.shuffle((0 until m).toList)
-      spark_context.parallelize(l)
-        .flatMap{ i => val rand = new Random()
-                       r.map{ j => ((i.toInt,j.toInt),rand.nextDouble()*max) } }
-        .cache()
-    }
-
-    def testMultiplyIJV (): Double = {
-      // matrix multiplication of IJV matrices using Diablo array comprehensions
-      val MM = randomIJVMatrix(n,m)
-      val NN = randomIJVMatrix(m,n)
-      val t = System.currentTimeMillis()
-      try {
-        val C = q("""
-                  rdd[ ((i,j),+/v) | ((i,k),mm) <- MM, ((kk,j),nn) <- NN, let v = mm*nn, k == kk, group by (i,j) ]
-                  """)
-        val x = C.count
-      } catch { case x: Throwable => println(x); return -1.0 }
-      (System.currentTimeMillis()-t)/1000.0
-    }
-
-    def randomTile ( nd: Int, md: Int ): DenseMatrix = {
-      val max = 10
-      val rand = new Random()
-      new DenseMatrix(nd,md,Array.tabulate(nd*md){ i => rand.nextDouble()*max })
-    }
-
-    def randomMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
-      val l = Random.shuffle((0 until (rows+N-1)/N).toList)
-      val r = Random.shuffle((0 until (cols+N-1)/N).toList)
-      spark_context.parallelize(for { i <- l; j <- r } yield (i,j),
-                                number_of_partitions)
-                   .map{ case (i,j) => ((i,j),randomTile(if ((i+1)*N > rows) rows%N else N,
-                                                         if ((j+1)*N > cols) cols%N else N)) }
-    }
-
-    def randomTileSparse ( nd: Int, md: Int ): SparseMatrix = {
-      val max = 10
-      val rand = new Random()
-      var entries = scala.collection.mutable.ArrayBuffer[(Int,Int,Double)]()
-      for (i <- 0 to nd-1; j <- 0 to md-1) {
-        if (rand.nextDouble() <= sparsity)
-          entries += ((i,j,rand.nextDouble()*max))
-      }
-      SparseMatrix.fromCOO(nd,md,entries)
-    }
-
-    def randomSparseMatrix ( rows: Int, cols: Int ): RDD[((Int, Int),org.apache.spark.mllib.linalg.Matrix)] = {
-      val l = Random.shuffle((0 until (rows+N-1)/N).toList)
-      val r = Random.shuffle((0 until (cols+N-1)/N).toList)
-      spark_context.parallelize(for { i <- l; j <- r } yield (i,j),
-                                number_of_partitions)
-            .map{ case (i,j) => ((i,j),randomTileSparse(if ((i+1)*N > rows) rows%N else N,
-                              if ((j+1)*N > cols) cols%N else N)) }
-    }
-
-    val Am = randomMatrix(n,m).cache()
-    val Bm = randomMatrix(m,n).cache()
-    val Cm = randomMatrix(n,n).cache()
-
-    val A = new BlockMatrix(Am,N,N)
-    val B = new BlockMatrix(Bm,N,N)
-
-    val AS = randomSparseMatrix(n,m).cache()
-    val BS = randomSparseMatrix(m,n).cache()
-
-    val ASparse = new BlockMatrix(AS,N,N).cache
-    val BSparse = new BlockMatrix(BS,N,N).cache
-
     type tiled_matrix = ((Int,Int),EmptyTuple,RDD[((Int,Int),((Int,Int),EmptyTuple,Array[Double]))])
-    val et = EmptyTuple()
-    // dense block tensors
-    val AA = ((n,m),et,Am.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
-    val BB = ((m,n),et,Bm.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
-    val CC = ((n,n),et,Cm.map{ case ((i,j),a) => ((i,j),((a.numRows,a.numCols),et,a.transpose.toArray)) })
-    AA._3.cache
-    BB._3.cache
-    CC._3.cache
 
     val rand = new Random()
     def random () = rand.nextDouble()*10
 
-    // sparse block tensors with 99% zeros
-    val Az = q("tensor*(n)(m)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > (1.0-sparsity)*10 ]")
-    Az._3.cache
-    val Bz = q("tensor*(m)(n)[ ((i,j),random()) | i <- 0..(n-1), j <- 0..(m-1), random() > (1.0-sparsity)*10 ]")
-    Bz._3.cache
+    val AA = q("tensor*(n,n)[ ((i,j),random()) | i <- 1..n, j <- 1..n ]")
+    val BB = q("tensor*(n,n)[ ((i,j),random()) | i <- 1..n, j <- 1..n ]")
+    val CC = q("tensor*(n,n)[ ((i,j),random()) | i <- 1..n, j <- 1..n ]")
 
-    def validate ( M: tiled_matrix ) = {
-      if (!validate_output)
-        M._3.count()
-      else {
-        val C = A.multiply(B).toLocalMatrix()
-        val CC = M._3.collect
-        println("Validating ...")
-        for { ((ii,jj),((nd,md),_,a)) <- CC
-              i <- 0 until nd
-              j <- 0 until md } {
-           val ci = ii*N+nd
-           if (Math.abs(a(i*md+j)-C(ii*N+i,jj*N+j)) > 0.01)
-             println("Element (%d,%d)(%d,%d) is wrong: %.3f %.3f"
-                     .format(ii,jj,i,j,a(i*md+j),C(ii*N+i,jj*N+j)))
-        }
-      }
-    }
-
-    // forces df to materialize in memory and evaluate all transformations
-    // (noop write format doesn't have much overhead)
-    def force ( df: DataFrame ) {
-      df.write.mode("overwrite").format("noop").save()
-    }
 
     def testAddMult (): Double = {
       val t = System.currentTimeMillis()
@@ -168,7 +64,7 @@ object AddMult {
                                                                    k == kk, let c = a*b, group by (i,j) ],
                           ((ii,jj),c) <- CC, ii==i, jj==j ]
                   """)
-        validate(C)
+        C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
     }
@@ -183,7 +79,7 @@ object AddMult {
                                                                    k == kk, let c = a*b, group by (i,j) ],
                           ((ii,jj),c) <- CC, ii==i, jj==j ]
                   """)
-        validate(C)
+        C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       param(mapPreserve,true)
       (System.currentTimeMillis()-t)/1000.0

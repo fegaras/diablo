@@ -667,7 +667,7 @@ object ComprehensionTranslator {
                    val Comprehension(nh,ns) = lift(yieldReductions(Comprehension(hs,s),usedVars))
                    val red = MethodCall(Store("rdd",Nil,Nil,       // type parameter?
                                               Comprehension(Tuple(List(k,tuple(gs))),r)),
-                                        "reduceByKey",List(m))
+                                        "reduceByKey",List(m,IntConst(number_of_partitions)))
                    translate_rdd(nh,Generator(TuplePat(List(p,tuple(env.map(x => VarPat(x._2))))),
                                               red)::ns,vars)
               case _

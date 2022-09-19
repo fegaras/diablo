@@ -49,6 +49,30 @@ package object diablo extends diablo.ArrayFunctions {
 
   private def opt ( e: Expr): Expr = Optimizer.optimizeAll(Normalizer.normalizeAll(e))
 
+  def spark_plan ( e: Expr, tab: Int, is_plan: Boolean ): String
+    = "   "*tab+
+      (e match {
+        case Block(l)
+          => l.map(spark_plan(_,tab,is_plan)).mkString("")
+        case Seq(l)
+          => l.map(spark_plan(_,tab,false)).mkString("")
+        case flatMap(_,x)
+          => "flatMap:\n"+spark_plan(x,tab+1,true)
+        case groupBy(x)
+          => "groupBy:\n"+spark_plan(x,tab+1,true)
+        case Tuple(l)
+          => l.map(spark_plan(_,tab,false)).mkString("")
+        case MethodCall(x,"reduceByKey",_)
+          => "reduceByKey;\n"+spark_plan(x,tab+1,true)
+        case MethodCall(x,"join",y::_)
+          => "join:\n"+spark_plan(x,tab+1,true)+spark_plan(y,tab+1,true)
+        case MethodCall(x,"cogroup",y::_)
+          => "cogroup:\n"+spark_plan(x,tab+1,true)+spark_plan(y,tab+1,true)
+        case MethodCall(_,"parallelize",_)
+          => "parallelize:\n"
+        case _ => if (is_plan) e.toString()+"\n" else ""
+    })
+
   def q_impl ( c: Context ) ( query: c.Expr[String] ): c.Expr[Any] = {
     import c.universe.{Expr=>_,Type=>_,_}
     val context: c.type = c
@@ -84,6 +108,7 @@ package object diablo extends diablo.ArrayFunctions {
     if (trace) println("Compiled comprehension:\n"+Pretty.print(pc))
     val ec = cg.codeGen(pc,env)
     if (trace) println("Scala code:\n"+showCode(ec))
+    if (trace) print("Spark plan:\n"+spark_plan(pc,0,false))
     val tc = cg.getType(ec,env)
     if (trace) println("Scala type: "+tc)
     context.Expr[Any](ec)
