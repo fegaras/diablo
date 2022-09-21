@@ -59,6 +59,7 @@ object AddAdd {
                   tensor*(n,n)[ ((i,j),a+b+c) | ((i,j),a) <= AA, ((ii,jj),b) <= BB, ((iii,jjj),c) <- CC,
                                               ii==i, jj==j, iii==i, jjj==j ]
                   """)
+        println(C._3.toDebugString)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       (System.currentTimeMillis()-t)/1000.0
@@ -72,6 +73,7 @@ object AddAdd {
                   tensor*(n,n)[ ((i,j),a+b+c) | ((i,j),a) <= AA, ((ii,jj),b) <= BB, ((iii,jjj),c) <- CC,
                                               ii==i, jj==j, iii==i, jjj==j ]
                   """)
+        println(C._3.toDebugString)
         C._3.count()
       } catch { case x: Throwable => println(x); return -1.0 }
       param(mapPreserve,true)

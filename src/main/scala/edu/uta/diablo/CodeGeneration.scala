@@ -496,6 +496,17 @@ abstract class CodeGeneration {
            val nv = TermName(c.freshName("_x"))
            val bc = codeGen(b,add(p,tp,env))
            q"mapPreservesPartitioning( $xc, ($nv:$tp) => $nv match { case $pc => $bc } )"
+      case flatMap(Lambda(p@TuplePat(List(pk,pv)),Seq(List(b@Tuple(List(k,_))))),
+                   x@Call("diablo_join",
+                          flatMap(Lambda(_,bx),_)::
+                          flatMap(Lambda(_,by),_)::_))
+        if mapPreserve && irrefutable(p) && (getKey(bx) == k || getKey(by) == k)
+         // mapValues maintains partitioning
+        => val pc = code(p)
+           val (tp,xc) = typedCode(x,env)
+           val nv = TermName(c.freshName("_x"))
+           val bc = codeGen(b,add(p,tp,env))
+           q"mapPreservesPartitioning( $xc, ($nv:$tp) => $nv match { case $pc => $bc } )"
       case flatMap(Lambda(p,Seq(List(b))),x)
         if irrefutable(p)
         => val pc = code(p)

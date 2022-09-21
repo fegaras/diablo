@@ -33,6 +33,7 @@ trait ArrayFunctions {
     estimate(x)
   }
 
+  def array_size ( x: EmptyTuple ): Int = 0
   def array_size ( x: Int ): Int = x
   def array_size ( x: (Int,Int) ): Int = x._1*x._2
   def array_size ( x: (Int,Int,Int) ): Int = x._1*x._2*x._3
@@ -40,6 +41,34 @@ trait ArrayFunctions {
   // an RDD map that preserves partitioning
   def mapPreservesPartitioning[V:ClassTag,U:ClassTag] ( rdd: RDD[V], f: V => U ): RDD[U]
     = rdd.mapPartitions( it => it.map(f), preservesPartitioning = true )
+
+  // map-join or reduce-join based on rdd size
+  final def diablo_join[K:ClassTag, T:ClassTag, S:ClassTag]
+                ( x: RDD[(K,T)], y: RDD[(K,S)],
+                  size_x: Int, size_y: Int, numPartions: Int ): RDD[(K,(T,S))] = {
+    if (size_x > 0 && size_x <= broadcast_limit) {
+      val bc = spark_context.broadcast(x.groupByKey().collectAsMap())
+      y.flatMap { case (i,v) => {
+          var ret: List[(K, (T,S))] = List()
+          for (x_i <- bc.value(i))
+             ret :+= (i,(x_i, v))
+          ret
+        }
+      }
+    } else if (size_y > 0 && size_y <= broadcast_limit) {
+      val bc = spark_context.broadcast(y.groupByKey().collectAsMap())
+      x.flatMap { case (i,v) => {
+          var ret: List[(K, (T,S))] = List()
+          for (y_i <- bc.value(i))
+             ret :+= (i,(v,y_i))
+          ret
+        }
+      }
+    }
+    else {
+      x.join(y, numPartions)
+    }
+  }
 
   // An outer-join for 1-1 join relationship
   @specialized

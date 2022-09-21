@@ -29,6 +29,8 @@ package object diablo extends diablo.ArrayFunctions {
   var block_dim_size = 1000      // size of each dimension of a block tensor
   var number_of_partitions = 10  // num of partitions in shuffling operations
   var data_frames = false        // false for RDD, true for DataFrame
+  var broadcast_limit = 1000000  // max size of RDD for broadcasting
+  var use_map_join = true        // use map-side join, if one of the join inputs has size less than broadcast_limit
   var mapPreserve = true         // use a map that preserves partitioning when applicable
 
   val rddClass = "org.apache.spark.rdd.RDD"
@@ -65,6 +67,8 @@ package object diablo extends diablo.ArrayFunctions {
         case MethodCall(x,"reduceByKey",_)
           => "reduceByKey;\n"+spark_plan(x,tab+1,true)
         case MethodCall(x,"join",y::_)
+          => "join:\n"+spark_plan(x,tab+1,true)+spark_plan(y,tab+1,true)
+        case Call("diablo_join",x::y::_)
           => "join:\n"+spark_plan(x,tab+1,true)+spark_plan(y,tab+1,true)
         case MethodCall(x,"cogroup",y::_)
           => "cogroup:\n"+spark_plan(x,tab+1,true)+spark_plan(y,tab+1,true)
@@ -124,6 +128,7 @@ package object diablo extends diablo.ArrayFunctions {
     s match {
        case "block_dim_size" => block_dim_size = bv
        case "number_of_partitions" => number_of_partitions = bv
+       case "broadcast_limit" => broadcast_limit = bv
        case p => throw new Error("Wrong param: "+p)
     }
     c.Expr[Unit](q"$x = $b")
@@ -141,6 +146,7 @@ package object diablo extends diablo.ArrayFunctions {
        case "groupByJoin" => groupByJoin = bv
        case "parallel" => parallel = bv
        case "mapPreserve" => mapPreserve = bv
+       case "use_map_join" => use_map_join = bv
        case "data_frames"
          => data_frames = bv
             collectionClass = if (data_frames) datasetClass else rddClass

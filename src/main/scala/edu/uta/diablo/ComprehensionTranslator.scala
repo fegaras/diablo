@@ -705,28 +705,23 @@ object ComprehensionTranslator {
                                           case (r,LetBinding(p,e)) => Let(p,e,r)
                                           case (r,_) => r
                                        }
-/*******************************************************************************/
-                    def size ( e: Expr ): Option[Expr]
-                      = e match {
-                          case Lift("rdd",Nth(x,3))
-                            => Some(Call("array_size",List(Nth(x,1))))
-                          case _ => None
-                        }
-                    val join = (size(d1),size(d2)) match {
-                                  case (Some(s1),Some(s2))
-                                    => Call("diablo_join",
-                                            List(s1,s2,left,nright,
+                          def size ( e: Expr ): Expr
+                            = e match {
+                                case Lift("rdd",Nth(x,3))
+                                  => Call("array_size",List(Nth(x,1)))
+                                case _ => IntConst(0)
+                              }
+                          val join = if (use_map_join)
+                                       Call("diablo_join",
+                                            List(left,nright,size(d1),size(d2),
                                                  IntConst(number_of_partitions)))
-                                  case _ => MethodCall(left,"join",
-                                                       List(nright,IntConst(number_of_partitions)))
-                               }
-/*******************************************************************************/
+                                     else MethodCall(left,"join",
+                                                     List(nright,IntConst(number_of_partitions)))
                           val z = Generator(TuplePat(List(p1,p2)),
                                             Lift("rdd",
                                                  flatMap(Lambda(TuplePat(List(VarPat("_k"),VarPat("_x"))),
                                                                 Seq(List(Var("_x")))),
-                                                         MethodCall(left,"join",
-                                                                    List(nright,IntConst(number_of_partitions))))))
+                                                         join)))
                           translate_rdd(hs,qs.flatMap {
                                case Generator(p,_) if p==p1 => List(z) // replace 1st generator with the join
                                case Generator(p,_) if p==p2 => Nil     // remove 2nd generator
