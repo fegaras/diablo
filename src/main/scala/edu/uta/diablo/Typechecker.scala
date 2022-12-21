@@ -265,7 +265,7 @@ object Typechecker {
             => if (env.contains(v))
                  env(v)
                else if (global_env.contains(v))
-                 global_env(v)
+                 import_type(global_env(v),v)
                else import_type(typecheck_var(v). // call the Scala typechecker to find var v
                             getOrElse(throw new Error("Undefined variable: "+v)),v)
           case Nth(u,n)

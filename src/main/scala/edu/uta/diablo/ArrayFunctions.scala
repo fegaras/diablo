@@ -38,6 +38,22 @@ trait ArrayFunctions {
   def array_size ( x: (Int,Int) ): Int = x._1*x._2
   def array_size ( x: (Int,Int,Int) ): Int = x._1*x._2*x._3
 
+  object TensorPartitioner extends org.apache.spark.Partitioner {
+    def numPartitions: Int = number_of_partitions
+    def getPartition ( key: Any ): Int = {
+      val bkey = key match {
+          case i: Int
+            => i/block_dim_size
+          case (i:Int,j:Int)
+            => ( i/block_dim_size, j/block_dim_size )
+          case (i:Int,j:Int,k:Int)
+            => ( i/block_dim_size, j/block_dim_size, k/block_dim_size )
+          case _ => key
+        }
+      Math.abs(bkey.hashCode) % numPartitions
+    }
+  }
+
   // an RDD map that preserves partitioning
   def mapPreservesPartitioning[V:ClassTag,U:ClassTag] ( rdd: RDD[V], f: V => U ): RDD[U]
     = rdd.mapPartitions( it => it.map(f), preservesPartitioning = true )

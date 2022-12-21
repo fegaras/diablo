@@ -120,6 +120,14 @@ object Test {
 
         tensor*(N,N)[ ((i,j),m+1) | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
 
+        tensor*(N,N)[ ((ii,jj),(+/a)/a.length)
+                    | ((i,j),a) <- M1, di <- (-1)..1, dj <- (-1)..1,
+                      let ii = i+di, let jj = j+dj, group by (ii,jj) ];
+
+        tensor*(N,N)[ ((ii,jj),(+/a)/a.length)
+                    | ((i,j),a) <- M2, di <- (-1)..1, dj <- (-1)..1,
+                      let ii = i+di, let jj = j+dj, group by (ii,jj) ];
+
 /* run-time error:
         +/[ m | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
 */

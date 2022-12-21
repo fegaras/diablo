@@ -461,52 +461,69 @@ abstract class CodeGeneration {
         case _ => Seq(Nil)
       }
 
+  def isRDD ( x: Expr, env: Environment ): Boolean = {
+    val xc = codeGen(x,env)
+    getOptionalType(xc,env) match {
+        case Left(tq"$c[$etp]")
+          => c.toString == rddClass
+        case _ => false
+    }
+  }
+
   /** Generate Scala code for expressions */
   def codeGen ( e: Expr, env: Environment ): c.Tree = try {
     e match {
       case flatMap(Lambda(p,Seq(List(b))),x)
         if toExpr(p) == b
         => codeGen(x,env)
+      case flatMap(Lambda(p@TuplePat(List(pk,_)),Seq(List(b@Tuple(List(k,_))))),x)
+        if mapPreserve && irrefutable(p) && toExpr(pk) == k && isRDD(x,env)
+         // mapValues maintains partitioning
+        => val pc = code(p)
+           val (tp,xc) = typedCode(x,env)
+           val nv = TermName(c.freshName("_x"))
+           val bc = codeGen(b,add(p,tp,env))
+           q"$xc.mapPartitions( _.map{ case $pc => $bc }, preservesPartitioning = true )"
       case flatMap(Lambda(p@TuplePat(List(pk,pv)),Seq(List(b@Tuple(List(k,_))))),
                    x@groupBy(flatMap(Lambda(_,bx),_)))
-        if mapPreserve && irrefutable(p) && getKey(bx) == k
+        if mapPreserve && irrefutable(p) && getKey(bx) == k && isRDD(x,env)
          // mapValues maintains partitioning
         => val pc = code(p)
            val (tp,xc) = typedCode(x,env)
            val nv = TermName(c.freshName("_x"))
            val bc = codeGen(b,add(p,tp,env))
-           q"mapPreservesPartitioning( $xc, ($nv:$tp) => $nv match { case $pc => $bc } )"
+           q"$xc.mapPartitions( _.map{ case $pc => $bc }, preservesPartitioning = true )"
       case flatMap(Lambda(p@TuplePat(List(pk,pv)),Seq(List(b@Tuple(List(k,_))))),
                    x@MethodCall(flatMap(Lambda(_,bx),_),"reduceByKey",_))
-        if mapPreserve && irrefutable(p) && getKey(bx) == k
+        if mapPreserve && irrefutable(p) && getKey(bx) == k && isRDD(x,env)
          // mapValues maintains partitioning
         => val pc = code(p)
            val (tp,xc) = typedCode(x,env)
            val nv = TermName(c.freshName("_x"))
            val bc = codeGen(b,add(p,tp,env))
-           q"mapPreservesPartitioning( $xc, ($nv:$tp) => $nv match { case $pc => $bc } )"
+           q"$xc.mapPartitions( _.map{ case $pc => $bc }, preservesPartitioning = true )"
       case flatMap(Lambda(p@TuplePat(List(pk,pv)),Seq(List(b@Tuple(List(k,_))))),
                    x@MethodCall(flatMap(Lambda(_,bx),_),
                                 "join",
                                 flatMap(Lambda(_,by),_)::_))
-        if mapPreserve && irrefutable(p) && (getKey(bx) == k || getKey(by) == k)
+        if mapPreserve && irrefutable(p) && (getKey(bx) == k || getKey(by) == k) && isRDD(x,env)
          // mapValues maintains partitioning
         => val pc = code(p)
            val (tp,xc) = typedCode(x,env)
            val nv = TermName(c.freshName("_x"))
            val bc = codeGen(b,add(p,tp,env))
-           q"mapPreservesPartitioning( $xc, ($nv:$tp) => $nv match { case $pc => $bc } )"
+           q"$xc.mapPartitions( _.map{ case $pc => $bc }, preservesPartitioning = true )"
       case flatMap(Lambda(p@TuplePat(List(pk,pv)),Seq(List(b@Tuple(List(k,_))))),
                    x@Call("diablo_join",
                           flatMap(Lambda(_,bx),_)::
                           flatMap(Lambda(_,by),_)::_))
-        if mapPreserve && irrefutable(p) && (getKey(bx) == k || getKey(by) == k)
+        if mapPreserve && irrefutable(p) && (getKey(bx) == k || getKey(by) == k) && isRDD(x,env)
          // mapValues maintains partitioning
         => val pc = code(p)
            val (tp,xc) = typedCode(x,env)
            val nv = TermName(c.freshName("_x"))
            val bc = codeGen(b,add(p,tp,env))
-           q"mapPreservesPartitioning( $xc, ($nv:$tp) => $nv match { case $pc => $bc } )"
+           q"$xc.mapPartitions( _.map{ case $pc => $bc }, preservesPartitioning = true )"
       case flatMap(Lambda(p,Seq(List(b))),x)
         if irrefutable(p)
         => val pc = code(p)
@@ -559,6 +576,17 @@ abstract class CodeGeneration {
              case tq"($kt,$et)"
                => val bc = codeGen(b,add(p,tq"($et,$et)",env))
                   q"$xc.reduceByKey(($nx:$et,$ny:$et) => ($nx,$ny) match { case $pc => $bc },$nc)"
+             case _ => throw new Error("Wrong reduceByKey: "+e)
+           }
+      case MethodCall(x,"reduceByKeyTensor",List(Lambda(p,b)))
+        => val (tp,xc) = typedCode(x,env)
+           val pc = code(p)
+           val nx = TermName(c.freshName("_x"))
+           val ny = TermName(c.freshName("_y"))
+           tp match {
+             case tq"($kt,$et)"
+               => val bc = codeGen(b,add(p,tq"($et,$et)",env))
+                  q"$xc.reduceByKey(TensorPartitioner,($nx:$et,$ny:$et) => ($nx,$ny) match { case $pc => $bc })"
              case _ => throw new Error("Wrong reduceByKey: "+e)
            }
       case Call("reducer",List(Lambda(p,b),zero))  // DataFrame custom aggregator

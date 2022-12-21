@@ -110,6 +110,14 @@ object Test {
         tensor(N,N)[ ((i,j),tensor(N)[ (ii,(v+1,i+j)) | (ii,v) <- V2 ]) | ((i,j),m) <- M2 ];
         tensor(N,N)[ ((i,j),m+1) | ((i,j),m) <- M1, +/[ v | (ii,v) <- V1 ] < 10 ];
 
+        tensor(N,N)[ ((ii,jj),(+/a)/a.length)
+                   | ((i,j),a) <- M1, di <- (-1)..1, dj <- (-1)..1,
+                     let ii = i+di, let jj = j+dj, group by (ii,jj) ];
+
+        tensor(N,N)[ ((ii,jj),(+/a)/a.length)
+                   | ((i,j),a) <- M2, di <- (-1)..1, dj <- (-1)..1,
+                     let ii = i+di, let jj = j+dj, group by (ii,jj) ];
+
         tensor(N)[ (i,tensor(N) w) | ((i,j),m) <- M2, let w = (j,m), group by i ];
 
         map[ (i,v+1) | (i,v) <- V2 ];

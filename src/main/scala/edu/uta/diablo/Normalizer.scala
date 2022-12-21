@@ -226,6 +226,22 @@ object Normalizer {
       case q::r => q::normalize(head,r,env,opts)
     }
 
+  def isRepeated ( v: String, h: Expr, qs: List[Qualifier], first: Boolean ): Boolean = {
+      def f ( e: Expr ): Boolean = if (first) isRepeated(v,e) else occurrences(v,e) >= 1
+      qs match {
+         case Generator(p,u)::r
+           => f(u) || (if (patvars(p).contains(v)) false else isRepeated(v,h,r,false))
+         case Predicate(u)::r
+           => f(u) || isRepeated(v,h,r,first)
+         case GroupByQual(p,u)::r
+           => f(u) || (if (patvars(p).contains(v)) false else isRepeated(v,h,r,false))
+         case LetBinding(p,u)::r
+           => f(u) || (if (patvars(p).contains(v)) false else isRepeated(v,h,r,false))
+         case Nil => f(h)
+         case _ => false
+      }
+  }
+
   def isRepeated ( v: String, e: Expr ): Boolean
     = e match {
         case flatMap(Lambda(p,b),u)
@@ -233,14 +249,16 @@ object Normalizer {
           => isRepeated(v,u)
         case flatMap(Lambda(p,b),u)
           => occurrences(v,b) >= 1 || isRepeated(v,b) || isRepeated(v,u)
-        case Comprehension(_,_)
-          => occurrences(v,e) >= 1
+        case Comprehension(h,gs)
+          => isRepeated(v,h,gs,true)
         case _ => accumulate[Boolean](e,isRepeated(v,_),_||_,false)
       }
 
   /** normalize an expression */
   def normalize ( e: Expr ): Expr =
     e match {
+//      case MethodCall(_,"parallelize",List(MethodCall(MethodCall(x,"collect",null),"toList",null)))
+//        => normalize(x)
       case Apply(Lambda(p,b),u)
         => normalize(Let(p,u,b))
       case Let(VarPat(v),u,b)   // if v appears in a flatMap body, don't subst

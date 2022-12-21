@@ -322,8 +322,9 @@ object ComprehensionTranslator {
                                 case _ => Nil
                               }
                    // the traversal indices are i1, i2, ... with i1<d1, i2<d2, ...
-                   val conds = all_dims.zipWithIndex.map {
-                                  case (d,i) => Predicate(MethodCall(Var("i"+(i+1)),"<",List(d)))
+                   val conds = all_dims.zipWithIndex.flatMap {
+                                  case (d,i) => List(Predicate(MethodCall(Var("i"+(i+1)),">=",List(IntConst(0)))),
+                                                     Predicate(MethodCall(Var("i"+(i+1)),"<",List(d))))
                                }
                    val nqs = qs++(LetBinding(tuple(1.to(ndims).map(i => VarPat("i"+i)).toList),k)::
                                   conds++xvincr++incr)
@@ -668,6 +669,10 @@ object ComprehensionTranslator {
                    val red = MethodCall(Store("rdd",Nil,Nil,       // type parameter?
                                               Comprehension(Tuple(List(k,tuple(gs))),r)),
                                         "reduceByKey",List(m,IntConst(number_of_partitions)))
+/*
+                   val red = MethodCall(optimize(translate_rdd(Tuple(List(k,tuple(gs))),r,vars)),
+                                        "reduceByKey",List(m,IntConst(number_of_partitions)))
+*/
                    translate_rdd(nh,Generator(TuplePat(List(p,tuple(env.map(x => VarPat(x._2))))),
                                               red)::ns,vars)
               case _
@@ -1275,14 +1280,6 @@ object ComprehensionTranslator {
                    val rt = findReducedTerms(yieldReductions(Comprehension(hs,s),usedVars),
                                              usedVars).distinct
                    assert(rt.nonEmpty,"Expected aggregations in a group-by comprehension")
-                   val gs = rt.map(_._2)
-                              .map{ case reduce(_,Var(v))
-                                      => Var(v)
-                                    case reduce(_,flatMap(Lambda(p,Seq(List(u))),Var(v)))
-                                      => Apply(Lambda(p,u),Var(v))
-                                    case e
-                                      => Seq(List(e))
-                                  }
                    val ms = rt.map{ case (_,reduce(m,_)) => m
                                     case (_,_) => "++"
                                   }
@@ -1482,7 +1479,12 @@ object ComprehensionTranslator {
 
 /* -------------------- translate block tensor comprehensions -----------------------------------------*/
 
-  var QLcache: Option[Expr] = None
+  def makeTensorReduceByKey ( e: Expr ): Expr
+    = e match {
+        case MethodCall(u,"reduceByKey",f::_)
+          => MethodCall(makeTensorReduceByKey(u),"reduceByKeyTensor",List(f))
+        case _ => apply(e,makeTensorReduceByKey)
+      }
 
   def translate_tiled ( block: String, hs: Expr, qs: List[Qualifier], vars: List[String],
                         tp: Type, dims: List[Expr] ): Expr
@@ -1494,15 +1496,17 @@ object ComprehensionTranslator {
         if shuffles_tiles(p,qs)
         => shuffle_tiles(block,hs,qs,vars,tp,dims)
       case Tuple(List(kp,_))   // group-by tiled comprehension with group-by-key == comprehension key
+                               //  and this key is from tensor indices
         if hasGroupByTiling(qs,kp)
         => groupBy_tiles(block,hs,qs,vars,tp,dims)
-        case _
-          if is_rdd_comprehension(qs)
+      case _
+        if is_rdd_comprehension(qs)
           // Any other tiled comprehension that depends on RDDs and block tensors
-          => val rdd = translate_dataset(hs,qs,vars)
-             store(block,List(tp),dims,Lift("rdd",rdd))
-        case _
-          => store(block,List(tp),dims,translate(Comprehension(hs,qs),vars))
+        => val rdd = translate_dataset(hs,qs,vars)
+           val res = translate(store(block,List(tp),dims,Lift("rdd",rdd)),vars)
+           makeTensorReduceByKey(res)
+      case _
+        => store(block,List(tp),dims,translate(Comprehension(hs,qs),vars))
     }
 
 
