@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2022 University of Texas at Arlington
+ * Copyright © 2020-2023 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -203,8 +203,8 @@ object Normalizer {
       case LetBinding(TuplePat(ps),Tuple(es))::r
         => normalize(head,(ps zip es).map{ case (p,e) => LetBinding(p,e) }++r,env,opts)
       case LetBinding(p@VarPat(v),u)::r
-        => if (notGrouped(p,head,r) && ((isSimple(u) || occurrences(v,Comprehension(head,r)) <= 1)
-                                        && !isRepeated(v,head)))
+        => if (notGrouped(p,head,r) && (isSimple(u) || occurrences(v,Comprehension(head,r)) <= 1))
+//   why? nested tiled fails with this                                     && !isRepeated(v,head)))
              normalize(head,r,bindEnv(p,normalize(substE(u,env)))++freeEnv(p,env),opts)
            else LetBinding(p,normalize(substE(u,env)))::normalize(head,r,env,opts)
       case LetBinding(p,u)::r
@@ -257,8 +257,6 @@ object Normalizer {
   /** normalize an expression */
   def normalize ( e: Expr ): Expr =
     e match {
-//      case MethodCall(_,"parallelize",List(MethodCall(MethodCall(x,"collect",null),"toList",null)))
-//        => normalize(x)
       case Apply(Lambda(p,b),u)
         => normalize(Let(p,u,b))
       case Let(VarPat(v),u,b)   // if v appears in a flatMap body, don't subst

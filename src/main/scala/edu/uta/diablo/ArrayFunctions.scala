@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2022 University of Texas at Arlington
+ * Copyright © 2020-2023 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -66,8 +66,9 @@ trait ArrayFunctions {
       val bc = spark_context.broadcast(x.groupByKey().collectAsMap())
       y.flatMap { case (i,v) => {
           var ret: List[(K, (T,S))] = List()
-          for (x_i <- bc.value(i))
-             ret :+= (i,(x_i, v))
+          if (bc.value.contains(i))
+             for (x_i <- bc.value(i))
+                ret :+= (i,(x_i, v))
           ret
         }
       }
@@ -75,14 +76,31 @@ trait ArrayFunctions {
       val bc = spark_context.broadcast(y.groupByKey().collectAsMap())
       x.flatMap { case (i,v) => {
           var ret: List[(K, (T,S))] = List()
-          for (y_i <- bc.value(i))
-             ret :+= (i,(v,y_i))
+          if (bc.value.contains(i))
+             for (y_i <- bc.value(i))
+                ret :+= (i,(v,y_i))
           ret
         }
       }
     }
     else {
       x.join(y, numPartions)
+    }
+  }
+
+  // map-join or reduce-join based on rdd size
+  final def diablo_cogroup[K:ClassTag, T:ClassTag, S:ClassTag]
+                ( x: RDD[(K,T)], y: RDD[(K,S)],
+                  size_x: Int, size_y: Int, numPartions: Int ): RDD[(K,(Iterable[T],Iterable[S]))] = {
+    if (size_x > 0 && size_x <= broadcast_limit) {
+      val bc = spark_context.broadcast(x.groupByKey().collectAsMap())
+      y.groupByKey().map{ case (i,ys) => (i,(if (bc.value.contains(i)) bc.value(i) else Nil,ys)) }
+    } else if (size_y > 0 && size_y <= broadcast_limit) {
+      val bc = spark_context.broadcast(y.groupByKey().collectAsMap())
+      x.groupByKey().map{ case (i,xs) => (i,(xs,if (bc.value.contains(i)) bc.value(i) else Nil)) }
+    }
+    else {
+      x.cogroup(y, numPartions)
     }
   }
 

@@ -128,18 +128,16 @@ object Test {
                     | ((i,j),a) <- M2, di <- (-1)..1, dj <- (-1)..1,
                       let ii = i+di, let jj = j+dj, group by (ii,jj) ];
 
-/* run-time error:
-        +/[ m | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
-*/
-/* Can't compile: group-by key != comprehension key:
         tensor*(10)[ (i%10,+/m) | ((i,j),m) <- M1, group by i ];
         tensor*(10)[ (i%10,(+/m)/m.length) | ((i,j),m) <- M2, group by i ];
 
         tensor*(10,20)[ (k,+/m) | ((i,j),m) <- M1, group by k: (i%10,j%20) ];
-        rdd[ (k,+/m) | ((i,j),m) <- M1, group by k: (i%10,j%20) ];
 
         tensor*(N,N,10)[ ((i,j,(i+j)%10),+/v) | ((i,k),m) <- M1, ((kk,j),n) <- M1, kk==k, let v = m*n, group by (i,j) ];
         tensor*(N)(N,10)[ ((i,j,(i+j)%10),+/v) | ((i,k),m) <- M2, ((kk,j),n) <- M1, kk==k, let v = m*n, group by (i,j) ];
+
+/* run-time error:
+        +/[ m | ((i,j),m) <- M1, (+/[ v | ((ii,jj),v) <- M1, ii == i, jj == j ]) < 10 ];
 */
 
     """)

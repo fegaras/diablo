@@ -1,5 +1,5 @@
 /*
- * Copyright © 2022 University of Texas at Arlington
+ * Copyright © 2022-2023 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,8 @@ object SQLGenerator {
   import Typechecker.{tuple=>_,_}
 
   type Env = Map[String,Expr]
+
+  val dataFrameClass = "org.apache.spark.sql.DataFrame"
 
   var sql_tables: List[String] = Nil
 
@@ -281,7 +283,7 @@ object SQLGenerator {
 
   def make_sql ( sql: String ): Expr = {
     val rv = newvar
-    Block((VarDecl(rv,BasicType("DataFrame"),
+    Block((VarDecl(rv,BasicType(dataFrameClass),
                        Seq(List(MethodCall(Var("spark"),"sql",List(StringConst(sql))))))
            ::sql_tables.distinct.map(v => MethodCall(MethodCall(Var("spark"),"catalog",null),
                                                      "dropTempView",
@@ -304,8 +306,14 @@ object SQLGenerator {
     clean(h)   // clear cached types
     sql_tables = Nil
     val (SQL(ts,f,l,w,g,hv),el) = translate(h,qs,global_env)
-    val sql = toSQL(SQL(List(Call(sql_udafs(op),ts)),f,l,w,g,hv))
-    Block( el:+make_sql(sql) )
+    // total aggregation needs more work
+    //val sql = toSQL(SQL(List(Call(sql_udafs(op),ts)),f,l,w,g,hv))
+    val sql = toSQL(SQL(ts,f,l,w,g,hv))
+    //Block( el:+make_sql(sql) )
+    reduce(op,
+           flatMap(Lambda(VarPat("x"),Seq(List(MethodCall(Var("x"),"getDouble",List(IntConst(0)))))),
+                   MethodCall(Block( el:+make_sql(sql) ),
+                              "rdd",null)))
   }
 
   def translate_sql ( h: Expr, qs: List[Qualifier], acc: Lambda, zero: Expr, map: Option[Lambda] ): Expr = {

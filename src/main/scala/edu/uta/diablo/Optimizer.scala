@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2022 University of Texas at Arlington
+ * Copyright © 2020-2023 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -351,7 +351,7 @@ object Optimizer {
                       case _
                         => // a group-by on a unique key
                            qs.span{ case Generator(TuplePat(List(k,v)),u)
-                                      if ComprehensionTranslator.isTiled(u)
+                                      if TiledTranslator.isTiled(u)
                                       => false
                                     case _ => true } match {
                              case (r,(x@Generator(TuplePat(List(k,v)),u))::(s:+GroupByQual(p,gk)))

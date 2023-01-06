@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2022 University of Texas at Arlington
+ * Copyright © 2020-2023 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ object Typechecker {
     var typecheck_method: ( Type, String, List[Type] ) => Option[Type] = _
     var typecheck_var: String => Option[Type] = _
 
-    val collection_names = List("array","map","List",collectionClass)
+    val collection_names = List("array","map","List","Iterable",rddClass,datasetClass)
 
     val system_functions = List("binarySearch","zero","array2tensor","array2tensor_bool")
 
@@ -369,7 +369,8 @@ object Typechecker {
                val ev = tmatch(st,typecheck(ne,env))
                substType(at,ev)
           case x@Store(f,tps,args,u)
-            => tps match {
+            => typecheck(u,env)
+               tps match {
                  case List(BasicType("Boolean"))
                    => f match {
                         case tpat(full,_,dn,sn) if sn.toInt > 0
@@ -384,8 +385,10 @@ object Typechecker {
                }
                getTypeMap(x.mapping)
                args.map(typecheck(_,env))
-               typecheck(u,env)
                StorageType(x.mapping,tps,args)
+          case Call("merge_tensors",List(x,y,_,_))
+            => typecheck(x,env)
+               typecheck(y,env)
           case x@Call(f,args@(_:+l))
             if (f match { case tpat(_,_,_,_) => true; case btpat(_,_,_,_) => true; case _ => false })
             => typecheck(l,env) match {
@@ -462,11 +465,12 @@ object Typechecker {
                                   }
                typecheck_call(f,tas)
                  .getOrElse(throw new Error("Wrong function call: "+e+" for type "+tas))
-          case MethodCall(u,"reduceByKey",List(Lambda(TuplePat(List(p1,p2)),b)))
-            => val tu = typecheck(u,env)
-               val TupleType(List(_,tp)) = elemType(tu)
-               typecheck_method(tu,"reduceByKey",List(FunctionType(TupleType(List(tp,tp)),tp)))
-                 .getOrElse(throw new Error("Wrong method call: "+e+" for type "+tu))
+          case MethodCall(_,"register",_)
+            => intType
+          case MethodCall(u,"reduceByKey",_)
+            => typecheck(u,env)
+          case MethodCall(u,"reduce",_)
+            => elemType(typecheck(u,env))
           case MethodCall(u,m,null)
             => // call the Scala typechecker to find method m
                val tu = typecheck(u,env)
@@ -491,7 +495,7 @@ object Typechecker {
                val tu = typecheck(u,env)
                val tas = args.map(typecheck(_,env))
                typecheck_method(tu,m,tas)
-                 .getOrElse(throw new Error("Wrong method call: "+e+" for type "+tu+"."+tas))
+                 .getOrElse(throw new Error("Wrong method call: "+e+" for type "+tu+"  ("+tas+")"))
           case IfE(p,a,b)
             => if (typecheck(p,env) != boolType)
                  throw new Error("The if-expression condition "+p+" must be a boolean")
@@ -510,7 +514,8 @@ object Typechecker {
                   case _ => throw new Error("Expected a function "+f)
                }
           case Coerce(x,tp)
-            => tp
+            => typecheck(x,env)
+               tp
           case Lambda(p,b)   // fix: needs type inference
             => val tp = TypeParameter(newvar)
                FunctionType(tp,typecheck(b,bindPattern(p,tp,env)))
@@ -525,7 +530,8 @@ object Typechecker {
                    throw new Error("Incompatible types in Merge: "+e+" (found "+xtp+" and "+ytp+")")
                xtp
           case flatMap(Lambda(p,b),u)
-            => val nenv = unfold_storage_type(typecheck(u,env)) match {
+            => val utp = unfold_storage_type(typecheck(u,env))
+               val nenv = utp match {
                             case ArrayType(d,t)
                               => bindPattern(p,tuple(List(tuple((1 to d).map(i => longType).toList),t)),env)
                             case MapType(k,v)
@@ -537,7 +543,15 @@ object Typechecker {
                               => bindPattern(p,t,env)
                             case t => throw new Error("Expected a collection type in "+e+" (found "+t+")")
                          }
-               typecheck(b,nenv)
+               val btp = typecheck(b,nenv)
+               utp match {
+                 case ArrayType(d,_)
+                   => ArrayType(d,elemType(btp))
+                 case ParametricType(c,List(_))
+                   if isCollection(c)
+                   => ParametricType(c,List(elemType(btp)))
+                 case _ => btp
+               }
           case groupBy(u)
             => unfold_storage_type(typecheck(u,env)) match {
                  case ArrayType(d,t)

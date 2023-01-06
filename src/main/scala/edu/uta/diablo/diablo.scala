@@ -1,5 +1,5 @@
 /*
- * Copyright © 2020-2022 University of Texas at Arlington
+ * Copyright © 2020-2023 University of Texas at Arlington
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,8 @@ package object diablo extends diablo.ArrayFunctions {
           => "groupBy:\n"+spark_plan(x,tab+1,true)
         case Tuple(l)
           => l.map(spark_plan(_,tab,false)).mkString("")
+        case MethodCall(x,"reduce",_)
+          => "reduce:\n"+spark_plan(x,tab+1,true)
         case MethodCall(x,"reduceByKey",_)
           => "reduceByKey:\n"+spark_plan(x,tab+1,true)
         case MethodCall(x,"reduceByKeyTensor",_)
@@ -75,6 +77,8 @@ package object diablo extends diablo.ArrayFunctions {
           => "join:\n"+spark_plan(x,tab+1,true)+spark_plan(y,tab+1,true)
         case Call("diablo_join",x::y::_)
           => "join:\n"+spark_plan(x,tab+1,true)+spark_plan(y,tab+1,true)
+        case Call("diablo_cogroup",x::y::_)
+          => "cogroup:\n"+spark_plan(x,tab+1,true)+spark_plan(y,tab+1,true)
         case MethodCall(x,"cogroup",y::_)
           => "cogroup:\n"+spark_plan(x,tab+1,true)+spark_plan(y,tab+1,true)
         case MethodCall(_,"parallelize",_)
@@ -111,8 +115,16 @@ package object diablo extends diablo.ArrayFunctions {
     val le = opt(Lifting.lift(n))
     if (trace) println("Lifted comprehension:\n"+Pretty.print(le))
     Typechecker.clean(le)
-    Typechecker.typecheck(le)  // the ComprehensionTranslator needs type info
-    val to = opt(ComprehensionTranslator.translate(le))
+    Typechecker.typecheck(le)
+    val te = opt(TiledTranslator.translate_tiled(le,Nil))
+    if (trace) println("Translated tiled comprehension:\n"+Pretty.print(te))
+    Typechecker.clean(te)
+    Typechecker.typecheck(te)
+    val ce = opt(RDDTranslator.translate_rdd(te,Nil))
+    if (trace) println("Translated RDD comprehension:\n"+Pretty.print(ce))
+    Typechecker.clean(ce)
+    Typechecker.typecheck(ce)
+    val to = opt(ComprehensionTranslator.translate(ce,Nil))
     val pc = if (parallel) ComprehensionTranslator.parallelize(to) else to
     if (trace) println("Compiled comprehension:\n"+Pretty.print(pc))
     val ec = cg.codeGen(pc,env)
